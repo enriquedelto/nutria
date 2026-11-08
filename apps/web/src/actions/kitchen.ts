@@ -118,7 +118,7 @@ export async function discardBatch(id: string) {
 
 const EatIn = z.object({
   personId: uuid,
-  date: z.string().regex(/^d{4}-d{2}-d{2}$/),
+  date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
   mealSlot: z.string().min(1).max(40),
   portions: z.number().min(0.25).max(20).default(1),
 });

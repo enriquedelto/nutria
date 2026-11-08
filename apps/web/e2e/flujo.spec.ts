@@ -73,7 +73,7 @@ test("lo registrado por la IA se puede deshacer", async () => {
   await page.goto("/registrar");
   await page.getByPlaceholder(/lentejas con chorizo/).fill("Otra tortilla");
   await page.getByRole("button", { name: "Analizar" }).click();
-  await page.getByRole("button", { name: /^Registrar d+ kcal/ }).click();
+  await page.getByRole("button", { name: /^Registrar \d+ kcal/ }).click();
   await page.getByRole("button", { name: "Deshacer" }).click();
   await expect(page.getByText("Registro deshecho")).toBeVisible();
   await page.goto("/diario");
@@ -182,7 +182,7 @@ test("MCP: token personal de solo lectura", async () => {
   await page.getByLabel("Nombre").fill("E2E");
   await page.getByRole("button", { name: "Crear" }).click();
   const secret = page.getByText("Cópialo ahora").locator("..").locator("code");
-  await expect(secret).toHaveText(/S{20,}/);
+  await expect(secret).toHaveText(/\S{20,}/);
   const token = (await secret.textContent())!.trim();
   const rpc = async (method: string, params: unknown) => {
     const res = await page.request.post("/api/mcp", {
@@ -212,10 +212,7 @@ test("exportar JSON/CSV e importar un CSV", async () => {
   expect(csv.headers()["content-type"]).toContain("text/csv");
   expect(await csv.text()).toContain("Tortilla de patatas");
 
-  await page.locator("input[type=file]").setInputFiles({ name: "cronometer.csv", mimeType: "text/csv", buffer: Buffer.from("Day,Food Name,Amount,Energy (kcal),Protein (g),Carbs (g),Fat (g)
-2026-11-01,Yogur importado,125 g,80,5,6,3
-2026-11-01,Pan importado,60 g,150,5,30,1
-") });
+  await page.locator("input[type=file]").setInputFiles({ name: "cronometer.csv", mimeType: "text/csv", buffer: Buffer.from("Day,Food Name,Amount,Energy (kcal),Protein (g),Carbs (g),Fat (g)\n2026-11-01,Yogur importado,125 g,80,5,6,3\n2026-11-01,Pan importado,60 g,150,5,30,1\n") });
   await expect(page.getByText("Importación en cola")).toBeVisible();
   await expect(async () => {
     await page.reload();
@@ -235,14 +232,14 @@ test("profesional: solo lectura de lo compartido y notas", async ({ browser }) =
   await dialog.getByLabel("Correo").fill(PRO.email);
   await dialog.getByRole("button", { name: "Crear invitación" }).click();
   const link = dialog.locator("input[readonly]");
-  await expect(link).toHaveValue(//invitacion//);
+  await expect(link).toHaveValue(/\/invitacion\//);
   const url = new URL(await link.inputValue());
   const ana = page.url();
 
   const pro = await (await browser.newContext()).newPage();
   await pro.goto(url.pathname);
   await signUp(pro, PRO);
-  await expect(pro).toHaveURL(//bienvenida/);
+  await expect(pro).toHaveURL(/\/bienvenida/);
   await pro.goto("/familia");
   await expect(pro.getByText("Personas que sigues")).toBeVisible();
   await pro.getByRole("link", { name: /Ana Prueba/ }).click();
@@ -251,7 +248,7 @@ test("profesional: solo lectura de lo compartido y notas", async ({ browser }) =
   await pro.getByRole("button", { name: "Añadir nota" }).click();
   await expect(pro.getByText("Subir legumbres a 4 veces por semana")).toBeVisible();
   await pro.getByRole("button", { name: "Ver su día" }).click();
-  await expect(pro).toHaveURL(//hoy/);
+  await expect(pro).toHaveURL(/\/hoy/);
   await expect(pro.getByText("Solo lectura")).toBeVisible();
   await pro.goto("/diario");
   await expect(pro.getByText("Tortilla de patatas").first()).toBeVisible();
