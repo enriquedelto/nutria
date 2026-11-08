@@ -124,7 +124,7 @@ export const foods = pgTable(
     uniqueIndex("foods_source_uq").on(t.source, t.sourceId).where(sql`${t.sourceId} is not null`),
     index("foods_barcode_idx").on(t.barcode),
     index("foods_group_idx").on(t.groupId),
-    index("foods_name_trgm_idx").using("gin", sql`(coalesce(${t.nameEs}, ${t.name}) || ' ' || coalesce(${t.brand}, '')) gin_trgm_ops`),
+    index("foods_name_trgm_idx").using("gin", sql`f_unaccent(lower(coalesce(${t.nameEs}, ${t.name}) || ' ' || coalesce(${t.brand}, ''))) gin_trgm_ops`),
     index("foods_categories_idx").using("gin", t.categories),
   ],
 );

@@ -1,0 +1,2 @@
+DROP INDEX "foods_name_trgm_idx";--> statement-breakpoint
+CREATE INDEX "foods_name_trgm_idx" ON "foods" USING gin (f_unaccent(lower(coalesce("name_es", "name") || ' ' || coalesce("brand", ''))) gin_trgm_ops);

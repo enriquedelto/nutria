@@ -1,9 +1,12 @@
-import { drizzle, type PostgresJsDatabase } from "drizzle-orm/postgres-js";
+import { drizzle } from "drizzle-orm/postgres-js";
+import type { PgDatabase } from "drizzle-orm/pg-core";
 import postgres from "postgres";
 import * as schema from "./schema";
 
 export type Schema = typeof schema;
-export type Database = PostgresJsDatabase<Schema>;
+/** Driver-agnostic handle (postgres.js in prod, PGlite in tests). */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+export type Database = PgDatabase<any, Schema>;
 
 declare global {
   // eslint-disable-next-line no-var
