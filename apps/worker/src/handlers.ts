@@ -45,7 +45,7 @@ import {
   type JobName,
   type JobPayloads,
 } from "@nutria/core";
-import { CIQUAL_ZIP_URL, decodeLatin1, extractVideo, parseCiqual } from "@nutria/integrations";
+import { CIQUAL_ZIP_FALLBACK_URL, CIQUAL_ZIP_URL, decodeLatin1, extractVideo, parseCiqual } from "@nutria/integrations";
 import { addDays, todayIn, weekStart } from "@nutria/nutrition";
 import { ACCESS_SCOPES } from "@nutria/db/schema";
 import { log } from "./log";
@@ -150,7 +150,8 @@ export const handlers: Handlers = {
       const [c] = await db.select({ n: sql<number>`count(*)::int` }).from(foods).where(eq(foods.source, "ciqual"));
       if ((c?.n ?? 0) > 1000) return { skipped: "ya importado", foods: c!.n };
     }
-    const r = await fetch(url ?? CIQUAL_ZIP_URL, { signal });
+    let r = await fetch(url ?? CIQUAL_ZIP_URL, { signal });
+    if (!r.ok && !url) r = await fetch(CIQUAL_ZIP_FALLBACK_URL, { signal });
     if (!r.ok) throw new Error(`Descarga CIQUAL ${r.status}`);
     const files = unzipSync(new Uint8Array(await r.arrayBuffer()));
     const pick = (prefix: string) => {

@@ -5,6 +5,8 @@
 import type { CiqualRow } from "@nutria/nutrition";
 
 export const CIQUAL_ZIP_URL = "https://ciqual.anses.fr/cms/sites/default/files/inline-files/XML_2020_07_07.zip";
+/** Same official file archived by the Wayback Machine, for when ANSES is down (it goes into maintenance). */
+export const CIQUAL_ZIP_FALLBACK_URL = "https://web.archive.org/web/2024id_/https://ciqual.anses.fr/cms/sites/default/files/inline-files/XML_2020_07_07.zip";
 
 const tag = (block: string, name: string) => {
   const m = block.match(new RegExp(`<${name}>\\s*([\\s\\S]*?)\\s*</${name}>`));
