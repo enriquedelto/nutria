@@ -200,10 +200,15 @@ export async function extractLabReport(c: PersonFeatureCtx, doc: { pdf?: string;
 /* -------------------------------- recipes -------------------------------- */
 
 /** Structure a recipe from page text / video description + transcript. */
-export async function structureRecipe(c: FeatureCtx, input: { text: string; sourceUrl?: string; sourceType: "url" | "video" | "text" }) {
+export async function structureRecipe(c: FeatureCtx, input: { text: string; sourceUrl?: string; sourceType: "url" | "video" | "text"; imageUrl?: string | null; estimateId?: string }) {
   const { data, model } = await call(c, "recipe_structure", PROMPTS.recipe, [{ type: "text", text: `${input.sourceUrl ? `Fuente: ${input.sourceUrl}\n\n` : ""}${input.text.slice(0, 60_000)}` }], S.RecipeStructure, "low");
-  const estimateId = await saveEstimate(c, { kind: "recipe", input: { sourceUrl: input.sourceUrl ?? null, sourceType: input.sourceType }, output: data, model });
-  return { estimateId, ...data };
+  const output = { ...data, imageUrl: input.imageUrl ?? null, sourceUrl: input.sourceUrl ?? null };
+  if (input.estimateId) {
+    await c.db.update(aiEstimates).set({ output, status: "pending", model }).where(eq(aiEstimates.id, input.estimateId));
+    return { estimateId: input.estimateId, ...output };
+  }
+  const estimateId = await saveEstimate(c, { kind: "recipe", input: { sourceUrl: input.sourceUrl ?? null, sourceType: input.sourceType }, output, model });
+  return { estimateId, ...output };
 }
 
 export async function suggestSubstitutions(c: PersonFeatureCtx, input: { recipeTitle: string; ingredients: string[]; reason: string }) {

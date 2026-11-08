@@ -1,5 +1,5 @@
 {
-  "name": "worker",
+  "name": "@nutria/worker",
   "version": "0.1.0",
   "private": true,
   "type": "module",
@@ -9,7 +9,21 @@
     "typecheck": "tsc -p tsconfig.json"
   },
   "dependencies": {
+    "@nutria/ai": "workspace:*",
+    "@nutria/core": "workspace:*",
     "@nutria/db": "workspace:*",
+    "@nutria/integrations": "workspace:*",
+    "@nutria/nutrition": "workspace:*",
+    "fflate": "^0.8.3",
+    "pg-boss": "^12.38.1",
+    "web-push": "^4.0.0",
     "zod": "^4.6.7"
+  },
+  "devDependencies": {
+    "@electric-sql/pglite": "0.5.15",
+    "@types/node": "^26.6.6",
+    "@types/web-push": "^3.6.4",
+    "tsx": "^4.23.15",
+    "typescript": "^7.0.2"
   }
 }

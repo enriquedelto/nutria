@@ -1,5 +1,5 @@
 /** Queries shared by web, worker and AI tools. */
-import { and, desc, eq, inArray, isNull, or, sql } from "drizzle-orm";
+import { and, desc, eq, inArray, isNull, ne, or, sql } from "drizzle-orm";
 import { ACCESS_SCOPES, foods, personAccess, persons, type AccessScope } from "./schema";
 import type { Database } from "./client";
 
@@ -30,7 +30,8 @@ export async function searchFoods(db: Database, q: string, o: FoodSearchOptions 
     visible(o.groupId),
   ];
   if (o.kinds?.length) conds.push(inArray(foods.kind, o.kinds));
-  if (o.sources?.length) conds.push(inArray(foods.source, o.sources));
+  // Store catalogue rows (prices/cart, usually without nutrition) only when explicitly asked for.
+  conds.push(o.sources?.length ? inArray(foods.source, o.sources) : ne(foods.source, "store"));
   return db
     .select()
     .from(foods)
