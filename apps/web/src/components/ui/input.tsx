@@ -1,3 +1,4 @@
+import { Children, cloneElement, isValidElement, useId } from "react";
 import { cn } from "@/lib/utils";
 
 const field =
@@ -22,12 +23,22 @@ export function Label({ className, ...p }: React.ComponentProps<"label">) {
   return <label className={cn("mb-1 block text-sm font-medium text-ink-2", className)} {...p} />;
 }
 
+const FORM_CONTROLS: unknown[] = [Input, Textarea, Select, "input", "select", "textarea"];
+
+/**
+ * Label + control + hint. When the only child is a form control, the label is tied to it
+ * (htmlFor/id) and the hint becomes its description, so screen readers and getByLabel work.
+ */
 export function Field({ label, hint, error, children, className, htmlFor }: { label: React.ReactNode; hint?: React.ReactNode; error?: string | null; children: React.ReactNode; className?: string; htmlFor?: string }) {
+  const auto = useId();
+  const only = Children.count(children) === 1 && isValidElement<{ id?: string; "aria-describedby"?: string }>(children) && FORM_CONTROLS.includes(children.type) ? children : null;
+  const id = htmlFor ?? only?.props.id ?? (only ? auto : undefined);
+  const descId = (hint || error) && only ? `${auto}-d` : undefined;
   return (
     <div className={cn("space-y-1", className)}>
-      <Label htmlFor={htmlFor}>{label}</Label>
-      {children}
-      {error ? <p className="text-sm text-danger">{error}</p> : hint ? <p className="text-xs text-ink-3">{hint}</p> : null}
+      <Label htmlFor={id}>{label}</Label>
+      {only ? cloneElement(only, { id, "aria-describedby": [only.props["aria-describedby"], descId].filter(Boolean).join(" ") || undefined }) : children}
+      {error ? <p id={descId} className="text-sm text-danger">{error}</p> : hint ? <p id={descId} className="text-xs text-ink-3">{hint}</p> : null}
     </div>
   );
 }

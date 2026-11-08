@@ -16,3 +16,5 @@ playwright-report/
 test-results/
 .next-docs/
 apps/web/public/sw.js
+apps/web/playwright-report/
+apps/web/test-results/

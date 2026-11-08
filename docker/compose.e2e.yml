@@ -1,0 +1,53 @@
+# Instancia desechable para E2E (IA simulada, BD en memoria). No toca la de producción.
+#   docker compose -f docker/compose.e2e.yml up -d     → http://127.0.0.1:8131
+#   docker compose -f docker/compose.e2e.yml down -v   → se borra todo
+name: nutria-e2e
+
+x-app: &app
+  image: nutria-app:latest
+  environment: &env
+    DATABASE_URL: postgres://nutria:e2e@postgres:5432/nutria
+    BETTER_AUTH_URL: http://localhost:8131
+    BETTER_AUTH_SECRET: e2e-secret-e2e-secret-e2e-secret-0000
+    APP_ENCRYPTION_KEY: MDEyMzQ1Njc4OWFiY2RlZjAxMjM0NTY3ODlhYmNkZWY=
+    AI_BACKEND: mock
+    SKIP_PREMIGRATE_SNAPSHOT: "1"
+    OFF_USER_AGENT: Nutria-e2e/0.1
+  tmpfs:
+    - /data/uploads
+  depends_on:
+    postgres:
+      condition: service_healthy
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: nutria
+      POSTGRES_USER: nutria
+      POSTGRES_PASSWORD: e2e
+    tmpfs:
+      - /var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U nutria -d nutria"]
+      interval: 2s
+      retries: 30
+
+  migrate:
+    <<: *app
+    command: ["sh", "-c", "pnpm db:migrate && pnpm db:seed"]
+
+  web:
+    <<: *app
+    ports:
+      - "127.0.0.1:8131:3000"
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+
+  worker:
+    <<: *app
+    command: ["pnpm", "worker"]
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
