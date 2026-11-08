@@ -74,6 +74,23 @@ describe("cuentas", () => {
   });
 });
 
+describe("profesional", () => {
+  it("la invitación de profesional da acceso de solo lectura que caduca a los días pedidos", async () => {
+    const { token } = await core.createInvitation(db, { email: "nutri@example.com", invitedBy: uid, personId, accessRole: "professional", scopes: ["diary"], accessDays: 30 });
+    const inv = await core.findInvitation(db, token);
+    await db.insert(user).values({ id: "nutri", name: "Nutri", email: "nutri@example.com" });
+    await core.onUserCreated(db, { id: "nutri", name: "Nutri", email: "nutri@example.com" }, inv);
+    const [a] = await db.select().from(personAccess).where(eq(personAccess.userId, "nutri"));
+    expect(a?.role).toBe("professional");
+    expect(a?.canWrite).toBe(false);
+    const days = (a!.expiresAt!.getTime() - Date.now()) / 86_400_000;
+    expect(days).toBeGreaterThan(29.9);
+    expect(days).toBeLessThan(30.1);
+    // Sin persona propia ni hogar.
+    expect(await db.select().from(persons).where(eq(persons.userId, "nutri"))).toHaveLength(0);
+  });
+});
+
 describe("objetivos", () => {
   it("calcula objetivos y respeta el modo fijo", async () => {
     const t1 = await core.recomputeTargets(db, personId);

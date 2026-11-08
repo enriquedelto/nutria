@@ -161,7 +161,7 @@ export async function revokeAccess(personId: string, userId: string) {
 export async function inviteProfessional(input: { personId: string; email: string; scopes: string[]; days?: number }) {
   const v = z.object({ personId: uuid, email, scopes: scopes.min(1), days: z.number().int().min(1).max(365).default(90) }).parse(input);
   const { user } = await managerOf(v.personId);
-  const r = await createInvitation(db(), { email: v.email, invitedBy: user.id, personId: v.personId, accessRole: "professional", scopes: v.scopes, days: 14 });
+  const r = await createInvitation(db(), { email: v.email, invitedBy: user.id, personId: v.personId, accessRole: "professional", scopes: v.scopes, days: 14, accessDays: v.days });
   await audit(db(), { userId: user.id, personId: v.personId, action: "invite", resource: "invitation", resourceId: r.invitation.id, meta: { kind: "professional", scopes: v.scopes } });
   refresh();
   return { link: `${base()}/invitacion/${r.token}` };

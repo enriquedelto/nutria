@@ -4,7 +4,7 @@ import { newToken, sha256 } from "@nutria/integrations";
 import { ensureMealSlots } from "./reminders";
 import { rowsOf } from "./util";
 
-export async function createInvitation(db: Database, input: { email: string; invitedBy: string; groupId?: string | null; groupRole?: "admin" | "member"; personId?: string | null; accessRole?: "viewer" | "professional" | "manager"; scopes?: string[]; days?: number }) {
+export async function createInvitation(db: Database, input: { email: string; invitedBy: string; groupId?: string | null; groupRole?: "admin" | "member"; personId?: string | null; accessRole?: "viewer" | "professional" | "manager"; scopes?: string[]; days?: number; accessDays?: number | null }) {
   const t = newToken("inv");
   const [inv] = await db
     .insert(invitations)
@@ -15,6 +15,7 @@ export async function createInvitation(db: Database, input: { email: string; inv
       groupRole: input.groupRole ?? "member",
       personId: input.personId ?? null,
       accessRole: input.accessRole ?? null,
+      accessDays: input.accessDays ?? null,
       scopes: (input.scopes ?? []) as never,
       invitedBy: input.invitedBy,
       expiresAt: new Date(Date.now() + (input.days ?? 14) * 86_400_000),
@@ -43,8 +44,9 @@ export async function isFirstUser(db: Database) {
  */
 export async function onUserCreated(db: Database, u: { id: string; name: string; email: string }, inv: typeof invitations.$inferSelect | null, opts: { firstUser?: boolean } = {}) {
   if (opts.firstUser) await db.update(user).set({ role: "admin" }).where(eq(user.id, u.id));
+  const accessExpires = inv?.accessDays ? new Date(Date.now() + inv.accessDays * 86_400_000) : null;
   if (inv?.accessRole === "professional" && inv.personId) {
-    await db.insert(personAccess).values({ personId: inv.personId, userId: u.id, role: "professional", scopes: inv.scopes, canWrite: false }).onConflictDoNothing();
+    await db.insert(personAccess).values({ personId: inv.personId, userId: u.id, role: "professional", scopes: inv.scopes, canWrite: false, expiresAt: accessExpires }).onConflictDoNothing();
   } else {
     let groupId = inv?.groupId ?? null;
     if (!groupId) {
@@ -56,7 +58,7 @@ export async function onUserCreated(db: Database, u: { id: string; name: string;
     await db.insert(personAccess).values({ personId: p!.id, userId: u.id, role: "owner", canWrite: true });
     await ensureMealSlots(db, p!.id);
     if (inv?.personId && inv.accessRole) {
-      await db.insert(personAccess).values({ personId: inv.personId, userId: u.id, role: inv.accessRole, scopes: inv.scopes, canWrite: inv.accessRole === "manager" }).onConflictDoNothing();
+      await db.insert(personAccess).values({ personId: inv.personId, userId: u.id, role: inv.accessRole, scopes: inv.scopes, canWrite: inv.accessRole === "manager", expiresAt: accessExpires }).onConflictDoNothing();
     }
   }
   if (inv) await db.update(invitations).set({ acceptedAt: new Date(), acceptedBy: u.id }).where(eq(invitations.id, inv.id));

@@ -13,6 +13,7 @@ import {
   pgEnum,
   pgTable,
   real,
+  smallint,
   text,
   timestamp,
   uniqueIndex,
@@ -154,6 +155,8 @@ export const invitations = pgTable(
     personId: uuid().references(() => persons.id, { onDelete: "cascade" }),
     accessRole: accessRoleEnum(),
     scopes: text().array().$type<AccessScope[]>().notNull().default(sql`'{}'::text[]`),
+    /** How long the granted person access lasts once accepted (professionals); null = no expiry. */
+    accessDays: smallint(),
     invitedBy: text().references(() => user.id, { onDelete: "set null" }),
     expiresAt: timestamp({ withTimezone: true }).notNull(),
     acceptedAt: timestamp({ withTimezone: true }),

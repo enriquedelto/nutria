@@ -270,7 +270,7 @@ test("profesional: solo lectura de lo compartido y notas", async ({ browser }) =
   await expect(pro.getByText("Subir legumbres a 4 veces por semana")).toBeVisible();
   await pro.getByRole("button", { name: "Ver su día" }).click();
   await expect(pro).toHaveURL(/\/hoy/);
-  await expect(pro.getByText("Solo lectura")).toBeVisible();
+  await expect(pro.getByText("Solo lectura", { exact: true })).toBeVisible();
   await pro.goto("/diario");
   await expect(pro.getByText("Tortilla de patatas").first()).toBeVisible();
   // Lo no compartido (medicación) no se ve.
@@ -279,7 +279,8 @@ test("profesional: solo lectura de lo compartido y notas", async ({ browser }) =
 
   await page.goto(ana);
   await expect(page.getByText("Subir legumbres a 4 veces por semana")).toBeVisible();
-  await expect(page.getByText(PRO.email)).toBeVisible();
+  // El acceso del profesional caduca (90 días por defecto).
+  await expect(page.getByRole("listitem").filter({ hasText: "Marta Nutricionista" }).getByText(/· hasta \d/)).toBeVisible();
 });
 
 test("repaso semanal: valorar platos y aprender gustos", async () => {
