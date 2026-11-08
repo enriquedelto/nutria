@@ -3,7 +3,7 @@
  * `lockedValues` are per-100 g user corrections that scale with grams.
  * Every write originating from AI is recorded in ai_actions so it can be undone.
  */
-import { aiActions, aiEstimates, and, diaryEntries, eq, foods, inArray, isNull, sql, type Database } from "@nutria/db";
+import { aiActions, aiEstimates, and, batches, diaryEntries, eq, foods, inArray, isNull, sql, type Database } from "@nutria/db";
 import { applyLocked, completeDerived, macroColumns, scaleNutrients, type NutrientMap } from "@nutria/nutrition";
 import { z } from "zod";
 import { recomputeDay } from "./summaries";
@@ -84,6 +84,9 @@ export async function addEntries(db: Database, input: AddEntriesInput) {
   if (!values.length) return [];
   const rows = await db.insert(diaryEntries).values(values).onConflictDoNothing({ target: diaryEntries.clientId, where: sql`${diaryEntries.clientId} is not null` }).returning();
   if (foodIds.length) await db.update(foods).set({ popularity: sql`${foods.popularity} + 1` }).where(inArray(foods.id, foodIds));
+  // Eating from a batch (tupper) consumes portions.
+  for (const it of input.items.filter((i) => i.batchId))
+    if (rows.some((r) => r.batchId === it.batchId)) await db.update(batches).set({ portionsLeft: sql`greatest(0, ${batches.portionsLeft} - ${it.servingQty ?? 1})` }).where(eq(batches.id, it.batchId!));
   if (input.estimateId && rows.length) {
     await db.update(aiEstimates).set({ status: "confirmed", confirmedAt: new Date() }).where(eq(aiEstimates.id, input.estimateId));
     await db.insert(aiActions).values({ userId: input.userId, personId: input.personId, estimateId: input.estimateId, action: "insert", tableName: "diary_entries", rowIds: rows.map((r) => r.id) });
