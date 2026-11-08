@@ -110,14 +110,16 @@ export async function remindersTick(db: Database, now = new Date(), windowMin = 
     .select({ userId: notificationPrefs.userId, type: notificationPrefs.type, config: notificationPrefs.config, timezone: persons.timezone })
     .from(notificationPrefs)
     .innerJoin(persons, eq(persons.userId, notificationPrefs.userId))
-    .where(and(eq(notificationPrefs.enabled, true), sql`${notificationPrefs.type} in ('meal_reminder','water')`));
+    .where(and(eq(notificationPrefs.enabled, true), sql`(${notificationPrefs.type} in ('meal_reminder','water') or ${notificationPrefs.type} like 'custom:%')`));
   for (const p of prefs) {
     const times = Array.isArray(p.config.times) ? (p.config.times as string[]) : [];
     const today = todayIn(p.timezone, now);
+    const days = Array.isArray(p.config.daysOfWeek) ? (p.config.daysOfWeek as number[]) : null;
+    if (days?.length && !days.includes(isoDow(today))) continue;
     for (const t of times) {
       const at = zonedTime(today, t, p.timezone);
       if (at > since && at <= now) {
-        await notify(db, p.type === "water" ? { userId: p.userId, type: "water", title: "💧 ¿Un vaso de agua?", url: "/hoy?agua=1", tag: "water", timezone: p.timezone } : { userId: p.userId, type: "meal_reminder", title: "🍽️ ¿Registramos la comida?", url: "/registrar", tag: "meal", timezone: p.timezone });
+        await notify(db, p.type.startsWith("custom:") ? { userId: p.userId, type: "custom", title: `⏰ ${String(p.config.title ?? "Recordatorio")}`, url: String(p.config.url ?? "/hoy"), tag: p.type, timezone: p.timezone } : p.type === "water" ? { userId: p.userId, type: "water", title: "💧 ¿Un vaso de agua?", url: "/hoy?agua=250", tag: "water", timezone: p.timezone } : { userId: p.userId, type: "meal_reminder", title: "🍽️ ¿Registramos la comida?", url: "/registrar", tag: "meal", timezone: p.timezone });
         sent++;
       }
     }

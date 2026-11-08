@@ -10,3 +10,4 @@ export * from "./reminders";
 export * from "./insights";
 export * from "./accounts";
 export * from "./dataio";
+export * from "./proposals";
