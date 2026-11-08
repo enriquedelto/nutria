@@ -6,7 +6,7 @@ import { uploadDir } from "@nutria/core";
 /** Path inside the upload volume; rejects traversal. */
 export function uploadPath(...parts: string[]) {
   const base = normalize(uploadDir());
-  const p = normalize(join(base, ...parts));
+  const p = normalize(join(/*turbopackIgnore: true*/ base, ...parts));
   if (!p.startsWith(base)) throw new Error("Ruta no válida");
   return p;
 }
@@ -21,10 +21,10 @@ export async function saveShare(userId: string, id: string, files: File[]) {
   for (const [i, f] of files.slice(0, 6).entries()) {
     const ext = (f.name.split(".").pop() ?? "jpg").toLowerCase().replace(/[^a-z0-9]/g, "").slice(0, 5) || "jpg";
     const name = `${i}.${ext}`;
-    await writeFile(join(dir, name), Buffer.from(await f.arrayBuffer()));
+    await writeFile(join(/*turbopackIgnore: true*/ dir, name), Buffer.from(await f.arrayBuffer()));
     names.push(name);
   }
-  await writeFile(join(dir, "meta.json"), JSON.stringify({ userId, names, at: Date.now() }));
+  await writeFile(join(/*turbopackIgnore: true*/ dir, "meta.json"), JSON.stringify({ userId, names, at: Date.now() }));
   return names;
 }
 

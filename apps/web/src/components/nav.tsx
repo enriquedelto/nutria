@@ -1,4 +1,5 @@
 "use client";
+import { Suspense } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
@@ -40,8 +41,20 @@ export const SECTIONS = [
 
 const isActive = (path: string, href: string) => path === href || path.startsWith(href + "/");
 
+/** usePathname is request-time data: render inactive links in the static shell, then the live one. */
 export function Sidebar({ admin }: { admin?: React.ReactNode }) {
-  const path = usePathname();
+  return (
+    <Suspense fallback={<SidebarView path="" admin={admin} />}>
+      <LiveSidebar admin={admin} />
+    </Suspense>
+  );
+}
+
+function LiveSidebar({ admin }: { admin?: React.ReactNode }) {
+  return <SidebarView path={usePathname()} admin={admin} />;
+}
+
+function SidebarView({ path, admin }: { path: string; admin?: React.ReactNode }) {
   return (
     <nav aria-label="Secciones" className="no-print sticky top-0 hidden h-dvh w-60 shrink-0 flex-col gap-1 overflow-y-auto border-r border-line px-3 py-5 lg:flex">
       <Link href="/hoy" className="mb-4 flex items-center gap-2 px-2">
@@ -64,7 +77,18 @@ export function Sidebar({ admin }: { admin?: React.ReactNode }) {
 }
 
 export function AdminLink() {
-  const path = usePathname();
+  return (
+    <Suspense fallback={<AdminLinkView path="" />}>
+      <LiveAdminLink />
+    </Suspense>
+  );
+}
+
+function LiveAdminLink() {
+  return <AdminLinkView path={usePathname()} />;
+}
+
+function AdminLinkView({ path }: { path: string }) {
   return (
     <Link href="/admin" className={cn("mt-2 flex items-center gap-3 rounded-xl px-3 py-2 text-sm font-medium text-ink-2 hover:bg-paper-2", isActive(path, "/admin") && "bg-herb-soft text-herb")}>
       <Shield className="size-4" /> Administración
@@ -81,7 +105,18 @@ const TABS = [
 ] as const;
 
 export function BottomTabs() {
-  const path = usePathname();
+  return (
+    <Suspense fallback={<BottomTabsView path="" />}>
+      <LiveBottomTabs />
+    </Suspense>
+  );
+}
+
+function LiveBottomTabs() {
+  return <BottomTabsView path={usePathname()} />;
+}
+
+function BottomTabsView({ path }: { path: string }) {
   return (
     <nav aria-label="Principal" className="no-print fixed inset-x-0 bottom-0 z-30 border-t border-line bg-card/95 backdrop-blur safe-bottom lg:hidden">
       <ul className="mx-auto grid max-w-lg grid-cols-5">

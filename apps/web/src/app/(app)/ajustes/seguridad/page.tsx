@@ -9,7 +9,8 @@ import { ChangePassword, Passkeys, Sessions, TwoFactor } from "./security-client
 export const metadata = { title: "Seguridad" };
 
 async function Content() {
-  const s = await auth().api.getSession({ headers: await headers() });
+  const h = await headers();
+  const s = await auth().api.getSession({ headers: h });
   const twoFa = !!(s?.user as { twoFactorEnabled?: boolean } | undefined)?.twoFactorEnabled;
   return (
     <div className="space-y-4">
