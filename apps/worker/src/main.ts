@@ -15,6 +15,12 @@ const boss = new PgBoss({ connectionString: url, schema: "pgboss", application_n
 boss.on("error", (e: Error) => log.error("pg-boss", { error: e.message }));
 
 /** Queue options: heavy imports get long expirations and a single worker. */
+/** Short error for logs: the root cause, without SQL text or parameters (they may hold personal data). */
+function errorSummary(e: unknown): string {
+  const root = (e as { cause?: unknown })?.cause ?? e;
+  const msg = root instanceof Error ? root.message : String(root);
+  return msg.startsWith("Failed query:") ? "Fallo de SQL" : msg.slice(0, 300);
+}
 const HEAVY = new Set<JobName>([JOBS.offMirror, JOBS.ciqualImport, JOBS.storeCrawl, JOBS.translateFoods]);
 
 async function main() {
@@ -38,7 +44,7 @@ async function main() {
           const out = await handler(job.data, { db, boss, signal: job.signal });
           log.info("job ok", { job: name, id: job.id, ms: Date.now() - start, out: summarize(out) });
         } catch (e) {
-          log.error("job failed", { job: name, id: job.id, ms: Date.now() - start, error: e instanceof Error ? e.message : String(e) });
+          log.error("job failed", { job: name, id: job.id, ms: Date.now() - start, error: errorSummary(e) });
           throw e;
         }
       }

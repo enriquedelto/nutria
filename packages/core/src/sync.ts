@@ -21,7 +21,20 @@ import { latestWeight } from "./targets";
 
 /* ---------------------------------- foods --------------------------------- */
 
-function foodRow(f: FoodInput) {
+/** Postgres real holds ~1e-37…3e38: crowd-sourced data has values like 7e-47 or 1e40. */
+const realValue = (v: number | null | undefined) => (v == null || !Number.isFinite(v) || Math.abs(v) > 1e7 ? null : Math.abs(v) < 1e-9 ? 0 : v);
+
+function cleanNutrients(n: FoodInput["nutrients"]) {
+  const out: FoodInput["nutrients"] = {};
+  for (const [k, v] of Object.entries(n)) {
+    const c = realValue(v);
+    if (c != null) out[k] = c;
+  }
+  return out;
+}
+
+function foodRow(input: FoodInput) {
+  const f = { ...input, nutrients: cleanNutrients(input.nutrients) };
   const m = macroColumns(f.nutrients);
   return {
     source: f.source,
@@ -42,7 +55,7 @@ function foodRow(f: FoodInput) {
     fiber: f.nutrients.fiber ?? null,
     salt: f.nutrients.salt ?? null,
     nutrients: f.nutrients,
-    density: f.density,
+    density: realValue(f.density) ?? 1,
     nutriscore: f.nutriscore,
     nova: f.nova,
     ecoscore: f.ecoscore,
@@ -53,7 +66,7 @@ function foodRow(f: FoodInput) {
     labels: f.labels,
     ingredientsText: f.ingredientsText,
     countries: f.countries,
-    completeness: f.completeness,
+    completeness: realValue(f.completeness),
     fetchedAt: new Date(),
   };
 }
@@ -104,7 +117,7 @@ export async function upsertFoods(db: Database, items: FoodInput[]) {
     })
     .returning({ id: foods.id, sourceId: foods.sourceId });
   const bySource = new Map(rows.map((r) => [r.sourceId, r.id]));
-  const servings = valid.flatMap((f) => (f.servings ?? []).map((s) => ({ foodId: bySource.get(f.sourceId)!, label: s.label, grams: s.grams, isDefault: s.isDefault ?? false })).filter((s) => s.foodId && s.grams > 0));
+  const servings = valid.flatMap((f) => (f.servings ?? []).map((s) => ({ foodId: bySource.get(f.sourceId)!, label: s.label, grams: s.grams, isDefault: s.isDefault ?? false })).filter((s) => s.foodId && s.grams > 0 && s.grams < 1e6));
   if (servings.length) {
     await db.delete(foodServings).where(inArray(foodServings.foodId, [...new Set(servings.map((s) => s.foodId))]));
     await db.insert(foodServings).values(servings);
@@ -140,12 +153,25 @@ export async function importOffDump(db: Database, input: ReadableStream<Uint8Arr
   let buf: FoodInput[] = [];
   let seen = 0;
   let kept = 0;
+  let failed = 0;
   const flush = async () => {
     if (!buf.length) return;
     const dedup = [...new Map(buf.map((b) => [b.sourceId, b])).values()];
-    await upsertFoods(db, dedup);
-    kept += dedup.length;
     buf = [];
+    try {
+      await upsertFoods(db, dedup);
+      kept += dedup.length;
+    } catch {
+      // One bad product must not sink a 3 M-row import: retry the batch row by row and skip the bad ones.
+      for (const f of dedup) {
+        try {
+          await upsertFoods(db, [f]);
+          kept++;
+        } catch {
+          failed++;
+        }
+      }
+    }
     opts.onProgress?.(seen, kept);
   };
   for await (const line of rl) {
@@ -161,7 +187,7 @@ export async function importOffDump(db: Database, input: ReadableStream<Uint8Arr
     if (buf.length >= (opts.batch ?? 500)) await flush();
   }
   await flush();
-  return { seen, kept };
+  return { seen, kept, failed };
 }
 
 export async function importCiqualRows(db: Database, rows: CiqualRow[], batch = 300) {
