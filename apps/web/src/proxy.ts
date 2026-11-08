@@ -14,9 +14,11 @@ export function proxy(req: NextRequest) {
   headers.set("x-request-id", requestId);
   if (!PUBLIC.some((r) => r.test(pathname)) && !getSessionCookie(req)) {
     if (pathname.startsWith("/api/")) return NextResponse.json({ error: "No autenticado" }, { status: 401, headers: { "x-request-id": requestId } });
-    // Relative Location: req.url carries the internal host behind Docker/Caddy.
-    const next = pathname !== "/" ? `?next=${encodeURIComponent(pathname + req.nextUrl.search)}` : "";
-    return new NextResponse(null, { status: 307, headers: { Location: `/login${next}`, "x-request-id": requestId } });
+    // Proxy redirects must be absolute; req.url carries the internal host behind Docker/Caddy,
+    // so build it on the public URL.
+    const url = new URL("/login", process.env.BETTER_AUTH_URL ?? req.url);
+    if (pathname !== "/") url.searchParams.set("next", pathname + req.nextUrl.search);
+    return NextResponse.redirect(url);
   }
   const res = NextResponse.next({ request: { headers } });
   res.headers.set("x-request-id", requestId);

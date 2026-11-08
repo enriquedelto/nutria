@@ -27,7 +27,7 @@ async function signUp(page: Page, who: typeof ADMIN) {
 
 test("sin sesión, las páginas privadas llevan al login", async ({ page }) => {
   await page.goto("/diario");
-  await expect(page).toHaveURL(//login?next=%2Fdiario/);
+  await expect(page).toHaveURL(/\/login\?next=%2Fdiario/);
 });
 
 test("el primer registro crea la cuenta de administración", async () => {
