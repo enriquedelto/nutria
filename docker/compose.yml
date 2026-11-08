@@ -1,0 +1,107 @@
+# Nutria en el NUC.  Uso:  cd ~/nutria && docker compose -f docker/compose.yml --env-file docker/.env up -d --build
+# La web escucha solo en 127.0.0.1:${NUTRIA_PORT}; Caddy / tailscale serve la publican.
+name: nutria
+
+x-app: &app
+  image: nutria-app:latest
+  build:
+    context: ..
+    dockerfile: docker/Dockerfile
+    args:
+      APP_VERSION: ${APP_VERSION:-dev}
+  env_file: .env
+  environment:
+    DATABASE_URL: postgres://nutria:${POSTGRES_PASSWORD}@postgres:5432/nutria
+    WHISPER_URL: http://whisper:9000
+  volumes:
+    - ${NUTRIA_DATA:-./data}/uploads:/data/uploads
+    - ${NUTRIA_DATA:-./data}/backups:/data/backups
+  restart: unless-stopped
+  depends_on:
+    postgres:
+      condition: service_healthy
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: nutria
+      POSTGRES_USER: nutria
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+    volumes:
+      - ${NUTRIA_DATA:-./data}/postgres:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U nutria -d nutria"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+    restart: unless-stopped
+    shm_size: 256mb
+
+  # Migraciones (con snapshot previo) + datos de referencia; termina y deja paso a web y worker.
+  migrate:
+    <<: *app
+    command: ["sh", "-c", "pnpm db:migrate && pnpm db:seed"]
+    restart: "no"
+
+  web:
+    <<: *app
+    ports:
+      - "127.0.0.1:${NUTRIA_PORT:-8130}:3000"
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:3000/api/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 30s
+
+  worker:
+    <<: *app
+    command: ["pnpm", "worker"]
+    environment:
+      DATABASE_URL: postgres://nutria:${POSTGRES_PASSWORD}@postgres:5432/nutria
+      WHISPER_URL: http://whisper:9000
+      FLARESOLVERR_URL: ${FLARESOLVERR_URL:-}
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+
+  # Transcripción (voz sin Web Speech API y vídeos de recetas).
+  whisper:
+    image: onerahmet/openai-whisper-asr-webservice:latest
+    environment:
+      ASR_ENGINE: faster_whisper
+      ASR_MODEL: ${WHISPER_MODEL:-small}
+      ASR_QUANTIZATION: int8
+    volumes:
+      - ${NUTRIA_DATA:-./data}/whisper:/root/.cache
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          memory: 2g
+
+  # Copia diaria con 14 días de retención (más los snapshots previos a cada migración).
+  backup:
+    image: postgres:16-alpine
+    environment:
+      PGPASSWORD: ${POSTGRES_PASSWORD}
+    volumes:
+      - ${NUTRIA_DATA:-./data}/backups:/backups
+    entrypoint: ["sh", "-c"]
+    command:
+      - |
+        while true; do
+          f=/backups/nutria-$$(date +%F).dump
+          pg_dump -h postgres -U nutria -d nutria --format=custom --file="$$f.tmp" && mv "$$f.tmp" "$$f" && echo "backup $$f"
+          find /backups -name 'nutria-*.dump' -mtime +14 -delete
+          find /backups -name 'premigrate-*.dump' -mtime +30 -delete
+          sleep 86400
+        done
+    depends_on:
+      postgres:
+        condition: service_healthy
+    restart: unless-stopped
