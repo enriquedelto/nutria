@@ -1,4 +1,5 @@
 import { Suspense } from "react";
+import { connection } from "next/server";
 import { aiUsage, and, asc, auditLog, count, desc, eq, foods, gte, sql, user } from "@nutria/db";
 import { rowsOf } from "@nutria/core";
 import { quotaConfig } from "@nutria/ai";
@@ -30,6 +31,8 @@ async function jobStats() {
 
 async function Content() {
   const me = await requireAdmin();
+  // The session read is a private cache, not a dynamic access: opt in before using the clock.
+  await connection();
   const dayStart = new Date();
   dayStart.setHours(0, 0, 0, 0);
   const monthStart = new Date(dayStart.getFullYear(), dayStart.getMonth(), 1);
