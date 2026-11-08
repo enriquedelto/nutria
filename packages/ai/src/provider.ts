@@ -487,6 +487,6 @@ export function defaultMockHandlers(): Record<string, MockHandler> {
     what_to_eat: () => ({ options: [{ title: "Yogur con fruta", why: "Encaja con tus macros", items: [{ name: "Yogur natural", grams: 125 }] }] }),
     correlation_explain: () => ({ bodyMd: "Posible relación (simulado). No es un diagnóstico." }),
     memory_extract: () => ({ memories: [] }),
-    retro_summary: () => ({ householdMd: "", perPerson: [] }),
+    retro_summary: () => ({ householdMd: "- Gustan las legumbres (simulado)", perPerson: [] }),
   };
 }

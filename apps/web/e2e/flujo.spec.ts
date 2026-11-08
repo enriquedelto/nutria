@@ -66,6 +66,20 @@ test("registro por IA (simulada) llega al diario", async () => {
   await expect(page.getByText("Tortilla de patatas").first()).toBeVisible();
 });
 
+test("lo registrado por la IA se puede deshacer", async () => {
+  const page = adminPage;
+  await page.goto("/diario");
+  const before = await page.getByText("Tortilla de patatas").count();
+  await page.goto("/registrar");
+  await page.getByPlaceholder(/lentejas con chorizo/).fill("Otra tortilla");
+  await page.getByRole("button", { name: "Analizar" }).click();
+  await page.getByRole("button", { name: /^Registrar d+ kcal/ }).click();
+  await page.getByRole("button", { name: "Deshacer" }).click();
+  await expect(page.getByText("Registro deshecho")).toBeVisible();
+  await page.goto("/diario");
+  await expect(page.getByText("Tortilla de patatas")).toHaveCount(before);
+});
+
 test("receta manual con nutrición calculada", async () => {
   const page = adminPage;
   await page.goto("/recetas/nueva");
@@ -248,6 +262,21 @@ test("profesional: solo lectura de lo compartido y notas", async ({ browser }) =
   await page.goto(ana);
   await expect(page.getByText("Subir legumbres a 4 veces por semana")).toBeVisible();
   await expect(page.getByText(PRO.email)).toBeVisible();
+});
+
+test("repaso semanal: valorar platos y aprender gustos", async () => {
+  const page = adminPage;
+  await page.goto("/planes");
+  await page.locator('a[href$="/repaso"]').first().click();
+  await page.getByRole("button", { name: "Le gustó" }).first().click();
+  await page.getByRole("button", { name: "Guardar valoración" }).click();
+  await expect(page.getByText("Valoración guardada")).toBeVisible();
+  await page.getByRole("button", { name: "Proponer cambios" }).click();
+  await expect(page.getByLabel("Gustos del hogar")).toHaveValue(/legumbres/);
+  await page.getByRole("button", { name: "Guardar preferencias" }).click();
+  await expect(page.getByText("Preferencias actualizadas")).toBeVisible();
+  await page.reload();
+  await expect(page.getByText(/ya se usó para actualizar los gustos/)).toBeVisible();
 });
 
 const ROUTES = [
