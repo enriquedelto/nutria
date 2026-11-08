@@ -4,13 +4,13 @@
   "packageManager": "pnpm@12.18.0",
   "type": "module",
   "scripts": {
-    "dev": "pnpm --filter web dev",
-    "build": "pnpm --filter web build",
-    "worker": "pnpm --filter worker start",
+    "dev": "pnpm --filter @nutria/web dev",
+    "build": "pnpm --filter @nutria/web build",
+    "worker": "pnpm --filter @nutria/worker start",
     "test": "vitest run",
     "test:watch": "vitest",
     "typecheck": "pnpm -r typecheck",
-    "lint": "pnpm --filter web lint",
+    "lint": "pnpm --filter @nutria/web lint",
     "db:generate": "pnpm --filter @nutria/db generate",
     "db:migrate": "pnpm --filter @nutria/db migrate",
     "db:seed": "pnpm --filter @nutria/db seed"

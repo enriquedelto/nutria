@@ -6,3 +6,5 @@ allowBuilds:
   unrs-resolver: true
   esbuild: true
   "@node-rs/argon2": true
+  "@swc/core": true
+  "@parcel/watcher": true

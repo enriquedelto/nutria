@@ -1,5 +1,5 @@
 /** Targets (formula + conditions), adaptive TDEE and forecast persistence. */
-import { and, asc, dailySummaries, desc, eq, gte, personConditions, persons, targetSets, tdeeEstimates, weightLogs, type Database } from "@nutria/db";
+import { and, asc, dailySummaries, desc, eq, exerciseLogs, gte, personConditions, persons, targetSets, tdeeEstimates, weightLogs, type Database } from "@nutria/db";
 import {
   addDays,
   adaptiveTdee,
@@ -8,6 +8,7 @@ import {
   bmr,
   computeMacroTargets,
   computeMicroTargets,
+  isoDow,
   rebalanceMacros,
   todayIn,
   type DayTargets,
@@ -108,4 +109,24 @@ export async function weeklyAdaptiveTdee(db: Database, personId: string, now = n
   const [current] = await db.select({ mode: targetSets.mode }).from(targetSets).where(and(eq(targetSets.personId, personId), eq(targetSets.isDefault, true))).limit(1);
   if (current?.mode === "adaptive" && r.confidence >= 0.5) await recomputeTargets(db, personId, { overrideTdee: r.estimatedTdee, source: "adaptive" });
   return { ...r, suggestedKcal: suggested };
+}
+
+/**
+ * Target set that applies on a date: a non-default set whose rule matches (weekday list or
+ * training day = any exercise logged), otherwise the default set.
+ */
+export async function targetsForDate(db: Database, personId: string, date: string) {
+  const sets = await db.select().from(targetSets).where(eq(targetSets.personId, personId)).orderBy(desc(targetSets.isDefault));
+  if (!sets.length) return null;
+  const dow = isoDow(date);
+  let training: boolean | null = null;
+  for (const s of sets.filter((x) => !x.isDefault)) {
+    if (s.rule.days?.length && !s.rule.days.includes(dow)) continue;
+    if (s.rule.trainingDay !== undefined) {
+      training ??= (await db.select({ id: exerciseLogs.id }).from(exerciseLogs).where(and(eq(exerciseLogs.personId, personId), eq(exerciseLogs.date, date))).limit(1)).length > 0;
+      if (s.rule.trainingDay !== training) continue;
+    }
+    if (s.rule.days?.length || s.rule.trainingDay !== undefined) return s;
+  }
+  return sets.find((s) => s.isDefault) ?? sets[0]!;
 }
