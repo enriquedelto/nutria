@@ -36,7 +36,8 @@ RUN apt-get update \
   && curl -fsSL https://github.com/yt-dlp/yt-dlp/releases/latest/download/yt-dlp -o /usr/local/bin/yt-dlp \
   && chmod +x /usr/local/bin/yt-dlp \
   && apt-get purge -y curl && apt-get autoremove -y && rm -rf /var/lib/apt/lists/*
-ENV NODE_ENV=production UPLOAD_DIR=/data/uploads BACKUP_DIR=/data/backups AI_SANDBOX_DIR=/tmp/nutria-ai
+ARG APP_VERSION=dev
+ENV APP_VERSION=$APP_VERSION NODE_ENV=production UPLOAD_DIR=/data/uploads BACKUP_DIR=/data/backups AI_SANDBOX_DIR=/tmp/nutria-ai
 COPY --from=build --chown=node:node /app /app
 RUN mkdir -p /data/uploads /data/backups /tmp/nutria-ai && chown -R node:node /data /tmp/nutria-ai
 USER node
