@@ -21,12 +21,16 @@ FROM deps AS build
 COPY . .
 ARG APP_VERSION=dev
 ENV APP_VERSION=$APP_VERSION
-RUN pnpm --filter @nutria/web build
+RUN pnpm --filter @nutria/web build && rm -rf apps/web/.next/cache
 
 FROM base AS runtime
 # yt-dlp + ffmpeg: video recipes. pg_dump: snapshot before migrating. tini: signals.
 RUN apt-get update \
-  && apt-get install -y --no-install-recommends ca-certificates curl ffmpeg tini postgresql-client python3 \
+  && apt-get install -y --no-install-recommends ca-certificates curl ffmpeg tini python3 \
+  && install -d /usr/share/postgresql-common/pgdg \
+  && curl -fsSL https://www.postgresql.org/media/keys/ACCC4CF8.asc -o /usr/share/postgresql-common/pgdg/apt.postgresql.org.asc \
+  && echo "deb [signed-by=/usr/share/postgresql-common/pgdg/apt.postgresql.org.asc] https://apt.postgresql.org/pub/repos/apt bookworm-pgdg main" > /etc/apt/sources.list.d/pgdg.list \
+  && apt-get update && apt-get install -y --no-install-recommends postgresql-client-16 \
   && curl -fsSL https://github.com/yt-dlp/yt-dlp/releases/latest/download/yt-dlp -o /usr/local/bin/yt-dlp \
   && chmod +x /usr/local/bin/yt-dlp \
   && apt-get purge -y curl && apt-get autoremove -y && rm -rf /var/lib/apt/lists/*

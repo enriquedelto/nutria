@@ -1,5 +1,5 @@
 /** In-app notifications + Web Push (VAPID) + outgoing webhooks. */
-import webpush from "web-push";
+import * as webpush from "web-push";
 import { and, eq, inArray, notificationPrefs, notifications, pushSubscriptions, sql, webhooks, type Database } from "@nutria/db";
 import { decrypt, hmacSha256 } from "@nutria/integrations";
 

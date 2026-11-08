@@ -17,10 +17,14 @@ function snapshot() {
   mkdirSync(dir, { recursive: true });
   const file = join(dir, `premigrate-${new Date().toISOString().replace(/[:.]/g, "-")}.dump`);
   try {
-    execFileSync("pg_dump", ["--format=custom", `--file=${file}`, url!], { stdio: "inherit" });
+    // Password via env, never on the command line (it would end up in logs and ps).
+    const u = new URL(url!);
+    const env = { ...process.env, PGPASSWORD: decodeURIComponent(u.password) };
+    u.password = "";
+    execFileSync("pg_dump", ["--format=custom", `--file=${file}`, `--dbname=${u.toString()}`], { stdio: "inherit", env });
     console.log(`Snapshot: ${file}`);
   } catch (e) {
-    console.warn("No se pudo hacer snapshot previo (¿pg_dump instalado?):", (e as Error).message);
+    console.warn("No se pudo hacer snapshot previo (¿pg_dump instalado y de la misma versión?). Código:", (e as { status?: number }).status ?? "?");
   }
 }
 
