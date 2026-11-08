@@ -12,6 +12,7 @@
   },
   "dependencies": {
     "@nutria/db": "workspace:*",
+    "@nutria/nutrition": "workspace:*",
     "zod": "^4.6.7"
   }
 }
