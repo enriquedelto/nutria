@@ -19,7 +19,10 @@ test.beforeAll(async ({ browser }) => {
 
 async function signUp(page: Page, who: typeof ADMIN) {
   await page.getByLabel("Nombre").fill(who.name);
-  await page.getByLabel("Correo").fill(who.email);
+  const email = page.getByLabel("Correo");
+  // With an invitation the address comes prefilled and read-only.
+  if (await email.isEditable()) await email.fill(who.email);
+  else await expect(email).toHaveValue(who.email);
   await page.getByLabel("Contraseña", { exact: true }).fill(who.password);
   await page.getByLabel("Repite la contraseña").fill(who.password);
   await page.getByRole("button", { name: "Crear cuenta" }).click();

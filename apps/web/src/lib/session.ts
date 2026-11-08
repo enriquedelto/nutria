@@ -1,7 +1,7 @@
 import "server-only";
 import { cookies, headers } from "next/headers";
 import { redirect } from "next/navigation";
-import { getPersonAccess, listAccessiblePersons, type AccessScope } from "@nutria/db";
+import { eq, getPersonAccess, listAccessiblePersons, user as userTable, type AccessScope } from "@nutria/db";
 import { auth } from "./auth";
 import { db } from "./db";
 
@@ -9,21 +9,28 @@ export const PERSON_COOKIE = "nutria_person";
 
 export type CurrentUser = { id: string; name: string; email: string; role: string; twoFactorEnabled: boolean };
 
+/**
+ * The session cookie cache (5 min) may hold a stale user: role and 2FA always come from the
+ * database, so promotions/demotions apply on the next request. Null if the account is gone.
+ */
+async function freshUser(id: string): Promise<CurrentUser | null> {
+  const [u] = await db().select({ id: userTable.id, name: userTable.name, email: userTable.email, role: userTable.role, twoFactorEnabled: userTable.twoFactorEnabled }).from(userTable).where(eq(userTable.id, id)).limit(1);
+  return u ? { ...u, role: u.role ?? "member", twoFactorEnabled: !!u.twoFactorEnabled } : null;
+}
+
 /** Session user; redirects to /login when there is none. Private cache: browser only. */
 export async function getCurrentUser(): Promise<CurrentUser> {
   "use cache: private";
   const s = await auth().api.getSession({ headers: await headers() });
   if (!s) redirect("/login");
-  const u = s.user as typeof s.user & { role?: string; twoFactorEnabled?: boolean | null };
-  return { id: u.id, name: u.name, email: u.email, role: u.role ?? "member", twoFactorEnabled: !!u.twoFactorEnabled };
+  return (await freshUser(s.user.id)) ?? redirect("/login");
 }
 
 /** Same as getCurrentUser but for route handlers: null instead of redirect. */
 export async function getApiUser(req?: Request): Promise<CurrentUser | null> {
   const s = await auth().api.getSession({ headers: req?.headers ?? (await headers()) });
   if (!s) return null;
-  const u = s.user as typeof s.user & { role?: string; twoFactorEnabled?: boolean | null };
-  return { id: u.id, name: u.name, email: u.email, role: u.role ?? "member", twoFactorEnabled: !!u.twoFactorEnabled };
+  return freshUser(s.user.id);
 }
 
 export async function requireAdmin() {
