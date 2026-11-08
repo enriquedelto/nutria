@@ -7,7 +7,7 @@ Una sola imagen (`nutria-app`) para `migrate`, `web` y `worker`. Además corren 
 1. En el NUC, crea `~/nutria/docker/.env` a partir de `.env.example`, con permisos 600. Los secretos solo viven ahí.
 2. Desde el PC, en la raíz del repo, ejecuta `docker/deploy.sh`. El script copia `HEAD` con `git archive`, construye en el NUC con `nohup` y deja el log en `~/nutria/deploy.log`.
 3. La web queda en `http://127.0.0.1:8130`, solo dentro del NUC. Para entrar desde la tailnet: `sudo tailscale serve --bg --https=8459 http://127.0.0.1:8130`.
-4. **Regístrate antes de publicarla.** La primera cuenta se vuelve administradora y el resto del registro es solo por invitación.
+4. **Protege el primer registro.** La primera cuenta se vuelve administradora y el resto del registro es solo por invitación. Con `ADMIN_EMAIL` en el `.env`, solo ese correo puede crear esa primera cuenta. Si no la pones, regístrate antes de publicar.
 5. Publícala por Caddy. Añade a `/etc/caddy/Caddyfile`:
 
 ```caddy

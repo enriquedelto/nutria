@@ -73,7 +73,12 @@ function createAuth() {
         create: {
           // Closed registration: the first account bootstraps the instance; the rest need an invitation for that email.
           before: async (u, ctx) => {
-            if (await isFirstUser(db())) return;
+            if (await isFirstUser(db())) {
+              // With ADMIN_EMAIL set, only that address can bootstrap the instance (safe to publish early).
+              const admin = process.env.ADMIN_EMAIL?.trim().toLowerCase();
+              if (admin && u.email.trim().toLowerCase() !== admin) throw new APIError("FORBIDDEN", { message: "Este registro está reservado para la administración." });
+              return;
+            }
             const token = inviteToken(ctx);
             const inv = token ? await findInvitation(db(), token, u.email) : null;
             if (!inv) throw new APIError("FORBIDDEN", { message: "Necesitas una invitación válida para este correo." });
