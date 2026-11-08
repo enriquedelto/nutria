@@ -183,7 +183,7 @@ export const handlers: Handlers = {
     return { translated: done };
   },
 
-  [JOBS.storeCrawl]: async ({ store }, { db }) => ({ products: await crawlStore(db, store, { warehouse: process.env.MERCADONA_WAREHOUSE }) }),
+  [JOBS.storeCrawl]: async ({ store }, { db }) => ({ products: await crawlStore(db, store ?? "mercadona", { warehouse: process.env.MERCADONA_WAREHOUSE }) }),
 
   [JOBS.gamification]: async ({ personId }, { db }) => {
     const list = personId ? [{ id: personId }] : await db.select({ id: persons.id }).from(persons);

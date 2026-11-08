@@ -143,6 +143,7 @@ async function Content() {
         </ul>
         <div className="mt-3 flex flex-wrap gap-2">
           <RunJob job="ciqualImport" label="Reimportar CIQUAL" />
+          <RunJob job="storeCrawl" label="Catálogo de Mercadona" />
         </div>
       </Card>
 

@@ -219,7 +219,11 @@ export async function connectOpenGym(personId: string, baseUrl: string, code: st
   const c = z.string().trim().min(4).max(100).parse(code);
   const existing = await db().select({ id: integrationAccounts.id }).from(integrationAccounts).where(and(eq(integrationAccounts.userId, u.id), eq(integrationAccounts.provider, "opengym"), eq(integrationAccounts.personId, personId)));
   if (existing.length) await db().delete(integrationAccounts).where(eq(integrationAccounts.id, existing[0]!.id));
-  const acc = await pairOpenGym(db(), { userId: u.id, personId, baseUrl: url, code: c });
+  const acc = await pairOpenGym(db(), { userId: u.id, personId, baseUrl: url, code: c }).catch((e: unknown) => {
+    // The openGym client's messages are meant for people ("código no válido…"); network errors are not.
+    const m = e instanceof Error ? e.message : "";
+    throw new UserError(/código|openGym/i.test(m) ? m : "No se pudo conectar con openGym en esa dirección");
+  });
   await enqueue("opengym.sync", { accountId: acc.id });
   refresh();
 }

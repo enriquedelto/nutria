@@ -48,7 +48,7 @@ export async function inviteNewHousehold(email: string) {
   return `${base()}/invitacion/${r.token}`;
 }
 
-const RUNNABLE = { offMirror: JOBS.offMirror, ciqualImport: JOBS.ciqualImport, gamification: JOBS.gamification, cleanup: JOBS.cleanup, opengymSyncAll: JOBS.opengymSyncAll, tdeeWeekly: JOBS.tdeeWeekly } as const;
+const RUNNABLE = { offMirror: JOBS.offMirror, ciqualImport: JOBS.ciqualImport, gamification: JOBS.gamification, cleanup: JOBS.cleanup, opengymSyncAll: JOBS.opengymSyncAll, tdeeWeekly: JOBS.tdeeWeekly, storeCrawl: JOBS.storeCrawl } as const;
 export type RunnableJob = keyof typeof RUNNABLE;
 
 export async function runJobNow(job: RunnableJob) {
