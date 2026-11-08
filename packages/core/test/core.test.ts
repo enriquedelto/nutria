@@ -1,4 +1,5 @@
 import { mkdir, mkdtemp, writeFile } from "node:fs/promises";
+import { gzipSync } from "node:zlib";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { Readable } from "node:stream";
@@ -217,6 +218,13 @@ describe("datos", () => {
     expect(r).toEqual({ seen: 2, kept: 1, failed: 0 });
     const [f] = await db.select().from(foods).where(eq(foods.sourceId, "8410000000001"));
     expect(f?.kcal).toBe(440);
+  });
+  it("un corte de la descarga del volcado es un error capturable, no tumba el proceso", async () => {
+    const gz = gzipSync(["code\tproduct_name\tcountries_tags\tenergy-kcal_100g", "8410000000009\tCortado\ten:spain\t100"].join("\n"));
+    const src = new Readable({ read() {} });
+    src.push(gz.subarray(0, 10));
+    setTimeout(() => src.destroy(new Error("other side closed")), 10);
+    await expect(core.importOffDump(db, src, { gzip: true })).rejects.toThrow(/other side closed/);
   });
   it("tolera valores fuera del rango de real (7e-47, 1e40)", async () => {
     const tsv = ["code\tproduct_name\tbrands\tcountries_tags\tenergy-kcal_100g\tproteins_100g\tsalt_100g", "8410000000003\tTofu raro\tMarca\ten:spain\t120\t7e-47\t1e40"].join("\n");

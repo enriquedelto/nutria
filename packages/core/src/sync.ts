@@ -146,8 +146,16 @@ export async function foodByBarcode(db: Database, barcode: string, off = new Off
  * given countries. Processes in batches to keep memory flat (~3 M rows worldwide).
  */
 export async function importOffDump(db: Database, input: ReadableStream<Uint8Array> | NodeJS.ReadableStream, opts: { gzip?: boolean; countries?: string[]; batch?: number; onProgress?: (seen: number, kept: number) => void } = {}) {
-  let stream: NodeJS.ReadableStream = "getReader" in input ? Readable.fromWeb(input as import("node:stream/web").ReadableStream<Uint8Array>) : input;
-  if (opts.gzip) stream = stream.pipe(createGunzip());
+  const source: NodeJS.ReadableStream = "getReader" in input ? Readable.fromWeb(input as import("node:stream/web").ReadableStream<Uint8Array>) : input;
+  let stream = source;
+  if (opts.gzip) {
+    // pipe() does not forward errors: without this, a dropped connection is an unhandled 'error'
+    // that kills the worker. If gunzip already ended (e.g. the server closes after the last byte),
+    // destroying it is a no-op and the import finishes normally.
+    const gunzip = createGunzip();
+    source.on("error", (e) => gunzip.destroy(e));
+    stream = source.pipe(gunzip);
+  }
   const rl = createInterface({ input: stream, crlfDelay: Infinity });
   let parse: ((l: string) => Record<string, string>) | null = null;
   let buf: FoodInput[] = [];
