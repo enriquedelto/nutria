@@ -3,7 +3,7 @@
 # (workspace packages are transpiled by Next and run with tsx in the worker).
 FROM node:26-bookworm-slim AS base
 ENV PNPM_HOME=/pnpm PATH=/pnpm:$PATH NEXT_TELEMETRY_DISABLED=1
-RUN corepack enable
+RUN npm install -g pnpm@12.18.0 && pnpm --version
 WORKDIR /app
 
 FROM base AS deps
