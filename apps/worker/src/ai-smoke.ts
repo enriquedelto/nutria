@@ -57,7 +57,7 @@ try {
     await step("Coach busca en la base de alimentos", async () => {
       const r = await coachChat({ ...c, groupId: p.groupId ?? null, timezone: p.timezone }, { message: "Busca en la base de alimentos el tofu firme y dime cuánta proteína tiene por 100 g. Una frase." });
       if (!r.toolCalls.length) throw new Error("no usó ninguna herramienta: " + r.text.slice(0, 80));
-      return `${r.toolCalls.map((x) => x.name).join(", ")} → ${r.text.replace(/s+/g, " ").slice(0, 120)}`;
+      return `${r.toolCalls.map((x) => x.name).join(", ")} → ${r.text.replace(/\s+/g, " ").slice(0, 120)}`;
     });
     throw new Rollback();
   });
