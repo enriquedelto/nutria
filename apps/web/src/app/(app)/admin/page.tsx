@@ -40,7 +40,7 @@ async function Content() {
   const [users, usage, byFeature, sources, resets, jobs, recentAudit] = await Promise.all([
     db().select({ id: user.id, name: user.name, email: user.email, role: user.role, twoFactor: user.twoFactorEnabled, createdAt: user.createdAt }).from(user).orderBy(asc(user.createdAt)),
     db()
-      .select({ userId: aiUsage.userId, today: sql<number>`count(*) filter (where ${aiUsage.createdAt} >= ${dayStart})`.mapWith(Number), month: count(), usd: sql<number>`coalesce(sum(${aiUsage.costUsd}),0)`.mapWith(Number), errors: sql<number>`count(*) filter (where ${aiUsage.ok} <> 'ok')`.mapWith(Number) })
+      .select({ userId: aiUsage.userId, today: sql<number>`count(*) filter (where ${aiUsage.createdAt} >= ${dayStart.toISOString()})`.mapWith(Number), month: count(), usd: sql<number>`coalesce(sum(${aiUsage.costUsd}),0)`.mapWith(Number), errors: sql<number>`count(*) filter (where ${aiUsage.ok} <> 'ok')`.mapWith(Number) })
       .from(aiUsage)
       .where(gte(aiUsage.createdAt, monthStart))
       .groupBy(aiUsage.userId),
