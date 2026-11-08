@@ -1,5 +1,6 @@
 import "server-only";
 import { z } from "zod";
+import { aiActions, and, desc, eq, isNull } from "@nutria/db";
 import { addEntries, DIARY_ORIGINS, DiaryItemInput } from "@nutria/core";
 import { db } from "./db";
 import { emit } from "./events";
@@ -23,5 +24,10 @@ export async function addDiaryItems(userId: string, raw: unknown) {
   const rows = await addEntries(db(), { ...input, userId, estimateId: input.estimateId ?? null });
   void enqueue("gamification.evaluate", { personId: input.personId }, { singletonKey: `gam:${input.personId}`, startAfter: 30 });
   void emit(userId, "diary.entry_created", { personId: input.personId, date: input.date, mealSlot: input.mealSlot, count: rows.length, kcal: Math.round(rows.reduce((a, r) => a + r.kcal, 0)) });
-  return rows;
+  let actionId: string | null = null;
+  if (input.estimateId) {
+    const [a] = await db().select({ id: aiActions.id }).from(aiActions).where(and(eq(aiActions.estimateId, input.estimateId), eq(aiActions.userId, userId), isNull(aiActions.undoneAt))).orderBy(desc(aiActions.createdAt)).limit(1);
+    actionId = a?.id ?? null;
+  }
+  return Object.assign(rows, { actionId });
 }

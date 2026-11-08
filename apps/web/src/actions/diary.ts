@@ -19,7 +19,7 @@ export async function addItems(payload: AddPayload) {
   const u = await user();
   const rows = await addDiaryItems(u.id, payload);
   refresh();
-  return { ids: rows.map((r) => r.id) };
+  return { ids: rows.map((r) => r.id), actionId: rows.actionId };
 }
 
 export async function editEntry(personId: string, id: string, patch: { grams?: number; mealSlot?: string; date?: string; lockedValues?: Record<string, number>; note?: string | null }) {
