@@ -190,6 +190,7 @@ export const NOTIFICATION_TYPES = [
   "challenge",
   "plan_ready",
   "retro",
+  "quiet_hours",
 ] as const;
 
 export const notificationPrefs = pgTable(

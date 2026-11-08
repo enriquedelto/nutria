@@ -35,10 +35,12 @@ function inQuietHours(range: unknown, timezone: string, now = new Date()): boole
 
 /** Stores the notification and pushes it to every subscription of the user (if enabled). */
 export async function notify(db: Database, n: NotifyInput): Promise<{ stored: boolean; pushed: number }> {
-  const [pref] = await db.select().from(notificationPrefs).where(and(eq(notificationPrefs.userId, n.userId), eq(notificationPrefs.type, n.type))).limit(1);
+  const prefs = await db.select().from(notificationPrefs).where(and(eq(notificationPrefs.userId, n.userId), inArray(notificationPrefs.type, [n.type, "quiet_hours"])));
+  const pref = prefs.find((p) => p.type === n.type);
+  const quiet = prefs.find((p) => p.type === "quiet_hours" && p.enabled);
   if (pref && !pref.enabled) return { stored: false, pushed: 0 };
   await db.insert(notifications).values({ userId: n.userId, type: n.type, title: n.title, body: n.body ?? "", url: n.url ?? null });
-  if (n.respectQuietHours !== false && inQuietHours(pref?.config.quietHours, n.timezone ?? "Europe/Madrid")) return { stored: true, pushed: 0 };
+  if (n.respectQuietHours !== false && inQuietHours(pref?.config.quietHours ?? quiet?.config.quietHours, n.timezone ?? "Europe/Madrid")) return { stored: true, pushed: 0 };
   if (!ensureVapid()) return { stored: true, pushed: 0 };
   const subs = await db.select().from(pushSubscriptions).where(eq(pushSubscriptions.userId, n.userId));
   const payload = JSON.stringify({ title: n.title, body: n.body ?? "", url: n.url ?? "/", tag: n.tag ?? n.type });

@@ -107,3 +107,19 @@ export function BottomTabs() {
     </nav>
   );
 }
+
+/** Mobile "Más" grid: every section not in the bottom tabs. */
+export function MoreGrid({ admin }: { admin?: boolean }) {
+  const items = [...SECTIONS.filter((s) => !TABS.some((t) => t.href === s.href)), ...(admin ? [{ href: "/admin", label: "Administración", icon: Shield }] : [])];
+  return (
+    <ul className="grid grid-cols-3 gap-3 sm:grid-cols-4">
+      {items.map(({ href, label, icon: Icon }) => (
+        <li key={href}>
+          <Link href={href} className="flex flex-col items-center gap-2 rounded-2xl border border-line bg-card p-4 text-sm font-medium hover:bg-paper-2">
+            <Icon className="size-6 text-herb" /> {label}
+          </Link>
+        </li>
+      ))}
+    </ul>
+  );
+}
