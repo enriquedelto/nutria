@@ -1,11 +1,14 @@
 "use client";
-import { useState, useTransition } from "react";
+import { errorText } from "@/lib/errors";
+import { useState } from "react";
+import { useSafeTransition } from "@/lib/use-safe-transition";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { CookingPot, Loader2, Minus, Plus, Sparkles, Star, Trash2, Utensils } from "lucide-react";
 import { toast } from "sonner";
 import { addItems } from "@/actions/diary";
 import { cookAction, deleteRecipe, rateRecipe, substitutionsFor } from "@/actions/recipes";
+import { eatFromBatch } from "@/actions/kitchen";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent } from "@/components/ui/dialog";
 import { Field, Input, Select } from "@/components/ui/input";
@@ -59,9 +62,9 @@ export function ScaledIngredients({ ingredients, baseServings }: { ingredients: 
   );
 }
 
-export function LogRecipe({ personId, foodId, servingGrams, title, slots, defaultSlot, today }: { personId: string; foodId: string; servingGrams: number | null; title: string; slots: { key: string; label: string }[]; defaultSlot: string; today: string }) {
+export function LogRecipe({ personId, foodId, servingGrams, title, slots, defaultSlot, today, batch }: { personId: string; foodId: string; servingGrams: number | null; title: string; slots: { key: string; label: string }[]; defaultSlot: string; today: string; batch?: { id: string; left: number } | null }) {
   const [open, setOpen] = useState(false);
-  const [pending, start] = useTransition();
+  const [pending, start] = useSafeTransition();
   return (
     <>
       <Button variant="soft" onClick={() => setOpen(true)}>
@@ -75,6 +78,11 @@ export function LogRecipe({ personId, foodId, servingGrams, title, slots, defaul
               action={(fd) =>
                 start(async () => {
                   const servings = Number(fd.get("servings"));
+                  if (batch && fd.get("fromBatch")) {
+                    const r = await eatFromBatch(batch.id, { personId, date: String(fd.get("date")), mealSlot: String(fd.get("slot")), portions: servings });
+                    toast.success(`Añadido al diario · quedan ${r.left} en el tupper`);
+                    return setOpen(false);
+                  }
                   const grams = fd.get("grams") ? Number(fd.get("grams")) : (servingGrams ?? 300) * servings;
                   await addItems({ personId, date: String(fd.get("date")), mealSlot: String(fd.get("slot")), origin: "recipe", items: [{ foodId, grams, servingLabel: "ración", servingQty: servings }] });
                   toast.success("Añadido al diario");
@@ -102,6 +110,12 @@ export function LogRecipe({ personId, foodId, servingGrams, title, slots, defaul
                   <Input name="date" type="date" defaultValue={today} />
                 </Field>
               </div>
+              {batch ? (
+                <label className="flex items-center gap-2 text-sm">
+                  <input type="checkbox" name="fromBatch" defaultChecked className="accent-[var(--herb)]" />
+                  Sale de un tupper (quedan {batch.left} raciones)
+                </label>
+              ) : null}
               <Button type="submit" className="w-full" disabled={pending}>
                 Añadir
               </Button>
@@ -115,7 +129,7 @@ export function LogRecipe({ personId, foodId, servingGrams, title, slots, defaul
 
 export function CookDialog({ recipeId, servings, freezable, timezone }: { recipeId: string; servings: number; freezable: boolean; timezone: string }) {
   const [open, setOpen] = useState(false);
-  const [pending, start] = useTransition();
+  const [pending, start] = useSafeTransition();
   return (
     <>
       <Button variant="outline" onClick={() => setOpen(true)}>
@@ -161,7 +175,7 @@ export function CookDialog({ recipeId, servings, freezable, timezone }: { recipe
 
 export function Rating({ personId, recipeId, current }: { personId: string; recipeId: string; current: number | null }) {
   const [stars, setStars] = useState(current ?? 0);
-  const [, start] = useTransition();
+  const [, start] = useSafeTransition();
   return (
     <div className="flex gap-0.5" role="radiogroup" aria-label="Valoración">
       {[1, 2, 3, 4, 5].map((n) => (
@@ -186,7 +200,7 @@ export function Rating({ personId, recipeId, current }: { personId: string; reci
 export function Substitutions({ personId, recipeId }: { personId: string; recipeId: string }) {
   const [reason, setReason] = useState("");
   const [opts, setOpts] = useState<{ ingredient: string; substitute: string; reason: string; ratio: string | null }[] | null>(null);
-  const [pending, start] = useTransition();
+  const [pending, start] = useSafeTransition();
   const presets = ["Más proteína", "Menos calorías", "Sin lactosa", "Sin gluten", "Vegana", "Con lo que tengo en la despensa"];
   return (
     <div className="space-y-2">
@@ -207,7 +221,7 @@ export function Substitutions({ personId, recipeId }: { personId: string; recipe
               try {
                 setOpts((await substitutionsFor(personId, recipeId, reason)).options);
               } catch (e) {
-                toast.error(e instanceof Error ? e.message : "Error de la IA");
+                toast.error(errorText(e, "Error de la IA"));
               }
             })
           }
@@ -231,7 +245,7 @@ export function Substitutions({ personId, recipeId }: { personId: string; recipe
 
 export function DeleteRecipe({ id }: { id: string }) {
   const [confirm, setConfirm] = useState(false);
-  const [pending, start] = useTransition();
+  const [pending, start] = useSafeTransition();
   const router = useRouter();
   return confirm ? (
     <span className="flex items-center gap-1">

@@ -1,4 +1,5 @@
 "use server";
+import { UserError } from "@/lib/errors";
 import { refresh } from "next/cache";
 import { z } from "zod";
 import { and, dailySummaries, eq, foodFavorites, mealTemplates, waterLogs, type MealTemplateItem } from "@nutria/db";
@@ -9,7 +10,7 @@ import { assertAccess, getApiUser } from "@/lib/session";
 
 async function user() {
   const u = await getApiUser();
-  if (!u) throw new Error("No autenticado");
+  if (!u) throw new UserError("No autenticado");
   return u;
 }
 

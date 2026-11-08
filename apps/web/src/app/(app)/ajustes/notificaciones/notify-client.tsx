@@ -1,5 +1,7 @@
 "use client";
-import { useEffect, useState, useTransition } from "react";
+import { errorText } from "@/lib/errors";
+import { useEffect, useState } from "react";
+import { useSafeTransition } from "@/lib/use-safe-transition";
 import { Bell, BellOff, Plus, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import { deleteCustomReminder, removePushSubscription, saveNotificationPref, savePushSubscription, sendTestPush } from "@/actions/settings";
@@ -16,7 +18,7 @@ const b64ToBytes = (b64: string) => {
 export function PushToggle({ vapidKey }: { vapidKey: string | null }) {
   const [state, setState] = useState<"loading" | "unsupported" | "denied" | "off" | "on">("loading");
   const [endpoint, setEndpoint] = useState<string | null>(null);
-  const [pending, start] = useTransition();
+  const [pending, start] = useSafeTransition();
   useEffect(() => {
     (async () => {
       if (!("serviceWorker" in navigator) || !("PushManager" in window) || !vapidKey) return setState("unsupported");
@@ -41,7 +43,7 @@ export function PushToggle({ vapidKey }: { vapidKey: string | null }) {
         setState("on");
         toast.success("Avisos activados en este dispositivo");
       } catch (e) {
-        toast.error(e instanceof Error ? e.message : "No se pudo activar");
+        toast.error(errorText(e, "No se pudo activar"));
       }
     });
   const disable = () =>
@@ -82,7 +84,7 @@ export function PushToggle({ vapidKey }: { vapidKey: string | null }) {
 export function PrefRow({ type, label, hint, enabled, times, withTimes }: { type: string; label: string; hint?: string; enabled: boolean; times: string[]; withTimes?: boolean }) {
   const [on, setOn] = useState(enabled);
   const [ts, setTs] = useState(times);
-  const [pending, start] = useTransition();
+  const [pending, start] = useSafeTransition();
   const save = (next: { enabled?: boolean; times?: string[] }) =>
     start(async () => {
       const e = next.enabled ?? on;
@@ -132,7 +134,7 @@ export function PrefRow({ type, label, hint, enabled, times, withTimes }: { type
 
 export function QuietHours({ initial }: { initial: [string, string] | null }) {
   const [range, setRange] = useState<[string, string]>(initial ?? ["23:00", "07:30"]);
-  const [pending, start] = useTransition();
+  const [pending, start] = useSafeTransition();
   return (
     <div className="flex flex-wrap items-end gap-2">
       <label className="text-sm">
@@ -152,7 +154,7 @@ export function QuietHours({ initial }: { initial: [string, string] | null }) {
 }
 
 export function DeleteReminder({ type }: { type: string }) {
-  const [pending, start] = useTransition();
+  const [pending, start] = useSafeTransition();
   return (
     <Button size="icon-sm" variant="ghost" aria-label="Borrar recordatorio" disabled={pending} onClick={() => start(() => deleteCustomReminder(type))}>
       <Trash2 />

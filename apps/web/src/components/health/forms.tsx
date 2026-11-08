@@ -1,5 +1,6 @@
 "use client";
-import { useEffect, useRef, useState, useTransition } from "react";
+import { useEffect, useRef, useState } from "react";
+import { useSafeTransition } from "@/lib/use-safe-transition";
 import { Play, Plus, Square, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import {
@@ -28,7 +29,7 @@ import { cn } from "@/lib/utils";
 /* ------------------------------- exercise ------------------------------- */
 
 export function ExerciseForm({ personId, today, activities }: { personId: string; today: string; activities: { code: string; nameEs: string; category: string; met: number }[] }) {
-  const [pending, start] = useTransition();
+  const [pending, start] = useSafeTransition();
   const ref = useRef<HTMLFormElement>(null);
   const cats = [...new Set(activities.map((a) => a.category))];
   return (
@@ -73,7 +74,7 @@ export function ExerciseForm({ personId, today, activities }: { personId: string
 }
 
 export function DeleteExercise({ personId, id }: { personId: string; id: string }) {
-  const [, start] = useTransition();
+  const [, start] = useSafeTransition();
   return (
     <button type="button" aria-label="Borrar" className="rounded-full p-1 text-ink-3 hover:bg-paper-2" onClick={() => start(() => deleteExercise(personId, id))}>
       <Trash2 className="size-4" />
@@ -82,7 +83,7 @@ export function DeleteExercise({ personId, id }: { personId: string; id: string 
 }
 
 export function StepsForm({ personId, today, current }: { personId: string; today: string; current: number | null }) {
-  const [pending, start] = useTransition();
+  const [pending, start] = useSafeTransition();
   return (
     <form className="flex items-end gap-2" action={(fd) => start(async () => void (await logSteps(personId, String(fd.get("date")), Number(fd.get("steps")))))}>
       <Field label="Pasos" className="flex-1">
@@ -103,7 +104,7 @@ export function StepsForm({ personId, today, current }: { personId: string; toda
 const PHASES: Record<string, string> = { anabolic: "Digestión", catabolic: "Glucógeno", fat_burning: "Quema de grasa", ketosis: "Cetosis", deep_ketosis: "Cetosis profunda" };
 
 export function FastingTimer({ personId, active, protocols, canWrite }: { personId: string; active: { startedAt: string; targetHours: number; protocol: string } | null; protocols: { code: string; nameEs: string; fastHours: number | null; description: string }[]; canWrite: boolean }) {
-  const [pending, start] = useTransition();
+  const [pending, start] = useSafeTransition();
   const [now, setNow] = useState(() => Date.now());
   const [proto, setProto] = useState("16:8");
   const [hours, setHours] = useState(16);
@@ -176,7 +177,7 @@ export function FastingTimer({ personId, active, protocols, canWrite }: { person
 /* --------------------------------- sleep --------------------------------- */
 
 export function SleepForm({ personId, today }: { personId: string; today: string }) {
-  const [pending, start] = useTransition();
+  const [pending, start] = useSafeTransition();
   const [quality, setQuality] = useState(3);
   return (
     <form
@@ -239,7 +240,7 @@ const CYCLE_SYMPTOMS = [
 ] as const;
 
 export function PeriodControls({ personId, today, open }: { personId: string; today: string; open: { id: string; startDate: string } | null }) {
-  const [pending, start] = useTransition();
+  const [pending, start] = useSafeTransition();
   return open ? (
     <Button variant="outline" disabled={pending} onClick={() => start(() => endPeriod(personId, open.id, today))}>
       Terminó la regla (hoy)
@@ -264,7 +265,7 @@ export function PeriodControls({ personId, today, open }: { personId: string; to
 }
 
 export function CycleSymptoms({ personId, today }: { personId: string; today: string }) {
-  const [pending, start] = useTransition();
+  const [pending, start] = useSafeTransition();
   return (
     <div className="flex flex-wrap gap-2">
       {CYCLE_SYMPTOMS.map(([code, label]) => (
@@ -284,7 +285,7 @@ export function CycleSymptoms({ personId, today }: { personId: string; today: st
 const COMMON_SYMPTOMS = ["Hinchazón", "Gases", "Ardor", "Dolor de barriga", "Diarrea", "Estreñimiento", "Dolor de cabeza", "Cansancio", "Picor", "Náuseas"];
 
 export function SymptomForm({ personId }: { personId: string }) {
-  const [pending, start] = useTransition();
+  const [pending, start] = useSafeTransition();
   const [symptom, setSymptom] = useState("");
   const [intensity, setIntensity] = useState(3);
   const nowLocal = () => {
@@ -332,7 +333,7 @@ export function SymptomForm({ personId }: { personId: string }) {
 }
 
 export function DeleteSymptom({ personId, id }: { personId: string; id: string }) {
-  const [, start] = useTransition();
+  const [, start] = useSafeTransition();
   return (
     <button type="button" aria-label="Borrar" className="rounded-full p-1 text-ink-3 hover:bg-paper-2" onClick={() => start(() => deleteSymptom(personId, id))}>
       <Trash2 className="size-4" />
@@ -341,7 +342,7 @@ export function DeleteSymptom({ personId, id }: { personId: string; id: string }
 }
 
 export function RunCorrelations({ personId }: { personId: string }) {
-  const [pending, start] = useTransition();
+  const [pending, start] = useSafeTransition();
   return (
     <Button size="sm" variant="soft" disabled={pending} onClick={() => start(async () => {
       await runCorrelationsNow(personId);
@@ -359,7 +360,7 @@ const DAYS = ["L", "M", "X", "J", "V", "S", "D"];
 
 export function MedicationDialog({ personId, med, trigger }: { personId: string; med?: Med; trigger: React.ReactNode }) {
   const [open, setOpen] = useState(false);
-  const [pending, start] = useTransition();
+  const [pending, start] = useSafeTransition();
   const [times, setTimes] = useState<string[]>(med?.times ?? ["08:00"]);
   const [days, setDays] = useState<number[]>(med?.daysOfWeek ?? []);
   return (
@@ -451,7 +452,7 @@ export function MedicationDialog({ personId, med, trigger }: { personId: string;
 }
 
 export function MedicationActions({ personId, id, active }: { personId: string; id: string; active: boolean }) {
-  const [pending, start] = useTransition();
+  const [pending, start] = useSafeTransition();
   return (
     <div className="flex gap-1">
       <Button size="sm" variant="ghost" disabled={pending} onClick={() => start(() => setMedicationActive(personId, id, !active))}>
@@ -467,7 +468,7 @@ export function MedicationActions({ personId, id, active }: { personId: string; 
 /* ------------------------------- conditions ------------------------------- */
 
 export function ConditionToggle({ personId, code, active }: { personId: string; code: string; active: boolean }) {
-  const [pending, start] = useTransition();
+  const [pending, start] = useSafeTransition();
   return (
     <button
       type="button"

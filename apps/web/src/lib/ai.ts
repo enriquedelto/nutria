@@ -5,6 +5,7 @@ import { db } from "./db";
 import { HttpError, json, personFor } from "./api";
 import type { CurrentUser } from "./session";
 import type { AccessScope } from "@nutria/db";
+import { UserError } from "./errors";
 
 export const ImageInput = z.object({
   mediaType: z.enum(["image/jpeg", "image/png", "image/webp", "image/gif"]),
@@ -32,6 +33,23 @@ const MESSAGE: Record<AiError["code"], string> = {
   aborted: "Cancelado.",
   unknown: "Error de la IA; inténtalo otra vez.",
 };
+
+const isAiError = (e: unknown): e is AiError => e instanceof AiError || (e instanceof Error && e.name === "AiError");
+
+/** Friendly text for an AI failure, or null if it is not one. */
+export function aiMessage(e: unknown) {
+  return isAiError(e) ? (MESSAGE[e.code] ?? e.message) : null;
+}
+
+/** For server actions: AI failures become a UserError the client can show. */
+export async function aiAction<T>(p: Promise<T>): Promise<T> {
+  try {
+    return await p;
+  } catch (e) {
+    const m = aiMessage(e);
+    throw m ? new UserError(m) : e;
+  }
+}
 
 /** Map AiError → friendly JSON (route() handles the rest). */
 export function aiErrorResponse(e: unknown) {

@@ -1,5 +1,7 @@
 "use client";
-import { useState, useTransition } from "react";
+import { errorText } from "@/lib/errors";
+import { useState } from "react";
+import { useSafeTransition } from "@/lib/use-safe-transition";
 import { KeyRound, Loader2, Play, UserPlus } from "lucide-react";
 import { toast } from "sonner";
 import { inviteNewHousehold, resetLinkFor, runJobNow, setUserRole, type RunnableJob } from "@/actions/admin";
@@ -8,10 +10,10 @@ import { Dialog, DialogContent } from "@/components/ui/dialog";
 import { Field, Input } from "@/components/ui/input";
 import { CopyLink } from "../familia/family-client";
 
-const err = (e: unknown) => toast.error(e instanceof Error ? e.message : "Algo ha fallado");
+const err = (e: unknown) => toast.error(errorText(e, "Algo ha fallado"));
 
 export function RoleToggle({ userId, role }: { userId: string; role: "admin" | "member" }) {
-  const [pending, start] = useTransition();
+  const [pending, start] = useSafeTransition();
   return (
     <Button size="sm" variant="ghost" disabled={pending} onClick={() => start(async () => void (await setUserRole(userId, role === "admin" ? "member" : "admin").catch(err)))}>
       {role === "admin" ? "Quitar admin" : "Hacer admin"}
@@ -20,7 +22,7 @@ export function RoleToggle({ userId, role }: { userId: string; role: "admin" | "
 }
 
 export function ResetLink({ userId }: { userId: string }) {
-  const [pending, start] = useTransition();
+  const [pending, start] = useSafeTransition();
   const [link, setLink] = useState<string | null>(null);
   return (
     <>
@@ -54,7 +56,7 @@ export function ResetLink({ userId }: { userId: string }) {
 export function InviteHousehold() {
   const [open, setOpen] = useState(false);
   const [link, setLink] = useState<string | null>(null);
-  const [pending, start] = useTransition();
+  const [pending, start] = useSafeTransition();
   return (
     <>
       <Button size="sm" variant="outline" onClick={() => setOpen(true)}>
@@ -92,7 +94,7 @@ export function InviteHousehold() {
 }
 
 export function RunJob({ job, label }: { job: RunnableJob; label: string }) {
-  const [pending, start] = useTransition();
+  const [pending, start] = useSafeTransition();
   return (
     <Button
       size="sm"

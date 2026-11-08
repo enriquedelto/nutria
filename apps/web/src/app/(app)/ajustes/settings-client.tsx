@@ -1,5 +1,7 @@
 "use client";
-import { useEffect, useState, useTransition } from "react";
+import { errorText } from "@/lib/errors";
+import { useEffect, useState } from "react";
+import { useSafeTransition } from "@/lib/use-safe-transition";
 import { ArrowDown, ArrowUp, Monitor, Moon, Plus, Sun, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import { saveMealSlots, updatePersonSettings } from "@/actions/settings";
@@ -48,7 +50,7 @@ type Display = { homeCards: string[]; trackedMicros: string[]; units: "metric" |
 
 export function DisplaySettings({ personId, initial, cards, micros, canEdit }: { personId: string; initial: Display; cards: { code: string; name: string }[]; micros: { code: string; name: string }[]; canEdit: boolean }) {
   const [v, setV] = useState(initial);
-  const [pending, start] = useTransition();
+  const [pending, start] = useSafeTransition();
   const move = (i: number, d: -1 | 1) =>
     setV((x) => {
       const a = [...x.homeCards];
@@ -144,7 +146,7 @@ type Slot = { key: string; label: string; defaultTime: string | null; kcalShare:
 
 export function MealSlotsEditor({ personId, initial }: { personId: string; initial: Slot[] }) {
   const [slots, setSlots] = useState(initial);
-  const [pending, start] = useTransition();
+  const [pending, start] = useSafeTransition();
   const share = slots.reduce((a, s) => a + (s.kcalShare ?? 0), 0);
   const set = (i: number, p: Partial<Slot>) => setSlots((xs) => xs.map((s, j) => (j === i ? { ...s, ...p } : s)));
   const slug = (l: string) =>
@@ -192,7 +194,7 @@ export function MealSlotsEditor({ personId, initial }: { personId: string; initi
                 await saveMealSlots(personId, slots.map((s) => ({ ...s, defaultTime: s.defaultTime?.slice(0, 5) ?? null })));
                 toast.success("Comidas guardadas");
               } catch (e) {
-                toast.error(e instanceof Error ? e.message : "Error");
+                toast.error(errorText(e, "Error"));
               }
             })
           }

@@ -1,5 +1,7 @@
 "use client";
-import { useState, useTransition } from "react";
+import { errorText } from "@/lib/errors";
+import { useState } from "react";
+import { useSafeTransition } from "@/lib/use-safe-transition";
 import { Lock, Plus, RefreshCw, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import { deleteTargetSet, recalcTargets, saveTargets } from "@/actions/health";
@@ -19,7 +21,7 @@ const MACROS = [
 export function TargetEditor({ personId, initial, trigger }: { personId: string; initial: TargetSet; trigger: React.ReactNode }) {
   const [open, setOpen] = useState(false);
   const [t, setT] = useState(initial);
-  const [pending, start] = useTransition();
+  const [pending, start] = useSafeTransition();
   const macroKcal = t.protein * 4 + t.carbs * 4 + t.fat * 9;
   const set = <K extends keyof TargetSet>(k: K, v: TargetSet[K]) => setT((x) => ({ ...x, [k]: v }));
   const pin = (k: string) => set("pinned", t.pinned.includes(k) ? t.pinned.filter((x) => x !== k) : [...t.pinned, k]);
@@ -48,7 +50,7 @@ export function TargetEditor({ personId, initial, trigger }: { personId: string;
                     toast.success("Objetivos guardados");
                     setOpen(false);
                   } catch (err) {
-                    toast.error(err instanceof Error ? err.message : "Error");
+                    toast.error(errorText(err, "Error"));
                   }
                 });
               }}
@@ -132,7 +134,7 @@ export function NewSpecialSet({ personId, base }: { personId: string; base: Targ
 }
 
 export function TargetRowActions({ personId, id, canDelete }: { personId: string; id: string; canDelete: boolean }) {
-  const [pending, start] = useTransition();
+  const [pending, start] = useSafeTransition();
   return canDelete ? (
     <Button size="icon-sm" variant="ghost" aria-label="Borrar" disabled={pending} onClick={() => start(() => deleteTargetSet(personId, id))}>
       <Trash2 />
@@ -141,7 +143,7 @@ export function TargetRowActions({ personId, id, canDelete }: { personId: string
 }
 
 export function Recalc({ personId }: { personId: string }) {
-  const [pending, start] = useTransition();
+  const [pending, start] = useSafeTransition();
   return (
     <Button size="sm" variant="soft" disabled={pending} onClick={() => start(async () => {
       await recalcTargets(personId);

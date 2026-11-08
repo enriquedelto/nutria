@@ -1,9 +1,11 @@
 "use server";
+import { UserError } from "@/lib/errors";
 import { refresh } from "next/cache";
 import { z } from "zod";
 import { aiEstimates, and, eq, groups, inArray, mealPlanItems, mealPlans, mealSlots, persons, planRetros, recipeRatings, recipes, type PortionByPerson } from "@nutria/db";
 import { addEntries, targetsForDate } from "@nutria/core";
 import { generateMealPlan, summarizeRetro } from "@nutria/ai";
+import { aiAction } from "@/lib/ai";
 import { DEFAULT_SLOT_SHARES, familyPortions } from "@nutria/nutrition";
 import { db } from "@/lib/db";
 import { kitchenGuard } from "@/lib/kitchen";
@@ -14,7 +16,7 @@ const day = z.string().regex(/^\d{4}-\d{2}-\d{2}$/);
 
 async function ownPlan(planId: string, groupId: string) {
   const [p] = await db().select().from(mealPlans).where(and(eq(mealPlans.id, uuid.parse(planId)), eq(mealPlans.groupId, groupId))).limit(1);
-  if (!p) throw new Error("Plan no encontrado");
+  if (!p) throw new UserError("Plan no encontrado");
   return p;
 }
 
@@ -59,11 +61,11 @@ export async function addPlanItem(planId: string, input: { date: string; mealSlo
   let kcal: number | null = null;
   if (v.recipeId) {
     const [r] = await db().select({ title: recipes.title, kcal: recipes.kcalPerServing }).from(recipes).where(and(eq(recipes.id, v.recipeId), eq(recipes.groupId, groupId))).limit(1);
-    if (!r) throw new Error("Receta no encontrada");
+    if (!r) throw new UserError("Receta no encontrada");
     title ||= r.title;
     kcal = r.kcal;
   }
-  if (!title) throw new Error("Pon un título o elige una receta");
+  if (!title) throw new UserError("Pon un título o elige una receta");
   await db().insert(mealPlanItems).values({ planId: p.id, date: v.date, mealSlot: v.mealSlot, recipeId: v.recipeId ?? null, title, note: v.note ?? null, portions: await portionsFor(p.personIds, v.date, v.mealSlot, kcal) });
   refresh();
 }
@@ -71,7 +73,7 @@ export async function addPlanItem(planId: string, input: { date: string; mealSlo
 export async function movePlanItem(itemId: string, date: string, mealSlot: string) {
   const { groupId } = await kitchenGuard();
   const [it] = await db().select({ id: mealPlanItems.id }).from(mealPlanItems).innerJoin(mealPlans, eq(mealPlans.id, mealPlanItems.planId)).where(and(eq(mealPlanItems.id, uuid.parse(itemId)), eq(mealPlans.groupId, groupId))).limit(1);
-  if (!it) throw new Error("No encontrado");
+  if (!it) throw new UserError("No encontrado");
   await db().update(mealPlanItems).set({ date: day.parse(date), mealSlot: z.string().max(40).parse(mealSlot) }).where(eq(mealPlanItems.id, it.id));
   refresh();
 }
@@ -86,7 +88,7 @@ export async function deletePlanItem(itemId: string) {
 export async function setPortion(itemId: string, personId: string, servings: number) {
   const { groupId } = await kitchenGuard();
   const [row] = await db().select({ item: mealPlanItems }).from(mealPlanItems).innerJoin(mealPlans, eq(mealPlans.id, mealPlanItems.planId)).where(and(eq(mealPlanItems.id, uuid.parse(itemId)), eq(mealPlans.groupId, groupId))).limit(1);
-  if (!row) throw new Error("No encontrado");
+  if (!row) throw new UserError("No encontrado");
   const portions = { ...row.item.portions };
   const s = z.number().min(0).max(10).parse(servings);
   if (s === 0) delete portions[personId];
@@ -99,8 +101,8 @@ export async function setPortion(itemId: string, personId: string, servings: num
 export async function logPlanItem(itemId: string, personIds: string[]) {
   const { user, groupId } = await kitchenGuard();
   const [row] = await db().select({ item: mealPlanItems, recipe: { foodId: recipes.foodId, totalWeightG: recipes.totalWeightG, servings: recipes.servings } }).from(mealPlanItems).innerJoin(mealPlans, eq(mealPlans.id, mealPlanItems.planId)).leftJoin(recipes, eq(recipes.id, mealPlanItems.recipeId)).where(and(eq(mealPlanItems.id, uuid.parse(itemId)), eq(mealPlans.groupId, groupId))).limit(1);
-  if (!row) throw new Error("No encontrado");
-  if (!row.recipe?.foodId) throw new Error("Solo se pueden registrar platos con receta guardada");
+  if (!row) throw new UserError("No encontrado");
+  if (!row.recipe?.foodId) throw new UserError("Solo se pueden registrar platos con receta guardada");
   const gramsPerServing = row.recipe.totalWeightG ? row.recipe.totalWeightG / (row.recipe.servings || 1) : 300;
   let n = 0;
   for (const pid of z.array(uuid).max(12).parse(personIds)) {
@@ -129,9 +131,9 @@ export async function generatePlanDraft(input: z.input<typeof GenIn>) {
   const { user, groupId } = await kitchenGuard();
   const v = GenIn.parse(input);
   const ps = await plannable(user.id, groupId, v.personIds);
-  if (!ps.length) throw new Error("Sin personas que planificar");
-  if (!ps.some((p) => p.scopes.has("ai"))) throw new Error("Sin permiso de IA");
-  const r = await generateMealPlan({ db: db(), userId: user.id, groupId }, { personIds: ps.map((p) => p.id), from: v.weekStart, days: v.days, slots: v.slots, maxPrepMinWeekday: v.maxPrepMinWeekday ?? undefined, budgetPerDay: v.budgetPerDay ?? undefined, notes: v.notes ?? undefined, scopesByPerson: Object.fromEntries(ps.map((p) => [p.id, p.scopes])) });
+  if (!ps.length) throw new UserError("Sin personas que planificar");
+  if (!ps.some((p) => p.scopes.has("ai"))) throw new UserError("Sin permiso de IA");
+  const r = await aiAction(generateMealPlan({ db: db(), userId: user.id, groupId }, { personIds: ps.map((p) => p.id), from: v.weekStart, days: v.days, slots: v.slots, maxPrepMinWeekday: v.maxPrepMinWeekday ?? undefined, budgetPerDay: v.budgetPerDay ?? undefined, notes: v.notes ?? undefined, scopesByPerson: Object.fromEntries(ps.map((p) => [p.id, p.scopes])) }));
   return r;
 }
 
@@ -139,7 +141,7 @@ export async function generatePlanDraft(input: z.input<typeof GenIn>) {
 export async function applyPlanDraft(estimateId: string, weekStart: string, personIds: string[]) {
   const { user, groupId } = await kitchenGuard();
   const [e] = await db().select().from(aiEstimates).where(and(eq(aiEstimates.id, uuid.parse(estimateId)), eq(aiEstimates.userId, user.id), eq(aiEstimates.kind, "meal_plan"))).limit(1);
-  if (!e) throw new Error("Propuesta no encontrada");
+  if (!e) throw new UserError("Propuesta no encontrada");
   const draft = e.output as { days: { date: string; meals: { mealSlot: string; recipeId: string | null; title: string; ingredients: string[]; servingsByPerson: { personId: string; servings: number }[]; why: string }[] }[] };
   const ps = (await plannable(user.id, groupId, z.array(uuid).parse(personIds))).map((p) => p.id);
   let [plan] = await db().select().from(mealPlans).where(and(eq(mealPlans.groupId, groupId), eq(mealPlans.weekStart, day.parse(weekStart)))).limit(1);
@@ -190,7 +192,7 @@ export async function retroProposal(planId: string) {
     db().select({ md: groups.preferencesMd }).from(groups).where(eq(groups.id, groupId)),
     db().select({ id: persons.id, name: persons.displayName, md: persons.preferencesMd }).from(persons).where(inArray(persons.id, p.personIds.length ? p.personIds : ["00000000-0000-0000-0000-000000000000"])),
   ]);
-  if (!retros.length) throw new Error("Primero valorad los platos de la semana");
+  if (!retros.length) throw new UserError("Primero valorad los platos de la semana");
   const title = new Map(items.map((i) => [i.id, i.title]));
   const feedback = retros
     .map((r) => {
@@ -207,7 +209,7 @@ export async function retroProposal(planId: string) {
       if (a.role === "owner" || a.role === "manager") editable.push(x);
     } catch {}
   }
-  const r = await summarizeRetro({ db: db(), userId: user.id, groupId }, { planId: p.id, feedback, household: g?.md ?? "", perPerson: editable.map((x) => ({ personId: x.id, name: x.name, current: x.md })) });
+  const r = await aiAction(summarizeRetro({ db: db(), userId: user.id, groupId }, { planId: p.id, feedback, household: g?.md ?? "", perPerson: editable.map((x) => ({ personId: x.id, name: x.name, current: x.md })) }));
   return { ...r, names: Object.fromEntries(editable.map((x) => [x.id, x.name])) };
 }
 
@@ -227,7 +229,7 @@ export async function applyRetro(planId: string, estimateId: string, householdMd
 export async function setItemCooked(itemId: string, cooked: boolean) {
   const { groupId } = await kitchenGuard();
   const [it] = await db().select({ id: mealPlanItems.id }).from(mealPlanItems).innerJoin(mealPlans, eq(mealPlans.id, mealPlanItems.planId)).where(and(eq(mealPlanItems.id, uuid.parse(itemId)), eq(mealPlans.groupId, groupId))).limit(1);
-  if (!it) throw new Error("No encontrado");
+  if (!it) throw new UserError("No encontrado");
   await db().update(mealPlanItems).set({ cooked }).where(eq(mealPlanItems.id, it.id));
   refresh();
 }

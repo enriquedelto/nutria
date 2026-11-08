@@ -1,5 +1,7 @@
 "use client";
-import { useRef, useState, useTransition } from "react";
+import { errorText } from "@/lib/errors";
+import { useRef, useState } from "react";
+import { useSafeTransition } from "@/lib/use-safe-transition";
 import { useRouter } from "next/navigation";
 import { Camera, Loader2, Plus, Trash2 } from "lucide-react";
 import { toast } from "sonner";
@@ -11,7 +13,7 @@ import { fileToJpeg } from "@/lib/image";
 import { dateShort, kg } from "@/lib/format";
 
 export function WeightForm({ personId, today }: { personId: string; today: string }) {
-  const [pending, start] = useTransition();
+  const [pending, start] = useSafeTransition();
   const ref = useRef<HTMLFormElement>(null);
   return (
     <form
@@ -42,7 +44,7 @@ export function WeightForm({ personId, today }: { personId: string; today: strin
 }
 
 export function WeightList({ personId, items, canWrite }: { personId: string; items: { id: string; date: string; kg: number; bodyFatPct: number | null; source: string }[]; canWrite: boolean }) {
-  const [, start] = useTransition();
+  const [, start] = useSafeTransition();
   return (
     <ul className="divide-y divide-line text-sm">
       {items.map((w) => (
@@ -65,7 +67,7 @@ export function WeightList({ personId, items, canWrite }: { personId: string; it
 }
 
 export function AcceptTdee({ personId, estimateId, kcal }: { personId: string; estimateId: string; kcal: number }) {
-  const [pending, start] = useTransition();
+  const [pending, start] = useSafeTransition();
   return (
     <Button size="sm" disabled={pending} onClick={() => start(async () => {
       await acceptTdee(personId, estimateId);
@@ -78,7 +80,7 @@ export function AcceptTdee({ personId, estimateId, kcal }: { personId: string; e
 
 export function GoalForm({ personId, current }: { personId: string; current: { targetValue: number; targetDate: string | null } | null }) {
   const [open, setOpen] = useState(false);
-  const [pending, start] = useTransition();
+  const [pending, start] = useSafeTransition();
   return (
     <>
       <Button size="sm" variant="outline" onClick={() => setOpen(true)}>
@@ -111,7 +113,7 @@ const SITES: [string, string][] = [["waist", "Cintura"], ["hips", "Cadera"], ["c
 
 export function MeasurementsForm({ personId, today }: { personId: string; today: string }) {
   const [open, setOpen] = useState(false);
-  const [pending, start] = useTransition();
+  const [pending, start] = useSafeTransition();
   return (
     <>
       <Button size="sm" variant="outline" onClick={() => setOpen(true)}>
@@ -162,7 +164,7 @@ export function PhotoUpload({ personId, today }: { personId: string; today: stri
       toast.success("Foto guardada (cifrada)");
       router.refresh();
     } catch (e) {
-      toast.error(e instanceof Error ? e.message : "No se pudo subir");
+      toast.error(errorText(e, "No se pudo subir"));
     } finally {
       setBusy(false);
     }

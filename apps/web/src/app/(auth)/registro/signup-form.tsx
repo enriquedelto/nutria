@@ -1,5 +1,6 @@
 "use client";
-import { useState, useTransition } from "react";
+import { useState } from "react";
+import { useSafeTransition } from "@/lib/use-safe-transition";
 import { useRouter } from "next/navigation";
 import { Loader2 } from "lucide-react";
 import { authClient } from "@/lib/auth-client";
@@ -8,7 +9,7 @@ import { Field, Input } from "@/components/ui/input";
 
 export function SignupForm({ token, email, first, professional }: { token: string | null; email: string; first: boolean; professional: boolean }) {
   const router = useRouter();
-  const [pending, start] = useTransition();
+  const [pending, start] = useSafeTransition();
   const [error, setError] = useState<string | null>(null);
 
   const onSubmit = (fd: FormData) =>

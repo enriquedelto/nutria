@@ -1,5 +1,6 @@
 "use client";
-import { useEffect, useState, useTransition } from "react";
+import { useEffect, useState } from "react";
+import { useSafeTransition } from "@/lib/use-safe-transition";
 import { useRouter } from "next/navigation";
 import { KeyRound, Laptop, ShieldCheck, Smartphone, Trash2 } from "lucide-react";
 import QRCode from "qrcode";
@@ -11,7 +12,7 @@ import { Field, Input } from "@/components/ui/input";
 const err = (e: { message?: string } | null | undefined, fallback: string) => e?.message ?? fallback;
 
 export function ChangePassword() {
-  const [pending, start] = useTransition();
+  const [pending, start] = useSafeTransition();
   return (
     <form
       className="grid gap-2 sm:grid-cols-[1fr_1fr_auto] sm:items-end"
@@ -42,7 +43,7 @@ export function TwoFactor({ enabled }: { enabled: boolean }) {
   const [qr, setQr] = useState<string | null>(null);
   const [uri, setUri] = useState("");
   const [codes, setCodes] = useState<string[]>([]);
-  const [pending, start] = useTransition();
+  const [pending, start] = useSafeTransition();
   const router = useRouter();
 
   const begin = () =>
@@ -154,7 +155,7 @@ type Pk = { id: string; name?: string | null; createdAt: Date | string; deviceTy
 
 export function Passkeys() {
   const [items, setItems] = useState<Pk[] | null>(null);
-  const [pending, start] = useTransition();
+  const [pending, start] = useSafeTransition();
   const load = async () => {
     const { data } = await authClient.passkey.listUserPasskeys();
     setItems((data as Pk[] | null) ?? []);
@@ -208,7 +209,7 @@ type Sess = { id: string; token: string; userAgent?: string | null; ipAddress?: 
 
 export function Sessions({ currentToken }: { currentToken: string | null }) {
   const [items, setItems] = useState<Sess[] | null>(null);
-  const [pending, start] = useTransition();
+  const [pending, start] = useSafeTransition();
   const load = async () => {
     const { data } = await authClient.listSessions();
     setItems((data as Sess[] | null) ?? []);

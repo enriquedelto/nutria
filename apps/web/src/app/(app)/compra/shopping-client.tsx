@@ -1,5 +1,6 @@
 "use client";
-import { useEffect, useOptimistic, useRef, useState, useTransition } from "react";
+import { useEffect, useOptimistic, useRef, useState } from "react";
+import { useSafeTransition } from "@/lib/use-safe-transition";
 import { useRouter } from "next/navigation";
 import { CalendarDays, Check, ExternalLink, Link2, Loader2, Plus, Repeat, ShoppingBag, Trash2 } from "lucide-react";
 import { toast } from "sonner";
@@ -19,7 +20,7 @@ export function ShoppingClient({ listId, items, categories, planId, store }: { l
   const router = useRouter();
   const [opt, setOpt] = useOptimistic(items, (state, u: { id: string; checked?: boolean; remove?: boolean }) => (u.remove ? state.filter((i) => i.id !== u.id) : state.map((i) => (i.id === u.id ? { ...i, checked: u.checked ?? i.checked } : i))));
   const [text, setText] = useState("");
-  const [pending, start] = useTransition();
+  const [pending, start] = useSafeTransition();
   const [linking, setLinking] = useState<Item | null>(null);
   const [cart, setCart] = useState<Awaited<ReturnType<typeof sendToStore>> | null>(null);
   const input = useRef<HTMLInputElement>(null);
@@ -199,7 +200,7 @@ function Row({ item: i, onToggle, onDelete, onLink }: { item: Item; onToggle: ()
 function LinkDialog({ item, store, onClose }: { item: Item; store: { code: string; name: string }; onClose: () => void }) {
   const [q, setQ] = useState(item.name);
   const [res, setRes] = useState<Awaited<ReturnType<typeof searchStoreProducts>> | null>(null);
-  const [pending, start] = useTransition();
+  const [pending, start] = useSafeTransition();
   const search = () => start(async () => setRes(await searchStoreProducts(store.code, q)));
   useEffect(search, []); // eslint-disable-line react-hooks/exhaustive-deps
   return (

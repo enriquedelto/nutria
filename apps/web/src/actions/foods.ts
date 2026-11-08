@@ -1,4 +1,5 @@
 "use server";
+import { UserError } from "@/lib/errors";
 import { refresh } from "next/cache";
 import { z } from "zod";
 import { and, eq, foodServings, foods } from "@nutria/db";
@@ -22,7 +23,7 @@ const FoodInput = z.object({
 /** Custom food shared with the person's group (visible to the whole household). */
 export async function createFood(personId: string, input: z.input<typeof FoodInput>) {
   const u = await getApiUser();
-  if (!u) throw new Error("No autenticado");
+  if (!u) throw new UserError("No autenticado");
   await assertAccess(u.id, personId, "diary", true);
   const { person } = await personFor(u, personId, "diary", true);
   const v = FoodInput.parse(input);
@@ -61,7 +62,7 @@ export async function createFood(personId: string, input: z.input<typeof FoodInp
 
 export async function deleteCustomFood(personId: string, foodId: string) {
   const u = await getApiUser();
-  if (!u) throw new Error("No autenticado");
+  if (!u) throw new UserError("No autenticado");
   const { person } = await personFor(u, personId, "diary", true);
   await db().delete(foods).where(and(eq(foods.id, z.string().uuid().parse(foodId)), eq(foods.source, "custom"), eq(foods.groupId, person.groupId!)));
   refresh();

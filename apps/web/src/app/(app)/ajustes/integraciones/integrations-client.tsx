@@ -1,5 +1,7 @@
 "use client";
-import { useState, useTransition } from "react";
+import { errorText } from "@/lib/errors";
+import { useState } from "react";
+import { useSafeTransition } from "@/lib/use-safe-transition";
 import { Copy, Plus, RefreshCw, Send, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import { connectOpenGym, createApiToken, createWebhook, deleteWebhook, disconnectIntegration, revokeApiToken, setWebhookEnabled, syncIntegration, testWebhook } from "@/actions/settings";
@@ -39,7 +41,7 @@ export function CodeLine({ text }: { text: string }) {
 export function NewToken() {
   const [token, setToken] = useState<string | null>(null);
   const [scopes, setScopes] = useState<string[]>(["read"]);
-  const [pending, start] = useTransition();
+  const [pending, start] = useSafeTransition();
   return (
     <div className="space-y-3">
       <form
@@ -86,7 +88,7 @@ export function NewToken() {
 }
 
 export function RevokeToken({ id }: { id: string }) {
-  const [pending, start] = useTransition();
+  const [pending, start] = useSafeTransition();
   return (
     <Button size="sm" variant="ghost" disabled={pending} onClick={() => start(() => revokeApiToken(id))}>
       Revocar
@@ -109,7 +111,7 @@ const EVENT_ES: Record<string, string> = {
 export function NewWebhook({ events }: { events: string[] }) {
   const [sel, setSel] = useState<string[]>(["goal.reached", "pantry.expiring"]);
   const [secret, setSecret] = useState<string | null>(null);
-  const [pending, start] = useTransition();
+  const [pending, start] = useSafeTransition();
   return (
     <div className="space-y-3">
       <form
@@ -119,7 +121,7 @@ export function NewWebhook({ events }: { events: string[] }) {
             try {
               setSecret(await createWebhook({ url: String(fd.get("url")), events: sel }));
             } catch (e) {
-              toast.error(e instanceof Error ? e.message : "URL no válida");
+              toast.error(errorText(e, "URL no válida"));
             }
           })
         }
@@ -144,7 +146,7 @@ export function NewWebhook({ events }: { events: string[] }) {
 }
 
 export function WebhookActions({ id, enabled }: { id: string; enabled: boolean }) {
-  const [pending, start] = useTransition();
+  const [pending, start] = useSafeTransition();
   return (
     <div className="flex gap-1">
       <Button size="icon-sm" variant="ghost" aria-label="Probar" disabled={pending} onClick={() => start(async () => {
@@ -166,7 +168,7 @@ export function WebhookActions({ id, enabled }: { id: string; enabled: boolean }
 /* --------------------------------- openGym -------------------------------- */
 
 export function OpenGymConnect({ personId, defaultUrl }: { personId: string; defaultUrl: string }) {
-  const [pending, start] = useTransition();
+  const [pending, start] = useSafeTransition();
   return (
     <form
       className="grid gap-2 sm:grid-cols-[1fr_10rem_auto] sm:items-end"
@@ -176,7 +178,7 @@ export function OpenGymConnect({ personId, defaultUrl }: { personId: string; def
             await connectOpenGym(personId, String(fd.get("url")), String(fd.get("code")));
             toast.success("openGym conectado. Importando historial…");
           } catch (e) {
-            toast.error(e instanceof Error ? e.message : "No se pudo emparejar");
+            toast.error(errorText(e, "No se pudo emparejar"));
           }
         })
       }
@@ -195,7 +197,7 @@ export function OpenGymConnect({ personId, defaultUrl }: { personId: string; def
 }
 
 export function IntegrationActions({ id }: { id: string }) {
-  const [pending, start] = useTransition();
+  const [pending, start] = useSafeTransition();
   return (
     <div className="flex gap-1">
       <Button size="sm" variant="outline" disabled={pending} onClick={() => start(async () => {

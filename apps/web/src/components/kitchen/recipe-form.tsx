@@ -1,5 +1,7 @@
 "use client";
-import { useState, useTransition } from "react";
+import { errorText } from "@/lib/errors";
+import { useState } from "react";
+import { useSafeTransition } from "@/lib/use-safe-transition";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { saveRecipeAction, type RecipeIn } from "@/actions/recipes";
@@ -24,7 +26,7 @@ export function RecipeForm({ initial, recipeId, estimateId }: { initial?: Recipe
   const d: RecipeIn = initial ?? { title: "", servings: 4, ingredients: [], steps: [], tags: [] };
   const [ings, setIngs] = useState(toLines(d));
   const [steps, setSteps] = useState(d.steps.map((s) => s.text).join("\n\n"));
-  const [pending, start] = useTransition();
+  const [pending, start] = useSafeTransition();
   const router = useRouter();
   return (
     <form
@@ -71,7 +73,7 @@ export function RecipeForm({ initial, recipeId, estimateId }: { initial?: Recipe
             toast.success(r.missing ? `Receta guardada. ${r.missing} ingrediente(s) sin cantidad o sin alimento: revisa la nutrición.` : "Receta guardada");
             router.push(`/recetas/${r.id}`);
           } catch (e) {
-            toast.error(e instanceof Error ? e.message : "No se pudo guardar");
+            toast.error(errorText(e, "No se pudo guardar"));
           }
         })
       }

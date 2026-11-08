@@ -1,4 +1,5 @@
 "use server";
+import { UserError } from "@/lib/errors";
 import { refresh } from "next/cache";
 import { z } from "zod";
 import { and, challengeParticipants, challenges, eq, persons } from "@nutria/db";
@@ -15,7 +16,7 @@ const METRICS = ["logging_days", "water_days", "protein_days", "veggie_days", "s
 
 async function ownChallenge(id: string, groupId: string) {
   const [c] = await db().select().from(challenges).where(and(eq(challenges.id, uuid.parse(id)), eq(challenges.groupId, groupId))).limit(1);
-  if (!c) throw new Error("Reto no encontrado");
+  if (!c) throw new UserError("Reto no encontrado");
   return c;
 }
 
@@ -51,7 +52,7 @@ export async function joinChallenge(challengeId: string, personId: string) {
   const { user, groupId } = await kitchenGuard();
   const c = await ownChallenge(challengeId, groupId);
   const [pid] = await enrollable(user.id, groupId, [uuid.parse(personId)]);
-  if (!pid) throw new Error("No puedes apuntar a esta persona");
+  if (!pid) throw new UserError("No puedes apuntar a esta persona");
   await db().insert(challengeParticipants).values({ challengeId: c.id, personId: pid }).onConflictDoNothing();
   await scoreChallenge(db(), c.id);
   refresh();
@@ -68,7 +69,7 @@ export async function leaveChallenge(challengeId: string, personId: string) {
 export async function deleteChallenge(challengeId: string) {
   const { user, groupId, groupRole } = await kitchenGuard();
   const c = await ownChallenge(challengeId, groupId);
-  if (c.createdBy !== user.id && groupRole !== "admin") throw new Error("Solo quien lo creó o un admin puede borrarlo");
+  if (c.createdBy !== user.id && groupRole !== "admin") throw new UserError("Solo quien lo creó o un admin puede borrarlo");
   await db().delete(challenges).where(eq(challenges.id, c.id));
   refresh();
 }

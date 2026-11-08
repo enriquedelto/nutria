@@ -1,5 +1,5 @@
 "use client";
-import { useTransition } from "react";
+import { useSafeTransition } from "@/lib/use-safe-transition";
 import { DropdownMenu } from "radix-ui";
 import { Check, ChevronDown, LogOut, Settings } from "lucide-react";
 import { useRouter } from "next/navigation";
@@ -19,7 +19,7 @@ export function Avatar({ name, color, size = 32 }: { name: string; color: string
 }
 
 export function PersonSwitcher({ persons, activeId, userName }: { persons: PersonSummary[]; activeId: string; userName: string }) {
-  const [pending, start] = useTransition();
+  const [pending, start] = useSafeTransition();
   const router = useRouter();
   const active = persons.find((p) => p.id === activeId) ?? persons[0]!;
   return (

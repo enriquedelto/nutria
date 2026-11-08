@@ -1,5 +1,7 @@
 "use client";
-import { useRef, useState, useTransition } from "react";
+import { errorText } from "@/lib/errors";
+import { useRef, useState } from "react";
+import { useSafeTransition } from "@/lib/use-safe-transition";
 import { useRouter } from "next/navigation";
 import { FileUp, Loader2 } from "lucide-react";
 import { toast } from "sonner";
@@ -24,7 +26,7 @@ export function ImportCsv({ personId }: { personId: string }) {
       toast.success("Importación en cola. Tardará unos minutos.");
       router.refresh();
     } catch (e) {
-      toast.error(e instanceof Error ? e.message : "Error");
+      toast.error(errorText(e, "Error"));
     } finally {
       setBusy(false);
       if (input.current) input.current.value = "";
@@ -42,7 +44,7 @@ export function ImportCsv({ personId }: { personId: string }) {
 
 export function DeleteAccount({ email }: { email: string }) {
   const [open, setOpen] = useState(false);
-  const [pending, start] = useTransition();
+  const [pending, start] = useSafeTransition();
   return (
     <>
       <Button variant="danger" onClick={() => setOpen(true)}>

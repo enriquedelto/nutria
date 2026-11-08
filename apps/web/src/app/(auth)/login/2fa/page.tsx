@@ -1,5 +1,6 @@
 "use client";
-import { useState, useTransition } from "react";
+import { useState } from "react";
+import { useSafeTransition } from "@/lib/use-safe-transition";
 import { useRouter } from "next/navigation";
 import { authClient } from "@/lib/auth-client";
 import { Button } from "@/components/ui/button";
@@ -7,7 +8,7 @@ import { Field, Input } from "@/components/ui/input";
 
 export default function TwoFactorPage() {
   const router = useRouter();
-  const [pending, start] = useTransition();
+  const [pending, start] = useSafeTransition();
   const [backup, setBackup] = useState(false);
   const [error, setError] = useState<string | null>(null);
 

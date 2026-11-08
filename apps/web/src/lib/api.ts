@@ -2,9 +2,10 @@ import "server-only";
 import { ZodError } from "zod";
 import { eq, getPersonAccess, persons, type AccessScope } from "@nutria/db";
 import { db } from "./db";
+import { UserError } from "./errors";
 import { getApiUser, type CurrentUser } from "./session";
 
-export class HttpError extends Error {
+export class HttpError extends UserError {
   constructor(
     public status: number,
     message: string,
@@ -26,6 +27,7 @@ export function route<C = unknown>(fn: (req: Request, user: CurrentUser, ctx: C)
       if (e instanceof HttpError) return json({ error: e.message }, e.status);
       if (e instanceof ZodError) return json({ error: "Datos no válidos", issues: e.issues }, 400);
       if (e instanceof Error && e.message.startsWith("Sin permiso")) return json({ error: e.message }, 403);
+      if (e instanceof UserError) return json({ error: e.message }, 400);
       console.error(JSON.stringify({ svc: "web", msg: "route error", path: new URL(req.url).pathname, requestId: req.headers.get("x-request-id"), error: e instanceof Error ? e.message : String(e) }));
       return json({ error: "Error interno" }, 500);
     }

@@ -1,4 +1,5 @@
 import "server-only";
+import { UserError } from "@/lib/errors";
 import { and, asc, eq, groupMembers, persons } from "@nutria/db";
 import { db } from "./db";
 import { getApiUser, getPersonContext } from "./session";
@@ -7,14 +8,14 @@ import { getApiUser, getPersonContext } from "./session";
 export async function groupOf(userId: string, preferred?: string | null) {
   const rows = await db().select({ groupId: groupMembers.groupId, role: groupMembers.role }).from(groupMembers).where(eq(groupMembers.userId, userId)).orderBy(asc(groupMembers.createdAt));
   const g = rows.find((r) => r.groupId === preferred) ?? rows[0];
-  if (!g) throw new Error("Sin permiso: no perteneces a ningún hogar");
+  if (!g) throw new UserError("Sin permiso: no perteneces a ningún hogar");
   return g;
 }
 
 /** For server actions. */
 export async function kitchenGuard() {
   const u = await getApiUser();
-  if (!u) throw new Error("No autenticado");
+  if (!u) throw new UserError("No autenticado");
   const g = await groupOf(u.id);
   return { user: u, groupId: g.groupId, groupRole: g.role };
 }

@@ -1,5 +1,7 @@
 "use client";
-import { useState, useTransition } from "react";
+import { errorText } from "@/lib/errors";
+import { useState } from "react";
+import { useSafeTransition } from "@/lib/use-safe-transition";
 import { Check, Loader2, Meh, Sparkles, ThumbsDown, ThumbsUp, Utensils } from "lucide-react";
 import { toast } from "sonner";
 import { applyRetro, retroProposal, saveRetroAnswers } from "@/actions/plans";
@@ -28,7 +30,7 @@ export function RetroClient(props: {
 }) {
   const [who, setWho] = useState(props.defaultPersonId);
   const [all, setAll] = useState(props.answers);
-  const [pending, start] = useTransition();
+  const [pending, start] = useSafeTransition();
   const mine = all[who] ?? { items: {}, comment: "" };
   const items = props.items.filter((i) => !i.eaters.length || i.eaters.includes(who));
   const set = (itemId: string, patch: Answer) => setAll((a) => ({ ...a, [who]: { ...mine, items: { ...mine.items, [itemId]: { ...mine.items[itemId], ...patch } } } }));
@@ -98,7 +100,7 @@ export function RetroClient(props: {
                 await saveRetroAnswers(props.planId, who, mine.items, mine.comment);
                 toast.success("Valoración guardada");
               } catch (e) {
-                toast.error(e instanceof Error ? e.message : "Error");
+                toast.error(errorText(e, "Error"));
               }
             })
           }
@@ -115,7 +117,7 @@ export function RetroClient(props: {
 type Proposal = Awaited<ReturnType<typeof retroProposal>>;
 
 function Learn({ planId, done, ready, currentHousehold }: { planId: string; done: boolean; ready: boolean; currentHousehold: string }) {
-  const [pending, start] = useTransition();
+  const [pending, start] = useSafeTransition();
   const [p, setP] = useState<Proposal | null>(null);
   const [household, setHousehold] = useState("");
   const [per, setPer] = useState<Record<string, string>>({});
@@ -145,7 +147,7 @@ function Learn({ planId, done, ready, currentHousehold }: { planId: string; done
                   setHousehold(r.householdMd);
                   setPer(Object.fromEntries(r.perPerson.map((x) => [x.personId, x.preferencesMd])));
                 } catch (e) {
-                  toast.error(e instanceof Error ? e.message : "Error de la IA");
+                  toast.error(errorText(e, "Error de la IA"));
                 }
               })
             }
@@ -177,7 +179,7 @@ function Learn({ planId, done, ready, currentHousehold }: { planId: string; done
                     toast.success("Preferencias actualizadas");
                     setP(null);
                   } catch (e) {
-                    toast.error(e instanceof Error ? e.message : "Error");
+                    toast.error(errorText(e, "Error"));
                   }
                 })
               }

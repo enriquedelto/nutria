@@ -1,7 +1,8 @@
 import { Suspense } from "react";
 import Link from "next/link";
 import { Package, Refrigerator, Snowflake, Sparkles } from "lucide-react";
-import { and, asc, batches, eq, gt, pantryItems, sql } from "@nutria/db";
+import { and, asc, batches, eq, gt, mealSlots, pantryItems, sql } from "@nutria/db";
+import { ensureMealSlots } from "@nutria/core";
 import { expiryStatus, todayIn } from "@nutria/nutrition";
 import { PageHeader } from "@/components/page-header";
 import { Button } from "@/components/ui/button";
@@ -10,7 +11,8 @@ import { Empty, Skeleton } from "@/components/ui/empty";
 import { db } from "@/lib/db";
 import { dateShort, n1 } from "@/lib/format";
 import { kitchenContext } from "@/lib/kitchen";
-import { AddPantry, BatchDone, PantryRow } from "./pantry-client";
+import { closestSlot } from "@/lib/slots";
+import { AddPantry, BatchDone, EatBatch, PantryRow } from "./pantry-client";
 
 export const metadata = { title: "Despensa" };
 
@@ -33,10 +35,14 @@ function label(expiresOn: string | null, today: string) {
 async function Content() {
   const k = await kitchenContext();
   const today = todayIn(k.person.timezone);
-  const [items, tuppers] = await Promise.all([
+  const canEat = k.canWrite && k.scopes.has("diary");
+  if (canEat) await ensureMealSlots(db(), k.person.id);
+  const [items, tuppers, slots] = await Promise.all([
     db().select().from(pantryItems).where(eq(pantryItems.groupId, k.groupId)).orderBy(sql`${pantryItems.expiresOn} asc nulls last`, asc(pantryItems.name)),
     db().select().from(batches).where(and(eq(batches.groupId, k.groupId), gt(batches.portionsLeft, 0))).orderBy(asc(batches.expiresOn)),
+    canEat ? db().select({ key: mealSlots.key, time: mealSlots.defaultTime }).from(mealSlots).where(eq(mealSlots.personId, k.person.id)).orderBy(asc(mealSlots.sortOrder)) : Promise.resolve([]),
   ]);
+  const slot = closestSlot(slots, k.person.timezone);
   const urgent = items.filter((i) => ["expired", "soon"].includes(expiryStatus(i.expiresOn, today)));
   return (
     <div className="space-y-4">
@@ -72,6 +78,7 @@ async function Content() {
                     {b.location} · cocinado el {dateShort(b.cookedOn)} · {label(b.expiresOn, today)}
                   </span>
                 </span>
+                {canEat && b.recipeId ? <EatBatch id={b.id} personId={k.person.id} personName={k.person.name} date={today} slot={slot} /> : null}
                 <BatchDone id={b.id} />
               </li>
             ))}

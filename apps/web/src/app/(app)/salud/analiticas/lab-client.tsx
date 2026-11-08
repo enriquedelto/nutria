@@ -1,5 +1,7 @@
 "use client";
-import { useRef, useState, useTransition } from "react";
+import { errorText } from "@/lib/errors";
+import { useRef, useState } from "react";
+import { useSafeTransition } from "@/lib/use-safe-transition";
 import { FileUp, Loader2, Plus, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import { confirmLabReport, deleteLabReport } from "@/actions/health";
@@ -38,7 +40,7 @@ export function LabUpload({ personId, params, drafts }: { personId: string; para
       setDraft({ reportId: out.reportId, date: out.date ?? new Date().toISOString().slice(0, 10), labName: out.labName, results: out.results });
       toast.success(`${out.results.length} valores leídos. Revísalos antes de guardar.`);
     } catch (e) {
-      toast.error(e instanceof Error ? e.message : "Error");
+      toast.error(errorText(e, "Error"));
     } finally {
       setBusy(false);
       if (input.current) input.current.value = "";
@@ -61,7 +63,7 @@ function LabReview({ personId, params, draft, onDone }: { personId: string; para
   const [rows, setRows] = useState<LabRow[]>(draft.results);
   const [date, setDate] = useState(draft.date);
   const [lab, setLab] = useState(draft.labName ?? "");
-  const [pending, start] = useTransition();
+  const [pending, start] = useSafeTransition();
   const set = (i: number, patch: Partial<LabRow>) => setRows((xs) => xs.map((r, j) => (j === i ? { ...r, ...patch } : r)));
   const num = (v: string) => (v === "" ? null : Number(v.replace(",", ".")));
   return (
@@ -163,7 +165,7 @@ function LabReview({ personId, params, draft, onDone }: { personId: string; para
 }
 
 export function DeleteReport({ personId, id }: { personId: string; id: string }) {
-  const [pending, start] = useTransition();
+  const [pending, start] = useSafeTransition();
   return (
     <button type="button" disabled={pending} aria-label="Borrar analítica" className="rounded-full p-1 text-ink-3 hover:bg-paper-2" onClick={() => start(() => deleteLabReport(personId, id))}>
       <Trash2 className="size-4" />

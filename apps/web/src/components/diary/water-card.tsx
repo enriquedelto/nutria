@@ -1,5 +1,6 @@
 "use client";
-import { useEffect, useOptimistic, useRef, useTransition } from "react";
+import { useEffect, useOptimistic, useRef } from "react";
+import { useSafeTransition } from "@/lib/use-safe-transition";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Droplet, Minus } from "lucide-react";
 import { toast } from "sonner";
@@ -10,7 +11,7 @@ import { n0 } from "@/lib/format";
 
 export function WaterCard({ personId, date, ml, goal, canWrite }: { personId: string; date: string; ml: number; goal: number; canWrite: boolean }) {
   const [optimistic, add] = useOptimistic(ml, (s, d: number) => Math.max(0, s + d));
-  const [, start] = useTransition();
+  const [, start] = useSafeTransition();
   const params = useSearchParams();
   const router = useRouter();
   const done = useRef(false);

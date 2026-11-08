@@ -10,6 +10,7 @@ import { Skeleton } from "@/components/ui/empty";
 import { db } from "@/lib/db";
 import { dateShort, n0, n1 } from "@/lib/format";
 import { requireAdmin } from "@/lib/session";
+import { aiConfigured } from "@/lib/ai";
 import { InviteHousehold, RoleToggle, RunJob, ResetLink } from "./admin-client";
 
 export const metadata = { title: "Administración" };
@@ -57,7 +58,7 @@ async function Content() {
   return (
     <div className="grid gap-4 xl:grid-cols-2">
       <Card className="xl:col-span-2">
-        <CardHeader title="Usuarios" subtitle={`${users.length} cuentas · IA: ${cfg.dailyRequests} peticiones/día por persona (admins sin límite) · ${process.env.AI_BACKEND ?? "subscription"}`} action={<InviteHousehold />} />
+        <CardHeader title="Usuarios" subtitle={`${users.length} cuentas · IA: ${cfg.dailyRequests} peticiones/día por persona (admins sin límite) · ${process.env.AI_BACKEND ?? "subscription"}${aiConfigured() ? "" : " (sin configurar: falta el token o la clave)"}`} action={<InviteHousehold />} />
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
             <thead className="text-left text-xs text-ink-3">

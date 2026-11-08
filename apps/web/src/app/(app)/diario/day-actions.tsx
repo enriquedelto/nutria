@@ -1,5 +1,6 @@
 "use client";
-import { useState, useTransition } from "react";
+import { useState } from "react";
+import { useSafeTransition } from "@/lib/use-safe-transition";
 import { CheckCircle2, Copy, Save, Smile } from "lucide-react";
 import { toast } from "sonner";
 import { copyMealTo, saveTemplate, setDayComplete } from "@/actions/diary";
@@ -12,7 +13,7 @@ import { cn } from "@/lib/utils";
 type TemplateItem = { foodId?: string; name: string; grams: number; servingLabel?: string };
 
 export function DayActions({ personId, date, today, complete, hasEntries, meals }: { personId: string; date: string; today: string; complete: boolean; hasEntries: boolean; meals: { key: string; label: string; items: TemplateItem[] }[] }) {
-  const [pending, start] = useTransition();
+  const [pending, start] = useSafeTransition();
   const [tpl, setTpl] = useState(false);
   return (
     <div className="flex flex-wrap gap-2">
@@ -91,7 +92,7 @@ function Scale({ name, label, low, high, value }: { name: string; label: string;
 
 export function FeelingButton({ personId, date, slot, current }: { personId: string; date: string; slot: string; current: { hungerBefore: number | null; satietyAfter: number | null; mood: number | null; note: string | null } | null }) {
   const [open, setOpen] = useState(false);
-  const [pending, start] = useTransition();
+  const [pending, start] = useSafeTransition();
   const filled = current && (current.hungerBefore || current.satietyAfter || current.mood);
   return (
     <>

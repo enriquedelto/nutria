@@ -1,4 +1,5 @@
 "use server";
+import { UserError } from "@/lib/errors";
 import { refresh } from "next/cache";
 import { z } from "zod";
 import { and, auditLog, desc, eq, gte, user } from "@nutria/db";
@@ -10,7 +11,7 @@ import { getApiUser } from "@/lib/session";
 
 async function admin() {
   const u = await getApiUser();
-  if (!u || u.role !== "admin") throw new Error("Solo administración");
+  if (!u || u.role !== "admin") throw new UserError("Solo administración");
   return u;
 }
 
@@ -18,7 +19,7 @@ const base = () => (process.env.BETTER_AUTH_URL ?? "http://localhost:3000").repl
 
 export async function setUserRole(userId: string, role: "admin" | "member") {
   const me = await admin();
-  if (userId === me.id && role !== "admin") throw new Error("No puedes quitarte la administración a ti");
+  if (userId === me.id && role !== "admin") throw new UserError("No puedes quitarte la administración a ti");
   await db().update(user).set({ role: z.enum(["admin", "member"]).parse(role) }).where(eq(user.id, z.string().min(1).parse(userId)));
   await audit(db(), { userId: me.id, action: "set_role", resource: "user", resourceId: userId, meta: { role } });
   refresh();
@@ -28,13 +29,13 @@ export async function setUserRole(userId: string, role: "admin" | "member") {
 export async function resetLinkFor(userId: string) {
   const me = await admin();
   const [u] = await db().select({ id: user.id, email: user.email }).from(user).where(eq(user.id, z.string().min(1).parse(userId))).limit(1);
-  if (!u) throw new Error("Usuario no encontrado");
+  if (!u) throw new UserError("Usuario no encontrado");
   const since = new Date(Date.now() - 5_000);
   await auth().api.requestPasswordReset({ body: { email: u.email, redirectTo: "/login/restablecer" } });
   const [row] = await db().select().from(auditLog).where(and(eq(auditLog.resourceId, u.id), eq(auditLog.action, "password_reset_requested"), gte(auditLog.createdAt, since))).orderBy(desc(auditLog.createdAt)).limit(1);
   await audit(db(), { userId: me.id, action: "reset_link_generated", resource: "user", resourceId: u.id });
   const url = (row?.meta as { url?: string } | undefined)?.url;
-  if (!url) throw new Error("No se pudo generar el enlace");
+  if (!url) throw new UserError("No se pudo generar el enlace");
   return url;
 }
 

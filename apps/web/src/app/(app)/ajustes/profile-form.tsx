@@ -1,5 +1,7 @@
 "use client";
-import { useState, useTransition } from "react";
+import { errorText } from "@/lib/errors";
+import { useState } from "react";
+import { useSafeTransition } from "@/lib/use-safe-transition";
 import { X } from "lucide-react";
 import { toast } from "sonner";
 import { updateProfile } from "@/actions/settings";
@@ -45,7 +47,7 @@ const DIETS = [
 export function ProfileForm({ personId, initial, allergens, timezones, isChild }: { personId: string; initial: ProfileValues; allergens: { code: string; name: string }[]; timezones: string[]; isChild: boolean }) {
   const [v, setV] = useState(initial);
   const [dislike, setDislike] = useState("");
-  const [pending, start] = useTransition();
+  const [pending, start] = useSafeTransition();
   const set = <K extends keyof ProfileValues>(k: K, val: ProfileValues[K]) => setV((x) => ({ ...x, [k]: val }));
   const toggleAllergen = (c: string) => set("allergens", v.allergens.includes(c) ? v.allergens.filter((x) => x !== c) : [...v.allergens, c]);
   const addDislike = () => {
@@ -64,7 +66,7 @@ export function ProfileForm({ personId, initial, allergens, timezones, isChild }
             await updateProfile(personId, v);
             toast.success("Perfil guardado. Objetivos recalculados.");
           } catch (err) {
-            toast.error(err instanceof Error ? err.message : "Error");
+            toast.error(errorText(err, "Error"));
           }
         });
       }}

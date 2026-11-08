@@ -1,5 +1,7 @@
 "use client";
-import { useRef, useState, useTransition } from "react";
+import { errorText } from "@/lib/errors";
+import { useRef, useState } from "react";
+import { useSafeTransition } from "@/lib/use-safe-transition";
 import { useRouter } from "next/navigation";
 import { Camera, Loader2 } from "lucide-react";
 import { toast } from "sonner";
@@ -14,7 +16,7 @@ const MAIN = ["energy_kcal", "protein", "carbs", "sugars", "fat", "sat_fat", "fi
 
 export function NewFoodForm({ personId, barcode, label, aiEnabled }: { personId: string; barcode: string | null; label: boolean; aiEnabled: boolean }) {
   const router = useRouter();
-  const [pending, start] = useTransition();
+  const [pending, start] = useSafeTransition();
   const [reading, setReading] = useState(false);
   const [per100, setPer100] = useState<Record<string, number>>({});
   const [meta, setMeta] = useState({ name: "", brand: "", barcode: barcode ?? "", ingredients: "", servingLabel: "", servingGrams: "", estimateId: null as string | null, allergens: [] as string[] });
@@ -42,7 +44,7 @@ export function NewFoodForm({ personId, barcode, label, aiEnabled }: { personId:
       }));
       toast.success(d.confidence < 0.6 ? "Etiqueta leída con dudas: revisa los valores" : "Etiqueta leída");
     } catch (e) {
-      toast.error(e instanceof Error ? e.message : "No se pudo leer la etiqueta");
+      toast.error(errorText(e, "No se pudo leer la etiqueta"));
     } finally {
       setReading(false);
     }

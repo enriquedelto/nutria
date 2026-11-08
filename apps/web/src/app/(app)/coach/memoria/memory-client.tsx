@@ -1,5 +1,6 @@
 "use client";
-import { useRef, useState, useTransition } from "react";
+import { useRef, useState } from "react";
+import { useSafeTransition } from "@/lib/use-safe-transition";
 import { Loader2, Plus, Sparkles, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import { addMemory, deleteMemory, saveHouseholdPreferences } from "@/actions/ai";
@@ -25,7 +26,7 @@ export function MemoryClient({
   lastConversationId: string | null;
   canWrite: boolean;
 }) {
-  const [pending, start] = useTransition();
+  const [pending, start] = useSafeTransition();
   const [suggested, setSuggested] = useState<{ category: string; contentMd: string }[] | null>(null);
   const [extracting, setExtracting] = useState(false);
   const [hh, setHh] = useState(household);

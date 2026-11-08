@@ -1,8 +1,10 @@
 "use client";
-import { useRef, useState, useTransition } from "react";
+import { errorText } from "@/lib/errors";
+import { useRef, useState } from "react";
+import { useSafeTransition } from "@/lib/use-safe-transition";
 import { Camera, Loader2, Minus, Plus, ScanBarcode, Star, Trash2 } from "lucide-react";
 import { toast } from "sonner";
-import { addPantryItem, confirmPantryDraft, deletePantryItem, discardBatch, pantryFromBarcode, pantryPhotoDraft, updatePantryItem } from "@/actions/kitchen";
+import { addPantryItem, confirmPantryDraft, deletePantryItem, discardBatch, eatFromBatch, pantryFromBarcode, pantryPhotoDraft, updatePantryItem } from "@/actions/kitchen";
 import { Scanner } from "@/components/food/scanner";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent } from "@/components/ui/dialog";
@@ -13,7 +15,7 @@ import { cn } from "@/lib/utils";
 type Loc = "nevera" | "congelador" | "despensa";
 
 export function AddPantry({ defaultLocation = "despensa" }: { defaultLocation?: Loc }) {
-  const [pending, start] = useTransition();
+  const [pending, start] = useSafeTransition();
   const [scan, setScan] = useState(false);
   const [loc, setLoc] = useState<Loc>(defaultLocation);
   const [draft, setDraft] = useState<{ estimateId: string; items: { name: string; quantity: number; unit: "g" | "ml" | "ud"; location: Loc; expiresInDays: number | null }[] } | null>(null);
@@ -31,7 +33,7 @@ export function AddPantry({ defaultLocation = "despensa" }: { defaultLocation?: 
               await addPantryItem({ name: String(fd.get("name")), quantity: Number(fd.get("qty") || 1), unit: String(fd.get("unit")) as "ud", location: loc, expires: String(fd.get("exp") || "") || null });
               form.current?.reset();
             } catch (e) {
-              toast.error(e instanceof Error ? e.message : "Error");
+              toast.error(errorText(e, "Error"));
             }
           })
         }
@@ -90,7 +92,7 @@ export function AddPantry({ defaultLocation = "despensa" }: { defaultLocation?: 
                 const r = await pantryPhotoDraft(imgs);
                 setDraft({ estimateId: r.estimateId, items: r.items });
               } catch (err) {
-                toast.error(err instanceof Error ? err.message : "Error de la IA");
+                toast.error(errorText(err, "Error de la IA"));
               }
             });
           }}
@@ -139,7 +141,7 @@ export function AddPantry({ defaultLocation = "despensa" }: { defaultLocation?: 
 
 export function PantryRow({ item, status, label }: { item: { id: string; name: string; quantity: number; unit: string; staple: boolean; expiresOn: string | null; openedOn: string | null }; status: "expired" | "soon" | "ok" | "none"; label: string }) {
   const [q, setQ] = useState(item.quantity);
-  const [, start] = useTransition();
+  const [, start] = useSafeTransition();
   const step = item.unit === "ud" ? 1 : item.unit === "g" ? 50 : 100;
   const change = (d: number) => {
     const next = Math.max(0, Math.round((q + d) * 100) / 100);
@@ -176,10 +178,30 @@ export function PantryRow({ item, status, label }: { item: { id: string; name: s
 }
 
 export function BatchDone({ id }: { id: string }) {
-  const [pending, start] = useTransition();
+  const [pending, start] = useSafeTransition();
   return (
     <Button size="sm" variant="ghost" disabled={pending} onClick={() => start(() => discardBatch(id))}>
       Ya no queda
+    </Button>
+  );
+}
+
+export function EatBatch({ id, personId, personName, date, slot }: { id: string; personId: string; personName: string; date: string; slot: string }) {
+  const [pending, start] = useSafeTransition();
+  return (
+    <Button
+      size="sm"
+      variant="soft"
+      disabled={pending}
+      title={`Registra 1 ración en el diario de ${personName}`}
+      onClick={() =>
+        start(async () => {
+          const r = await eatFromBatch(id, { personId, date, mealSlot: slot, portions: 1 });
+          toast.success(`Registrado en el diario · quedan ${r.left}`);
+        })
+      }
+    >
+      Comer 1 ración
     </Button>
   );
 }

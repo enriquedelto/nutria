@@ -1,13 +1,16 @@
 "use server";
+import { UserError } from "@/lib/errors";
 import { refresh } from "next/cache";
 import { z } from "zod";
-import { aiEstimates, and, batches, desc, eq, foods, inArray, pantryItems, prices, searchFoods, shoppingItems, shoppingLists, storeProductLinks, stores } from "@nutria/db";
+import { aiEstimates, and, batches, desc, eq, foods, gt, inArray, pantryItems, prices, recipes, searchFoods, shoppingItems, shoppingLists, sql, storeProductLinks, stores } from "@nutria/db";
 import { openShoppingList, shoppingFromPlan } from "@nutria/core";
 import { pantryFromPhoto } from "@nutria/ai";
+import { aiAction } from "@/lib/ai";
 import { STORE_PROVIDERS } from "@nutria/integrations";
 import { guessCategory, ingredientKey, parseDateShorthand } from "@nutria/nutrition";
 import { publish } from "@/lib/bus";
 import { db } from "@/lib/db";
+import { addDiaryItems } from "@/lib/diary-service";
 import { kitchenGuard } from "@/lib/kitchen";
 
 const uuid = z.string().uuid();
@@ -30,7 +33,7 @@ const PantryIn = z.object({
 function expiresFrom(v: string | null | undefined): string | null {
   if (!v) return null;
   const r = parseDateShorthand(v);
-  if (r === null) throw new Error("Fecha no válida (usa 2026-12-31, +1m, +10d, 1231…)");
+  if (r === null) throw new UserError("Fecha no válida (usa 2026-12-31, +1m, +10d, 1231…)");
   return r === "never" ? null : r;
 }
 
@@ -91,7 +94,7 @@ export async function pantryFromBarcode(code: string, location: string) {
 export async function pantryPhotoDraft(images: { mediaType: "image/jpeg" | "image/png" | "image/webp"; data: string }[]) {
   const { user, groupId } = await kitchenGuard();
   const imgs = z.array(z.object({ mediaType: z.enum(["image/jpeg", "image/png", "image/webp"]), data: z.string().max(8_000_000) })).min(1).max(4).parse(images);
-  const r = await pantryFromPhoto({ db: db(), userId: user.id, groupId }, imgs.map((i) => ({ type: "image" as const, ...i })));
+  const r = await aiAction(pantryFromPhoto({ db: db(), userId: user.id, groupId }, imgs.map((i) => ({ type: "image" as const, ...i }))));
   return r;
 }
 
@@ -113,11 +116,43 @@ export async function discardBatch(id: string) {
   refresh();
 }
 
+const EatIn = z.object({
+  personId: uuid,
+  date: z.string().regex(/^d{4}-d{2}-d{2}$/),
+  mealSlot: z.string().min(1).max(40),
+  portions: z.number().min(0.25).max(20).default(1),
+});
+
+/** Log portions from a tupper: diary entry with the recipe food, and the batch goes down. */
+export async function eatFromBatch(id: string, input: z.input<typeof EatIn>) {
+  const { user, groupId } = await kitchenGuard();
+  const v = EatIn.parse(input);
+  const [b] = await db()
+    .select({ id: batches.id, left: batches.portionsLeft, grams: batches.gramsPerPortion, foodId: recipes.foodId, servings: recipes.servings, total: recipes.totalWeightG })
+    .from(batches)
+    .leftJoin(recipes, eq(recipes.id, batches.recipeId))
+    .where(and(eq(batches.id, uuid.parse(id)), eq(batches.groupId, groupId)))
+    .limit(1);
+  if (!b) throw new UserError("Tupper no encontrado");
+  if (b.left <= 0) throw new UserError("Ya no quedan raciones en ese tupper");
+  if (!b.foodId) throw new UserError("La receta del tupper ya no existe: regístralo a mano");
+  const portions = Math.min(v.portions, b.left);
+  const perPortion = b.grams ?? (b.total && b.servings ? b.total / b.servings : 300);
+  await addDiaryItems(user.id, { personId: v.personId, date: v.date, mealSlot: v.mealSlot, origin: "batch", items: [{ foodId: b.foodId, grams: Math.round(perPortion * portions), servingLabel: "ración", servingQty: portions }] });
+  // Atomic and never below zero, even with two people eating from the same tupper at once.
+  await db()
+    .update(batches)
+    .set({ portionsLeft: sql`greatest(0, ${batches.portionsLeft} - ${portions})` })
+    .where(and(eq(batches.id, b.id), gt(batches.portionsLeft, 0)));
+  refresh();
+  return { portions, left: Math.max(0, b.left - portions) };
+}
+
 /* ------------------------------- shopping ------------------------------- */
 
 async function ownList(listId: string, groupId: string) {
   const [l] = await db().select().from(shoppingLists).where(and(eq(shoppingLists.id, uuid.parse(listId)), eq(shoppingLists.groupId, groupId))).limit(1);
-  if (!l) throw new Error("Lista no encontrada");
+  if (!l) throw new UserError("Lista no encontrada");
   return l;
 }
 const changed = async (listId: string) => {
@@ -152,7 +187,7 @@ export async function addShoppingItem(listId: string, text: string) {
 export async function toggleShoppingItem(id: string, checked: boolean) {
   const { user, groupId } = await kitchenGuard();
   const [it] = await db().select({ id: shoppingItems.id, listId: shoppingItems.listId }).from(shoppingItems).innerJoin(shoppingLists, eq(shoppingLists.id, shoppingItems.listId)).where(and(eq(shoppingItems.id, uuid.parse(id)), eq(shoppingLists.groupId, groupId))).limit(1);
-  if (!it) throw new Error("No encontrado");
+  if (!it) throw new UserError("No encontrado");
   await db().update(shoppingItems).set({ checked, checkedBy: checked ? user.id : null }).where(eq(shoppingItems.id, it.id));
   await changed(it.listId);
 }
@@ -224,9 +259,9 @@ export async function searchStoreProducts(storeCode: string, q: string) {
 export async function linkStoreProduct(itemId: string, storeCode: string, product: { productId: string; name: string; pack?: string | null; price?: number | null }) {
   const { groupId } = await kitchenGuard();
   const [it] = await db().select({ item: shoppingItems }).from(shoppingItems).innerJoin(shoppingLists, eq(shoppingLists.id, shoppingItems.listId)).where(and(eq(shoppingItems.id, uuid.parse(itemId)), eq(shoppingLists.groupId, groupId))).limit(1);
-  if (!it) throw new Error("No encontrado");
+  if (!it) throw new UserError("No encontrado");
   const [store] = await db().select().from(stores).where(eq(stores.code, storeCode)).limit(1);
-  if (!store) throw new Error("Tienda no configurada");
+  if (!store) throw new UserError("Tienda no configurada");
   const p = z.object({ productId: z.string().max(40), name: z.string().max(200), pack: z.string().max(60).nullish(), price: z.number().min(0).max(10000).nullish() }).parse(product);
   await db().update(shoppingItems).set({ storeProductId: `${storeCode}:${p.productId}`, estimatedPrice: p.price != null ? p.price.toFixed(2) : null }).where(eq(shoppingItems.id, it.item.id));
   const key = ingredientKey(it.item.name);
@@ -265,7 +300,7 @@ export async function sendToStore(listId: string, storeCode: string) {
   const { groupId } = await kitchenGuard();
   const l = await ownList(listId, groupId);
   const make = STORE_PROVIDERS[storeCode];
-  if (!make) throw new Error("Tienda no soportada");
+  if (!make) throw new UserError("Tienda no soportada");
   const items = await db().select().from(shoppingItems).where(and(eq(shoppingItems.listId, l.id), eq(shoppingItems.checked, false)));
   const lines = items.filter((i) => i.storeProductId?.startsWith(`${storeCode}:`)).map((i) => ({ productId: i.storeProductId!.split(":")[1]!, quantity: i.unit === "ud" || !i.unit ? Math.max(1, Math.round(i.quantity ?? 1)) : 1 }));
   const r = await make().toCart(lines);

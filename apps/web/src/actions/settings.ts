@@ -1,4 +1,5 @@
 "use server";
+import { UserError } from "@/lib/errors";
 import { refresh } from "next/cache";
 import { z } from "zod";
 import {
@@ -25,14 +26,14 @@ const hhmm = z.string().regex(/^\d{2}:\d{2}$/);
 
 async function me() {
   const u = await getApiUser();
-  if (!u) throw new Error("No autenticado");
+  if (!u) throw new UserError("No autenticado");
   return u;
 }
 /** Profile edits need owner/manager on that person. */
 async function manage(personId: string) {
   const u = await me();
   const a = await assertAccess(u.id, uuid.parse(personId), "diary", true);
-  if (a.role !== "owner" && a.role !== "manager") throw new Error("Solo quien gestiona a esta persona puede cambiar su perfil");
+  if (a.role !== "owner" && a.role !== "manager") throw new UserError("Solo quien gestiona a esta persona puede cambiar su perfil");
   return u;
 }
 
@@ -61,7 +62,7 @@ export async function updateProfile(personId: string, input: z.input<typeof Prof
   try {
     new Intl.DateTimeFormat("es", { timeZone: v.timezone });
   } catch {
-    throw new Error("Zona horaria no válida");
+    throw new UserError("Zona horaria no válida");
   }
   // Losing/gaining with rate 0 makes no sense; maintain forces 0.
   const weeklyRateKg = v.goalType === "maintain" ? 0 : v.goalType === "lose" ? -Math.abs(v.weeklyRateKg || 0.5) : Math.abs(v.weeklyRateKg || 0.25);
@@ -95,7 +96,7 @@ const Slot = z.object({ id: uuid.optional(), key: z.string().regex(/^[a-z0-9_]{1
 export async function saveMealSlots(personId: string, slots: z.input<typeof Slot>[]) {
   await manage(personId);
   const v = z.array(Slot).min(1).max(10).parse(slots);
-  if (new Set(v.map((s) => s.key)).size !== v.length) throw new Error("Hay comidas repetidas");
+  if (new Set(v.map((s) => s.key)).size !== v.length) throw new UserError("Hay comidas repetidas");
   await db().transaction(async (tx) => {
     const existing = await tx.select({ id: mealSlots.id, key: mealSlots.key }).from(mealSlots).where(eq(mealSlots.personId, personId));
     const keep = new Set(v.map((s) => s.key));
@@ -196,7 +197,7 @@ export async function deleteWebhook(id: string) {
 export async function testWebhook(id: string) {
   const u = await me();
   const [w] = await db().select({ id: webhooks.id }).from(webhooks).where(and(eq(webhooks.id, uuid.parse(id)), eq(webhooks.userId, u.id))).limit(1);
-  if (!w) throw new Error("No encontrado");
+  if (!w) throw new UserError("No encontrado");
   await enqueue("webhook.deliver", { webhookId: w.id, event: "test", payload: { hello: "nutria", at: new Date().toISOString() } });
 }
 
@@ -216,7 +217,7 @@ export async function connectOpenGym(personId: string, baseUrl: string, code: st
 export async function syncIntegration(id: string) {
   const u = await me();
   const [a] = await db().select().from(integrationAccounts).where(and(eq(integrationAccounts.id, uuid.parse(id)), eq(integrationAccounts.userId, u.id))).limit(1);
-  if (!a) throw new Error("No encontrado");
+  if (!a) throw new UserError("No encontrado");
   if (a.provider === "opengym") await enqueue("opengym.sync", { accountId: a.id });
 }
 
@@ -228,7 +229,7 @@ export async function disconnectIntegration(id: string) {
 
 export async function deleteCustomReminder(type: string) {
   const u = await me();
-  if (!/^custom:[0-9a-f-]{36}$/.test(type)) throw new Error("Tipo no válido");
+  if (!/^custom:[0-9a-f-]{36}$/.test(type)) throw new UserError("Tipo no válido");
   await db().delete(notificationPrefs).where(and(eq(notificationPrefs.userId, u.id), eq(notificationPrefs.type, type)));
   refresh();
 }

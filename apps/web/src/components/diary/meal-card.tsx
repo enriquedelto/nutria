@@ -1,5 +1,6 @@
 "use client";
-import { useState, useTransition } from "react";
+import { useState } from "react";
+import { useSafeTransition } from "@/lib/use-safe-transition";
 import Link from "next/link";
 import { Copy, MoreHorizontal, Plus, Sparkles, Trash2 } from "lucide-react";
 import { DropdownMenu } from "radix-ui";
@@ -45,7 +46,7 @@ export function MealCard({
   slots: { key: string; label: string }[];
   canWrite: boolean;
 }) {
-  const [pending, start] = useTransition();
+  const [pending, start] = useSafeTransition();
   const [editing, setEditing] = useState<MealEntry | null>(null);
   const kcal = entries.reduce((a, e) => a + e.kcal, 0);
   const tomorrow = new Date(Date.parse(date + "T12:00:00Z") + 86_400_000).toISOString().slice(0, 10);
@@ -137,7 +138,7 @@ export function MealCard({
 }
 
 function EditEntryDialog({ personId, entry, slots, onClose }: { personId: string; entry: MealEntry; slots: { key: string; label: string }[]; onClose: () => void }) {
-  const [pending, start] = useTransition();
+  const [pending, start] = useSafeTransition();
   const [grams, setGrams] = useState(entry.grams);
   const ratio = entry.grams > 0 ? grams / entry.grams : 1;
   return (

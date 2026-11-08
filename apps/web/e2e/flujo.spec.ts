@@ -10,6 +10,7 @@ test.describe.configure({ mode: "serial" });
 const stamp = Date.now().toString(36);
 const ADMIN = { name: "Ana Prueba", email: `ana-${stamp}@e2e.test`, password: "contraseña-larga-1" };
 const SECOND = { name: "Luis Prueba", email: `luis-${stamp}@e2e.test`, password: "contraseña-larga-2" };
+const PRO = { name: "Marta Nutricionista", email: `marta-${stamp}@e2e.test`, password: "contraseña-larga-3" };
 let inviteLink = "";
 let adminPage: Page;
 
@@ -132,6 +133,121 @@ test("administración: usuarios y uso de la IA", async () => {
   await expect(page.getByRole("heading", { name: "Administración" })).toBeVisible();
   await expect(page.getByText(SECOND.email)).toBeVisible();
   await expect(page.getByText("meal_text")).toBeVisible();
+});
+
+test("los errores del servidor llegan con su mensaje en producción", async () => {
+  const page = adminPage;
+  await page.goto("/despensa");
+  await page.getByLabel("Producto").fill("Leche");
+  await page.getByLabel("Caduca").fill("pasado mañana");
+  await page.getByRole("button", { name: "Añadir" }).click();
+  await expect(page.getByText(/Fecha no válida/)).toBeVisible();
+});
+
+test("batch cooking: cocinar con tuppers y comer de uno", async () => {
+  const page = adminPage;
+  await page.goto("/recetas");
+  await page.getByRole("link", { name: /Garbanzos con espinacas/ }).first().click();
+  await page.getByRole("button", { name: "La he cocinado" }).click();
+  const dialog = page.getByRole("dialog");
+  await dialog.getByLabel("Para tuppers").fill("2");
+  await dialog.getByRole("button", { name: "Guardar" }).click();
+  await expect(page.getByText(/tuppers guardados/)).toBeVisible();
+  await page.goto("/despensa");
+  await expect(page.getByText(/2 de 2 raciones/)).toBeVisible();
+  await page.getByRole("button", { name: "Comer 1 ración" }).click();
+  await expect(page.getByText(/quedan 1/)).toBeVisible();
+  await expect(page.getByText(/1 de 2 raciones/)).toBeVisible();
+  await page.goto("/diario");
+  await expect(page.getByText("Garbanzos con espinacas").first()).toBeVisible();
+});
+
+test("MCP: token personal de solo lectura", async () => {
+  const page = adminPage;
+  await page.goto("/ajustes/integraciones");
+  await page.getByLabel("Nombre").fill("E2E");
+  await page.getByRole("button", { name: "Crear" }).click();
+  const secret = page.getByText("Cópialo ahora").locator("..").locator("code");
+  await expect(secret).toHaveText(/S{20,}/);
+  const token = (await secret.textContent())!.trim();
+  const rpc = async (method: string, params: unknown) => {
+    const res = await page.request.post("/api/mcp", {
+      headers: { authorization: `Bearer ${token}`, accept: "application/json, text/event-stream", "content-type": "application/json", "mcp-protocol-version": "2025-06-18" },
+      data: { jsonrpc: "2.0", id: 1, method, params },
+    });
+    expect(res.status(), await res.text()).toBe(200);
+    return (await res.json()) as { result: { tools?: { name: string }[]; content?: { text: string }[] } };
+  };
+  const tools = (await rpc("tools/list", {})).result.tools!.map((t) => t.name);
+  expect(tools).toContain("list_persons");
+  expect(tools).not.toContain("log_weight"); // sin permiso de escritura
+  const persons = await rpc("tools/call", { name: "list_persons", arguments: {} });
+  expect(persons.result.content![0]!.text).toContain("Ana Prueba");
+  const bad = await page.request.post("/api/mcp", { headers: { authorization: "Bearer nutria_falso", "content-type": "application/json" }, data: { jsonrpc: "2.0", id: 1, method: "tools/list" } });
+  expect(bad.status()).toBe(401);
+});
+
+test("exportar JSON/CSV e importar un CSV", async () => {
+  const page = adminPage;
+  await page.goto("/ajustes/datos");
+  const jsonHref = await page.getByRole("link", { name: "Todo (JSON)" }).getAttribute("href");
+  const json = await page.request.get(jsonHref!);
+  expect(json.status()).toBe(200);
+  expect(await json.text()).toContain("Tortilla de patatas");
+  const csv = await page.request.get(jsonHref!.replace("format=json", "format=csv&table=diario"));
+  expect(csv.headers()["content-type"]).toContain("text/csv");
+  expect(await csv.text()).toContain("Tortilla de patatas");
+
+  await page.locator("input[type=file]").setInputFiles({ name: "cronometer.csv", mimeType: "text/csv", buffer: Buffer.from("Day,Food Name,Amount,Energy (kcal),Protein (g),Carbs (g),Fat (g)
+2026-11-01,Yogur importado,125 g,80,5,6,3
+2026-11-01,Pan importado,60 g,150,5,30,1
+") });
+  await expect(page.getByText("Importación en cola")).toBeVisible();
+  await expect(async () => {
+    await page.reload();
+    await expect(page.getByText(/2 alimentos/)).toBeVisible({ timeout: 2000 });
+  }).toPass({ timeout: 60_000 });
+  await expect(page.getByText("Cronometer")).toBeVisible();
+  await page.goto("/diario?fecha=2026-11-01");
+  await expect(page.getByText("Yogur importado")).toBeVisible();
+});
+
+test("profesional: solo lectura de lo compartido y notas", async ({ browser }) => {
+  const page = adminPage;
+  await page.goto("/familia");
+  await page.getByRole("link", { name: /Ana Prueba/ }).click();
+  await page.getByRole("button", { name: "Invitar a un profesional" }).click();
+  const dialog = page.getByRole("dialog");
+  await dialog.getByLabel("Correo").fill(PRO.email);
+  await dialog.getByRole("button", { name: "Crear invitación" }).click();
+  const link = dialog.locator("input[readonly]");
+  await expect(link).toHaveValue(//invitacion//);
+  const url = new URL(await link.inputValue());
+  const ana = page.url();
+
+  const pro = await (await browser.newContext()).newPage();
+  await pro.goto(url.pathname);
+  await signUp(pro, PRO);
+  await expect(pro).toHaveURL(//bienvenida/);
+  await pro.goto("/familia");
+  await expect(pro.getByText("Personas que sigues")).toBeVisible();
+  await pro.getByRole("link", { name: /Ana Prueba/ }).click();
+  await expect(pro.getByText(/Profesional/).first()).toBeVisible();
+  await pro.getByPlaceholder(/Pauta, observación/).fill("Subir legumbres a 4 veces por semana");
+  await pro.getByRole("button", { name: "Añadir nota" }).click();
+  await expect(pro.getByText("Subir legumbres a 4 veces por semana")).toBeVisible();
+  await pro.getByRole("button", { name: "Ver su día" }).click();
+  await expect(pro).toHaveURL(//hoy/);
+  await expect(pro.getByText("Solo lectura")).toBeVisible();
+  await pro.goto("/diario");
+  await expect(pro.getByText("Tortilla de patatas").first()).toBeVisible();
+  // Lo no compartido (medicación) no se ve.
+  await pro.goto("/salud/medicacion");
+  await expect(pro).toHaveURL(/sinpermiso=medication/);
+
+  await page.goto(ana);
+  await expect(page.getByText("Subir legumbres a 4 veces por semana")).toBeVisible();
+  await expect(page.getByText(PRO.email)).toBeVisible();
 });
 
 const ROUTES = [

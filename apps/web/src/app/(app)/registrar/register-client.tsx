@@ -1,5 +1,7 @@
 "use client";
-import { useEffect, useMemo, useRef, useState, useTransition } from "react";
+import { errorText } from "@/lib/errors";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { useSafeTransition } from "@/lib/use-safe-transition";
 import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { Camera, HelpCircle, ImagePlus, Loader2, ScanText, Sparkles, Trash2, X } from "lucide-react";
@@ -55,7 +57,7 @@ export function RegisterClient({ ctx, aiEnabled, sharedImages }: { ctx: DayConte
   const [est, setEst] = useState<Estimate | null>(null);
   const [rows, setRows] = useState<Row[]>([]);
   const [busy, setBusy] = useState(false);
-  const [saving, start] = useTransition();
+  const [saving, start] = useSafeTransition();
   const fileRef = useRef<HTMLInputElement>(null);
   const camRef = useRef<HTMLInputElement>(null);
 
@@ -104,7 +106,7 @@ export function RegisterClient({ ctx, aiEnabled, sharedImages }: { ctx: DayConte
         })),
       );
     } catch (e) {
-      toast.error(e instanceof Error ? e.message : "No se pudo analizar");
+      toast.error(errorText(e, "No se pudo analizar"));
     } finally {
       setBusy(false);
     }

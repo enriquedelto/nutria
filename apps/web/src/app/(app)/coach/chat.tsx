@@ -1,4 +1,5 @@
 "use client";
+import { errorText } from "@/lib/errors";
 import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { ArrowUp, Check, ImagePlus, Loader2, Wrench, X } from "lucide-react";
@@ -89,7 +90,7 @@ export function Chat({ personId, conversationId: initialId, initial, personName,
         }
       }
     } catch (e) {
-      toast.error(e instanceof Error ? e.message : "Error del coach");
+      toast.error(errorText(e, "Error del coach"));
       setMessages((m) => m.filter((x) => x.id !== "draft" || x.content));
     } finally {
       setStreaming(false);

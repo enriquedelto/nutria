@@ -1,5 +1,7 @@
 "use client";
-import { useState, useTransition } from "react";
+import { errorText } from "@/lib/errors";
+import { useState } from "react";
+import { useSafeTransition } from "@/lib/use-safe-transition";
 import { Copy, MoreHorizontal, Pencil, Plus, UserPlus, X } from "lucide-react";
 import { toast } from "sonner";
 import { saveHouseholdPreferences } from "@/actions/ai";
@@ -9,11 +11,11 @@ import { Dialog, DialogContent } from "@/components/ui/dialog";
 import { Field, Input, Select, Textarea } from "@/components/ui/input";
 
 const COLORS = ["#22c55e", "#0ea5e9", "#f97316", "#a855f7", "#ef4444", "#eab308", "#14b8a6", "#ec4899"];
-const err = (e: unknown) => toast.error(e instanceof Error ? e.message : "Algo ha fallado");
+const err = (e: unknown) => toast.error(errorText(e, "Algo ha fallado"));
 
 export function RenameGroup({ name }: { name: string }) {
   const [open, setOpen] = useState(false);
-  const [pending, start] = useTransition();
+  const [pending, start] = useSafeTransition();
   return (
     <>
       <Button size="icon-sm" variant="ghost" aria-label="Renombrar hogar" onClick={() => setOpen(true)}>
@@ -58,7 +60,7 @@ export function ColorPicker({ value, onChange }: { value: string; onChange: (c: 
 export function AddPerson() {
   const [open, setOpen] = useState(false);
   const [color, setColor] = useState(COLORS[1]!);
-  const [pending, start] = useTransition();
+  const [pending, start] = useSafeTransition();
   return (
     <>
       <Button size="sm" variant="outline" onClick={() => setOpen(true)}>
@@ -147,7 +149,7 @@ export function CopyLink({ link }: { link: string }) {
 }
 
 export function InviteMember() {
-  const [pending, start] = useTransition();
+  const [pending, start] = useSafeTransition();
   const [link, setLink] = useState<string | null>(null);
   return (
     <div className="space-y-3">
@@ -183,7 +185,7 @@ export function InviteMember() {
 }
 
 export function RevokeInvite({ id }: { id: string }) {
-  const [pending, start] = useTransition();
+  const [pending, start] = useSafeTransition();
   return (
     <Button size="icon-sm" variant="ghost" aria-label="Anular invitación" disabled={pending} onClick={() => start(async () => void (await revokeInvitation(id).catch(err)))}>
       <X />
@@ -193,7 +195,7 @@ export function RevokeInvite({ id }: { id: string }) {
 
 export function MemberActions({ userId, name, role }: { userId: string; name: string; role: "admin" | "member" }) {
   const [open, setOpen] = useState(false);
-  const [pending, start] = useTransition();
+  const [pending, start] = useSafeTransition();
   return (
     <>
       <Button size="icon-sm" variant="ghost" aria-label={`Opciones de ${name}`} onClick={() => setOpen(true)}>
@@ -230,7 +232,7 @@ export function MemberActions({ userId, name, role }: { userId: string; name: st
 
 export function HouseholdPrefs({ groupId, value }: { groupId: string; value: string }) {
   const [v, setV] = useState(value);
-  const [pending, start] = useTransition();
+  const [pending, start] = useSafeTransition();
   return (
     <div className="space-y-2">
       <Textarea rows={6} value={v} onChange={(e) => setV(e.target.value)} placeholder={"- Cenas ligeras entre semana\n- A Lucía no le gusta el pescado azul\n- Legumbres dos veces por semana"} maxLength={8000} />

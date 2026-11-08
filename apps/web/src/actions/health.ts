@@ -1,4 +1,5 @@
 "use server";
+import { UserError } from "@/lib/errors";
 import { refresh } from "next/cache";
 import { z } from "zod";
 import {
@@ -38,7 +39,7 @@ const uuid = z.string().uuid();
 
 async function guard(personId: string, scope: AccessScope) {
   const u = await getApiUser();
-  if (!u) throw new Error("No autenticado");
+  if (!u) throw new UserError("No autenticado");
   await assertAccess(u.id, uuid.parse(personId), scope, true);
   return u;
 }
@@ -85,7 +86,7 @@ export async function setGoal(personId: string, input: { type: string; targetVal
 export async function acceptTdee(personId: string, estimateId: string) {
   await guard(personId, "body");
   const [e] = await db().select().from(tdeeEstimates).where(and(eq(tdeeEstimates.id, uuid.parse(estimateId)), eq(tdeeEstimates.personId, personId))).limit(1);
-  if (!e?.adaptiveTdee) throw new Error("Estimación no disponible");
+  if (!e?.adaptiveTdee) throw new UserError("Estimación no disponible");
   await recomputeTargets(db(), personId, { overrideTdee: e.adaptiveTdee, source: "adaptive" });
   await db().update(tdeeEstimates).set({ acceptedAt: new Date() }).where(eq(tdeeEstimates.id, e.id));
   refresh();
@@ -140,7 +141,7 @@ export async function endFast(personId: string, note?: string) {
 export async function logSleep(personId: string, input: { date: string; bedtime: string; wakeTime: string; quality?: number | null; note?: string | null }) {
   await guard(personId, "health");
   const bed = new Date(input.bedtime), wake = new Date(input.wakeTime);
-  if (!(wake > bed)) throw new Error("La hora de despertar debe ser posterior");
+  if (!(wake > bed)) throw new UserError("La hora de despertar debe ser posterior");
   const hours = Math.round(((wake.getTime() - bed.getTime()) / 3_600_000) * 10) / 10;
   await db()
     .insert(sleepLogs)

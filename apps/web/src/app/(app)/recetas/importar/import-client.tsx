@@ -1,5 +1,6 @@
 "use client";
-import { useEffect, useState, useTransition } from "react";
+import { useEffect, useState } from "react";
+import { useSafeTransition } from "@/lib/use-safe-transition";
 import { Link2, Loader2, Sparkles, Video } from "lucide-react";
 import { toast } from "sonner";
 import { importRecipe, recipeFromText, videoImportStatus, type ImportResult } from "@/actions/recipes";
@@ -12,7 +13,7 @@ export function ImportClient({ initialUrl, estimateId }: { initialUrl?: string; 
   const [url, setUrl] = useState(initialUrl ?? "");
   const [text, setText] = useState("");
   const [res, setRes] = useState<ImportResult | null>(estimateId ? { kind: "pending", estimateId } : null);
-  const [pending, start] = useTransition();
+  const [pending, start] = useSafeTransition();
 
   const run = (fn: () => Promise<ImportResult>) =>
     start(async () => {

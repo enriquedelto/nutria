@@ -1,9 +1,11 @@
 "use server";
+import { errorText, UserError } from "@/lib/errors";
 import { refresh } from "next/cache";
 import { z } from "zod";
 import { aiEstimates, and, eq, recipeRatings, recipes } from "@nutria/db";
 import { cookRecipe, recipeDetail, saveRecipe } from "@nutria/core";
 import { structureRecipe, suggestSubstitutions } from "@nutria/ai";
+import { aiAction, aiMessage } from "@/lib/ai";
 import { extractJsonLdRecipe, fetchPage, pageText } from "@nutria/integrations";
 import { todayIn } from "@nutria/nutrition";
 import { db } from "@/lib/db";
@@ -51,7 +53,7 @@ export async function rateRecipe(personId: string, recipeId: string, input: { st
   await assertAccess(user.id, uuid.parse(personId), "diary", true);
   const v = z.object({ stars: z.number().int().min(1).max(5).nullish(), verdict: z.enum(["like", "dislike", "neutral"]).nullish(), notEaten: z.boolean().optional(), comment: z.string().max(500).nullish(), planItemId: uuid.nullish() }).parse(input);
   const [r] = await db().select({ id: recipes.id }).from(recipes).where(and(eq(recipes.id, uuid.parse(recipeId)), eq(recipes.groupId, groupId))).limit(1);
-  if (!r) throw new Error("Receta no encontrada");
+  if (!r) throw new UserError("Receta no encontrada");
   const [prev] = await db().select({ id: recipeRatings.id }).from(recipeRatings).where(and(eq(recipeRatings.recipeId, r.id), eq(recipeRatings.personId, personId), v.planItemId ? eq(recipeRatings.planItemId, v.planItemId) : eq(recipeRatings.recipeId, r.id))).limit(1);
   const values = { stars: v.stars ?? null, verdict: v.verdict ?? null, notEaten: v.notEaten ?? false, comment: v.comment ?? null, planItemId: v.planItemId ?? null };
   if (prev) await db().update(recipeRatings).set(values).where(eq(recipeRatings.id, prev.id));
@@ -101,7 +103,7 @@ export async function importRecipe(url: string): Promise<ImportResult> {
     const r = await structureRecipe({ db: db(), userId: user.id }, { text: pageText(html), sourceUrl: u.data, sourceType: "url" });
     return { kind: "draft", via: "ai", estimateId: r.estimateId, draft: aiToDraft(r, u.data, "url") };
   } catch (e) {
-    return { kind: "error", message: e instanceof Error ? e.message : "No se pudo importar" };
+    return { kind: "error", message: aiMessage(e) ?? errorText(e, "No se pudo importar") };
   }
 }
 
@@ -113,7 +115,7 @@ export async function recipeFromText(text: string): Promise<ImportResult> {
     const r = await structureRecipe({ db: db(), userId: user.id }, { text: t, sourceType: "text" });
     return { kind: "draft", via: "ai", estimateId: r.estimateId, draft: aiToDraft(r, null, "ai") };
   } catch (e) {
-    return { kind: "error", message: e instanceof Error ? e.message : "Error de la IA" };
+    return { kind: "error", message: aiMessage(e) ?? errorText(e, "Error de la IA") };
   }
 }
 
@@ -147,10 +149,10 @@ function aiToDraft(r: AiRecipe, sourceUrl: string | null, sourceType: "url" | "v
 export async function substitutionsFor(personId: string, recipeId: string, reason: string) {
   const { user, groupId } = await kitchenGuard();
   const access = await assertAccess(user.id, uuid.parse(personId), "diary");
-  if (!access.scopes.has("ai")) throw new Error("Sin permiso de IA");
+  if (!access.scopes.has("ai")) throw new UserError("Sin permiso de IA");
   const d = await recipeDetail(db(), uuid.parse(recipeId), groupId);
-  if (!d) throw new Error("Receta no encontrada");
-  return suggestSubstitutions({ db: db(), userId: user.id, personId, scopes: access.scopes }, { recipeTitle: d.recipe.title, ingredients: d.ingredients.map((i) => i.rawText), reason: z.string().trim().min(2).max(300).parse(reason) });
+  if (!d) throw new UserError("Receta no encontrada");
+  return aiAction(suggestSubstitutions({ db: db(), userId: user.id, personId, scopes: access.scopes }, { recipeTitle: d.recipe.title, ingredients: d.ingredients.map((i) => i.rawText), reason: z.string().trim().min(2).max(300).parse(reason) }));
 }
 
 export async function cookAction(input: { recipeId: string; servings: number; batchPortions?: number; location?: string; planItemId?: string | null; timezone: string }) {

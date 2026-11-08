@@ -1,12 +1,13 @@
 "use client";
-import { useOptimistic, useTransition } from "react";
+import { useOptimistic } from "react";
+import { useSafeTransition } from "@/lib/use-safe-transition";
 import { Check } from "lucide-react";
 import { markDose } from "@/actions/health";
 import { cn } from "@/lib/utils";
 
 export function DoseButton({ personId, doseId, status, disabled }: { personId: string; doseId: string; status: string; disabled?: boolean }) {
   const [s, set] = useOptimistic(status);
-  const [, start] = useTransition();
+  const [, start] = useSafeTransition();
   const taken = s === "taken";
   return (
     <button

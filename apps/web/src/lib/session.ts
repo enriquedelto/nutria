@@ -1,4 +1,5 @@
 import "server-only";
+import { UserError } from "@/lib/errors";
 import { cookies, headers } from "next/headers";
 import { redirect } from "next/navigation";
 import { eq, getPersonAccess, listAccessiblePersons, user as userTable, type AccessScope } from "@nutria/db";
@@ -81,6 +82,6 @@ export async function requireScope(scope: AccessScope, opts: { write?: boolean }
 /** For server actions / route handlers: verify access to an explicit person id. */
 export async function assertAccess(userId: string, personId: string, scope: AccessScope, write = false) {
   const access = await getPersonAccess(db(), userId, personId);
-  if (!access || !access.scopes.has(scope) || (write && !access.canWrite)) throw new Error("Sin permiso para esta persona");
+  if (!access || !access.scopes.has(scope) || (write && !access.canWrite)) throw new UserError("Sin permiso para esta persona");
   return access;
 }

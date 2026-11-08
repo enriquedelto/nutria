@@ -2,7 +2,7 @@ import { Suspense } from "react";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { Clock, ExternalLink, Pencil, Snowflake } from "lucide-react";
-import { and, asc, eq, foodServings, inArray, mealSlots, recipeRatings } from "@nutria/db";
+import { and, asc, batches, eq, foodServings, gt, inArray, mealSlots, recipeRatings } from "@nutria/db";
 import { ensureMealSlots, recipeDetail } from "@nutria/core";
 import { CORE_MICROS, todayIn } from "@nutria/nutrition";
 import { CookDialog, CookModeLink, DeleteRecipe, LogRecipe, Rating, ScaledIngredients, Substitutions } from "@/components/kitchen/recipe-actions";
@@ -24,10 +24,11 @@ async function Content({ params }: { params: PageProps<"/recetas/[id]">["params"
   if (!d) notFound();
   const r = d.recipe;
   await ensureMealSlots(db(), k.person.id);
-  const [slots, ratings, serving] = await Promise.all([
+  const [slots, ratings, serving, [batch]] = await Promise.all([
     db().select().from(mealSlots).where(eq(mealSlots.personId, k.person.id)).orderBy(asc(mealSlots.sortOrder)),
     db().select().from(recipeRatings).where(and(eq(recipeRatings.recipeId, r.id), inArray(recipeRatings.personId, k.members.map((m) => m.id).concat(k.person.id)))),
     r.foodId ? db().select().from(foodServings).where(and(eq(foodServings.foodId, r.foodId), eq(foodServings.isDefault, true))).limit(1) : Promise.resolve([]),
+    db().select({ id: batches.id, left: batches.portionsLeft }).from(batches).where(and(eq(batches.recipeId, r.id), eq(batches.groupId, k.groupId), gt(batches.portionsLeft, 0))).orderBy(asc(batches.cookedOn)).limit(1),
   ]);
   const mine = ratings.filter((x) => x.personId === k.person.id).at(-1);
   const avg = ratings.filter((x) => x.stars).reduce((a, x, _, arr) => a + x.stars! / arr.length, 0);
@@ -62,7 +63,7 @@ async function Content({ params }: { params: PageProps<"/recetas/[id]">["params"
         actions={
           <>
             <CookModeLink id={r.id} />
-            {r.foodId && k.canWrite && k.scopes.has("diary") ? <LogRecipe personId={k.person.id} foodId={r.foodId} servingGrams={serving[0]?.grams ?? null} title={r.title} slots={slots.map((s) => ({ key: s.key, label: s.label }))} defaultSlot={closestSlot(slots.map((s) => ({ key: s.key, time: s.defaultTime })), tz)} today={today} /> : null}
+            {r.foodId && k.canWrite && k.scopes.has("diary") ? <LogRecipe personId={k.person.id} foodId={r.foodId} servingGrams={serving[0]?.grams ?? null} title={r.title} slots={slots.map((s) => ({ key: s.key, label: s.label }))} defaultSlot={closestSlot(slots.map((s) => ({ key: s.key, time: s.defaultTime })), tz)} today={today} batch={batch ?? null} /> : null}
             <CookDialog recipeId={r.id} servings={r.servings} freezable={r.freezable} timezone={tz} />
             <Button asChild variant="ghost" size="icon-sm" aria-label="Editar">
               <Link href={`/recetas/${r.id}/editar`}>

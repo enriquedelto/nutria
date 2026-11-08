@@ -1,5 +1,6 @@
 "use client";
-import { Suspense, useState, useTransition } from "react";
+import { Suspense, useState } from "react";
+import { useSafeTransition } from "@/lib/use-safe-transition";
 import { useRouter, useSearchParams } from "next/navigation";
 import { toast } from "sonner";
 import { authClient } from "@/lib/auth-client";
@@ -9,7 +10,7 @@ import { Field, Input } from "@/components/ui/input";
 function ResetForm() {
   const token = useSearchParams().get("token");
   const router = useRouter();
-  const [pending, start] = useTransition();
+  const [pending, start] = useSafeTransition();
   const [error, setError] = useState<string | null>(null);
   if (!token) return <p className="text-ink-2">El enlace no es válido o ha caducado.</p>;
   const onSubmit = (fd: FormData) =>

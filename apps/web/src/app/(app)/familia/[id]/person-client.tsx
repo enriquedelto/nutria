@@ -1,5 +1,7 @@
 "use client";
-import { useState, useTransition } from "react";
+import { errorText } from "@/lib/errors";
+import { useState } from "react";
+import { useSafeTransition } from "@/lib/use-safe-transition";
 import { useRouter } from "next/navigation";
 import { ArrowRightLeft, Pencil, Share2, Stethoscope, Trash2, X } from "lucide-react";
 import { toast } from "sonner";
@@ -11,11 +13,11 @@ import { Dialog, DialogContent } from "@/components/ui/dialog";
 import { Field, Input, Select, Textarea } from "@/components/ui/input";
 import { ColorPicker, CopyLink } from "../family-client";
 
-const err = (e: unknown) => toast.error(e instanceof Error ? e.message : "Algo ha fallado");
+const err = (e: unknown) => toast.error(errorText(e, "Algo ha fallado"));
 const ROLE: Record<string, string> = { owner: "propietaria", manager: "gestiona", viewer: "solo ver", professional: "profesional" };
 
 export function SwitchTo({ personId }: { personId: string }) {
-  const [pending, start] = useTransition();
+  const [pending, start] = useSafeTransition();
   const router = useRouter();
   return (
     <Button
@@ -36,7 +38,7 @@ export function SwitchTo({ personId }: { personId: string }) {
 export function EditBasics({ personId, name, color }: { personId: string; name: string; color: string }) {
   const [open, setOpen] = useState(false);
   const [c, setC] = useState(color);
-  const [pending, start] = useTransition();
+  const [pending, start] = useSafeTransition();
   return (
     <>
       <Button size="icon-sm" variant="ghost" aria-label="Editar" onClick={() => setOpen(true)}>
@@ -72,7 +74,7 @@ export function EditBasics({ personId, name, color }: { personId: string; name: 
 export function DeletePerson({ personId, name }: { personId: string; name: string }) {
   const [open, setOpen] = useState(false);
   const [v, setV] = useState("");
-  const [pending, start] = useTransition();
+  const [pending, start] = useSafeTransition();
   const router = useRouter();
   return (
     <>
@@ -108,7 +110,7 @@ export function DeletePerson({ personId, name }: { personId: string; name: strin
 }
 
 export function AccessRow({ personId, row, canRevoke }: { personId: string; row: { userId: string; name: string; email: string; role: string; canWrite: boolean; scopes: string[]; expires: string | null }; canRevoke: boolean }) {
-  const [pending, start] = useTransition();
+  const [pending, start] = useSafeTransition();
   return (
     <li className="flex items-center gap-2 py-2.5">
       <span className="min-w-0 flex-1">
@@ -147,7 +149,7 @@ export function GrantAccess({ personId, members, scopeNames }: { personId: strin
   const [open, setOpen] = useState(false);
   const [role, setRole] = useState<"viewer" | "manager">("viewer");
   const [scopes, setScopes] = useState<string[]>(["diary", "body"]);
-  const [pending, start] = useTransition();
+  const [pending, start] = useSafeTransition();
   return (
     <>
       <Button size="sm" variant="outline" onClick={() => setOpen(true)}>
@@ -205,7 +207,7 @@ export function InviteProfessional({ personId, scopeNames }: { personId: string;
   const [open, setOpen] = useState(false);
   const [scopes, setScopes] = useState<string[]>(["diary", "body"]);
   const [link, setLink] = useState<string | null>(null);
-  const [pending, start] = useTransition();
+  const [pending, start] = useSafeTransition();
   return (
     <>
       <Button size="sm" variant="outline" onClick={() => setOpen(true)}>
@@ -249,7 +251,7 @@ export function InviteProfessional({ personId, scopeNames }: { personId: string;
 
 export function NoteForm({ personId }: { personId: string }) {
   const [v, setV] = useState("");
-  const [pending, start] = useTransition();
+  const [pending, start] = useSafeTransition();
   return (
     <div className="space-y-2">
       <Textarea rows={3} value={v} onChange={(e) => setV(e.target.value)} placeholder="Pauta, observación o recordatorio…" maxLength={8000} />
@@ -274,7 +276,7 @@ export function NoteForm({ personId }: { personId: string }) {
 }
 
 export function DeleteNote({ id }: { id: string }) {
-  const [pending, start] = useTransition();
+  const [pending, start] = useSafeTransition();
   return (
     <button type="button" aria-label="Borrar nota" disabled={pending} onClick={() => start(async () => void (await deleteProfessionalNote(id).catch(err)))}>
       <Trash2 className="size-3.5" />

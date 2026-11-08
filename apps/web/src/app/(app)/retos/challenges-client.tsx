@@ -1,5 +1,7 @@
 "use client";
-import { useState, useTransition } from "react";
+import { errorText } from "@/lib/errors";
+import { useState } from "react";
+import { useSafeTransition } from "@/lib/use-safe-transition";
 import { Loader2, Plus, RefreshCw, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import { createChallenge, deleteChallenge, joinChallenge, leaveChallenge, refreshProgress, type ChallengeMetric } from "@/actions/challenges";
@@ -8,7 +10,7 @@ import { Dialog, DialogContent } from "@/components/ui/dialog";
 import { Field, Input, Select, Textarea } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
 
-const err = (e: unknown) => toast.error(e instanceof Error ? e.message : "Algo ha fallado");
+const err = (e: unknown) => toast.error(errorText(e, "Algo ha fallado"));
 const plus = (d: string, n: number) => {
   const x = new Date(`${d}T12:00:00Z`);
   x.setUTCDate(x.getUTCDate() + n);
@@ -16,7 +18,7 @@ const plus = (d: string, n: number) => {
 };
 
 export function RefreshProgress({ personId, timezone }: { personId: string; timezone: string }) {
-  const [pending, start] = useTransition();
+  const [pending, start] = useSafeTransition();
   return (
     <Button
       size="sm"
@@ -39,7 +41,7 @@ export function RefreshProgress({ personId, timezone }: { personId: string; time
 }
 
 export function ChallengeActions({ challengeId, personId, joined, ended }: { challengeId: string; personId: string; joined: boolean; ended: boolean }) {
-  const [pending, start] = useTransition();
+  const [pending, start] = useSafeTransition();
   return (
     <div className="flex items-center gap-1">
       {!ended ? (
@@ -63,7 +65,7 @@ const PRESETS: { title: string; metric: ChallengeMetric; days: number; target?: 
 
 export function NewChallenge({ today, members, metrics }: { today: string; members: { id: string; name: string }[]; metrics: Record<string, string> }) {
   const [open, setOpen] = useState(false);
-  const [pending, start] = useTransition();
+  const [pending, start] = useSafeTransition();
   const [form, setForm] = useState({ title: "", metric: "logging_days" as ChallengeMetric, start: today, end: plus(today, 6), target: "" as string, description: "" });
   const [who, setWho] = useState<string[]>(() => members.map((m) => m.id));
   return (

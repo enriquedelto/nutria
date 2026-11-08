@@ -1,4 +1,5 @@
 "use server";
+import { UserError } from "@/lib/errors";
 import { refresh } from "next/cache";
 import { z } from "zod";
 import { learnPortion } from "@nutria/ai";
@@ -8,7 +9,7 @@ import { assertAccess, getApiUser } from "@/lib/session";
 
 async function user() {
   const u = await getApiUser();
-  if (!u) throw new Error("No autenticado");
+  if (!u) throw new UserError("No autenticado");
   return u;
 }
 
@@ -40,7 +41,7 @@ export async function deleteMemory(personId: string, id: string) {
 export async function saveHouseholdPreferences(groupId: string, md: string) {
   const u = await user();
   const [m] = await db().select().from(groupMembers).where(and(eq(groupMembers.groupId, groupId), eq(groupMembers.userId, u.id))).limit(1);
-  if (!m) throw new Error("Sin permiso");
+  if (!m) throw new UserError("Sin permiso");
   await db().update(groups).set({ preferencesMd: z.string().max(8000).parse(md) }).where(eq(groups.id, groupId));
   refresh();
 }

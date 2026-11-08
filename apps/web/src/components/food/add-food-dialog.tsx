@@ -1,5 +1,7 @@
 "use client";
-import { useEffect, useMemo, useState, useTransition } from "react";
+import { errorText } from "@/lib/errors";
+import { useEffect, useMemo, useState } from "react";
+import { useSafeTransition } from "@/lib/use-safe-transition";
 import { AlertTriangle, Heart, Info, Loader2, ShieldAlert } from "lucide-react";
 import { toast } from "sonner";
 import { scaleNutrients, type NutrientMap } from "@nutria/nutrition";
@@ -60,7 +62,7 @@ export function AddFoodDialog({ foodId, ctx, defaultGrams, onClose, onAdded }: {
   const [qty, setQty] = useState<number>(defaultGrams ?? 100);
   const [slot, setSlot] = useState(ctx.slot);
   const [fav, setFav] = useState(ctx.favoriteIds.includes(foodId));
-  const [pending, start] = useTransition();
+  const [pending, start] = useSafeTransition();
 
   useEffect(() => {
     let alive = true;
@@ -113,7 +115,7 @@ export function AddFoodDialog({ foodId, ctx, defaultGrams, onClose, onAdded }: {
         onAdded?.();
         onClose();
       } catch (e) {
-        toast.error(e instanceof Error ? e.message : "No se pudo añadir");
+        toast.error(errorText(e, "No se pudo añadir"));
       }
     });
 

@@ -1,5 +1,6 @@
 "use client";
-import { useCallback, useEffect, useRef, useState, useTransition } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
+import { useSafeTransition } from "@/lib/use-safe-transition";
 import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { Barcode, Loader2, Plus, Search, Sparkles, Zap } from "lucide-react";
@@ -180,7 +181,7 @@ export function SearchClient({ ctx, lists }: { ctx: DayContext; lists: { recent:
 }
 
 function QuickAdd({ ctx, onClose }: { ctx: DayContext; onClose: () => void }) {
-  const [pending, start] = useTransition();
+  const [pending, start] = useSafeTransition();
   const router = useRouter();
   return (
     <Dialog open onOpenChange={(o) => !o && onClose()}>

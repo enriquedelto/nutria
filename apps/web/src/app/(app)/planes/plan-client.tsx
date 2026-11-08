@@ -1,5 +1,7 @@
 "use client";
-import { useMemo, useState, useTransition } from "react";
+import { errorText } from "@/lib/errors";
+import { useMemo, useState } from "react";
+import { useSafeTransition } from "@/lib/use-safe-transition";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Check, ChefHat, Copy, Loader2, NotebookPen, Plus, Printer, ShoppingCart, Sparkles, Trash2, Users } from "lucide-react";
@@ -23,7 +25,7 @@ const dayName = new Intl.DateTimeFormat("es-ES", { weekday: "short", day: "numer
 const dayLabel = (d: string) => dayName.format(new Date(`${d}T12:00:00Z`));
 
 function err(e: unknown) {
-  toast.error(e instanceof Error ? e.message : "Algo ha fallado");
+  toast.error(errorText(e, "Algo ha fallado"));
 }
 
 export function PlanBoard(props: {
@@ -41,7 +43,7 @@ export function PlanBoard(props: {
   plan: Plan | null;
 }) {
   const { plan, members, days, slots } = props;
-  const [pending, start] = useTransition();
+  const [pending, start] = useSafeTransition();
   const router = useRouter();
   const [adding, setAdding] = useState<{ date: string; slot: string } | null>(null);
   const [visibleSlots, setVisibleSlots] = useState<string[]>(() => {
@@ -167,7 +169,7 @@ function Cell({ items, names, days, slots, people, onAdd }: { items: Item[]; nam
 
 function PlanItem({ item, names, days, slots, people }: { item: Item; names: Map<string, string>; days: string[]; slots: Slot[]; people: Member[] }) {
   const [open, setOpen] = useState(false);
-  const [pending, start] = useTransition();
+  const [pending, start] = useSafeTransition();
   const [cooked, setCooked] = useState(item.cooked);
   const portions = Object.entries(item.portions);
   return (
@@ -280,7 +282,7 @@ function PlanItem({ item, names, days, slots, people }: { item: Item; names: Map
 
 function PortionRow({ itemId, person, servings, kcal }: { itemId: string; person: Member; servings: number; kcal?: number }) {
   const [v, setV] = useState(servings);
-  const [, start] = useTransition();
+  const [, start] = useSafeTransition();
   const set = (n: number) => {
     const next = Math.max(0, Math.round(n * 4) / 4);
     setV(next);
@@ -307,7 +309,7 @@ function PortionRow({ itemId, person, servings, kcal }: { itemId: string; person
 function AddDialog({ planId, target, slots, recipes, onClose }: { planId: string; target: { date: string; slot: string }; slots: Slot[]; recipes: Recipe[]; onClose: () => void }) {
   const [q, setQ] = useState("");
   const [free, setFree] = useState(false);
-  const [pending, start] = useTransition();
+  const [pending, start] = useSafeTransition();
   const list = useMemo(() => {
     const n = q.trim().toLocaleLowerCase("es");
     return (n ? recipes.filter((r) => r.title.toLocaleLowerCase("es").includes(n) || r.tags.some((t) => t.toLocaleLowerCase("es").includes(n))) : recipes).slice(0, 40);
@@ -402,7 +404,7 @@ function PersonPicker({ members, value, onChange }: { members: Member[]; value: 
 function PersonsDialog({ planId, members, selected }: { planId: string; members: Member[]; selected: string[] }) {
   const [open, setOpen] = useState(false);
   const [value, setValue] = useState(selected);
-  const [pending, start] = useTransition();
+  const [pending, start] = useSafeTransition();
   return (
     <>
       <Button size="sm" variant="outline" onClick={() => setOpen(true)}>
@@ -431,7 +433,7 @@ function PersonsDialog({ planId, members, selected }: { planId: string; members:
 
 function StartPlan(props: { week: string; members: Member[]; currentPersonId: string; prevPlan: { id: string; label: string } | null; canAi: boolean; slots: Slot[]; defaultSlots: string[]; recipes: Recipe[]; today: string; days: string[]; timezone: string }) {
   const [value, setValue] = useState(() => props.members.map((m) => m.id));
-  const [pending, start] = useTransition();
+  const [pending, start] = useSafeTransition();
   return (
     <Card className="mx-auto max-w-xl space-y-4 text-center">
       <ChefHat className="mx-auto size-10 text-herb" />
@@ -461,7 +463,7 @@ type Draft = Awaited<ReturnType<typeof generatePlanDraft>>;
 
 function GenerateDialog({ week, personIds, slots, defaultSlots, members, recipes }: { week: string; personIds: string[]; slots: Slot[]; defaultSlots: string[]; members: Member[]; recipes: Recipe[] }) {
   const [open, setOpen] = useState(false);
-  const [pending, start] = useTransition();
+  const [pending, start] = useSafeTransition();
   const [chosen, setChosen] = useState<string[]>(() => defaultSlots.filter((s) => s !== "breakfast"));
   const [draft, setDraft] = useState<Draft | null>(null);
   const names = new Map(members.map((m) => [m.id, m.name]));
