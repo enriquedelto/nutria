@@ -5,7 +5,7 @@ import { createGunzip } from "node:zlib";
 import { and, eq, exerciseLogs, foods, foodServings, inArray, integrationAccounts, isNull, prices, sql, stores, weightLogs, type Database } from "@nutria/db";
 import {
   decrypt,
-  encrypt,
+  encrypt, newToken,
   keepForMirror,
   mapOpenGymState,
   OffClient,
@@ -232,7 +232,7 @@ export async function pairOpenGym(db: Database, input: { userId: string; personI
   const token = await client.redeem(input.code);
   const [acc] = await db
     .insert(integrationAccounts)
-    .values({ userId: input.userId, personId: input.personId, provider: "opengym", baseUrl: input.baseUrl.replace(/\/$/, ""), credentialsEnc: encrypt(token), status: "active" })
+    .values({ userId: input.userId, personId: input.personId, provider: "opengym", baseUrl: input.baseUrl.replace(/\/$/, ""), credentialsEnc: encrypt(token), webhookSecretEnc: encrypt(newToken("whs").token), status: "active" })
     .returning();
   return acc!;
 }

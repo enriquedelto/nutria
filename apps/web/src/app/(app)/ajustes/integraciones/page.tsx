@@ -1,6 +1,7 @@
 import { Suspense } from "react";
 import { and, apiTokens, desc, eq, integrationAccounts, isNull, webhooks } from "@nutria/db";
 import { WEBHOOK_EVENTS } from "@nutria/core";
+import { decrypt } from "@nutria/integrations";
 import { PageHeader } from "@/components/page-header";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardHeader } from "@/components/ui/card";
@@ -52,7 +53,13 @@ async function Content() {
         ) : (
           <p className="text-sm text-ink-3">Solo quien gestiona a esta persona puede conectarla.</p>
         )}
-        <p className="mt-3 text-xs text-ink-3">Para tiempo real, configura en openGym el webhook {base}/api/hooks/opengym (lo hace automáticamente al emparejar).</p>
+        {ogHere?.webhookSecretEnc ? (
+          <div className="mt-4 space-y-2">
+            <p className="text-sm text-ink-2">Para tiempo real, añade en openGym este webhook y su secreto de firma:</p>
+            <CodeLine text={`${base}/api/hooks/opengym/${ogHere.id}`} />
+            <CodeLine text={decrypt(ogHere.webhookSecretEnc)} />
+          </div>
+        ) : null}
       </Card>
 
       <Card>
