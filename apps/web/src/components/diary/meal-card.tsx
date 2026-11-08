@@ -1,4 +1,5 @@
 "use client";
+import { submitForm } from "@/lib/forms";
 import { useState } from "react";
 import { useSafeTransition } from "@/lib/use-safe-transition";
 import Link from "next/link";
@@ -146,7 +147,7 @@ function EditEntryDialog({ personId, entry, slots, onClose }: { personId: string
       <DialogContent title={entry.name} description={entry.brand ?? undefined}>
         <form
           className="space-y-4"
-          action={(fd) =>
+          onSubmit={submitForm((fd) =>
             start(async () => {
               await editEntry(personId, entry.id, {
                 grams: entry.quick ? undefined : Number(fd.get("grams")),
@@ -155,7 +156,7 @@ function EditEntryDialog({ personId, entry, slots, onClose }: { personId: string
               });
               onClose();
             })
-          }
+          )}
         >
           <div className="grid grid-cols-2 gap-3">
             {!entry.quick ? (

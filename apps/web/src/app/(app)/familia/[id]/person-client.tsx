@@ -1,4 +1,5 @@
 "use client";
+import { submitForm } from "@/lib/forms";
 import { errorText } from "@/lib/errors";
 import { useState } from "react";
 import { useSafeTransition } from "@/lib/use-safe-transition";
@@ -48,7 +49,7 @@ export function EditBasics({ personId, name, color }: { personId: string; name: 
         <DialogContent title="Nombre y color">
           <form
             className="space-y-3"
-            action={(fd) =>
+            onSubmit={submitForm((fd) =>
               start(async () => {
                 try {
                   await updatePersonBasics(personId, { displayName: String(fd.get("name")), avatarColor: c });
@@ -57,7 +58,7 @@ export function EditBasics({ personId, name, color }: { personId: string; name: 
                   err(e);
                 }
               })
-            }
+            )}
           >
             <Input name="name" defaultValue={name} required maxLength={60} />
             <ColorPicker value={c} onChange={setC} />
@@ -159,7 +160,7 @@ export function GrantAccess({ personId, members, scopeNames }: { personId: strin
         <DialogContent title="Compartir" description="Quien gestiona puede verlo y cambiarlo todo; quien ve, solo lo que marques.">
           <form
             className="space-y-3"
-            action={(fd) =>
+            onSubmit={submitForm((fd) =>
               start(async () => {
                 try {
                   await grantAccess({ personId, userId: String(fd.get("user")), role, scopes: scopes as never, canWrite: fd.get("write") === "on" });
@@ -168,7 +169,7 @@ export function GrantAccess({ personId, members, scopeNames }: { personId: strin
                   err(e);
                 }
               })
-            }
+            )}
           >
             <Field label="Con">
               <Select name="user">
@@ -220,7 +221,7 @@ export function InviteProfessional({ personId, scopeNames }: { personId: string;
           ) : (
             <form
               className="space-y-3"
-              action={(fd) =>
+              onSubmit={submitForm((fd) =>
                 start(async () => {
                   try {
                     const r = await inviteProfessional({ personId, email: String(fd.get("email")), scopes, days: Number(fd.get("days") || 90) });
@@ -229,7 +230,7 @@ export function InviteProfessional({ personId, scopeNames }: { personId: string;
                     err(e);
                   }
                 })
-              }
+              )}
             >
               <Field label="Correo">
                 <Input name="email" type="email" required />

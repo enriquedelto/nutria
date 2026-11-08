@@ -1,4 +1,5 @@
 "use client";
+import { submitForm } from "@/lib/forms";
 import { errorText } from "@/lib/errors";
 import { useState } from "react";
 import { useSafeTransition } from "@/lib/use-safe-transition";
@@ -25,7 +26,7 @@ export function RenameGroup({ name }: { name: string }) {
         <DialogContent title="Nombre del hogar">
           <form
             className="space-y-3"
-            action={(fd) =>
+            onSubmit={submitForm((fd) =>
               start(async () => {
                 try {
                   await renameGroup(String(fd.get("name")));
@@ -34,7 +35,7 @@ export function RenameGroup({ name }: { name: string }) {
                   err(e);
                 }
               })
-            }
+            )}
           >
             <Input name="name" defaultValue={name} required maxLength={80} />
             <Button type="submit" className="w-full" disabled={pending}>
@@ -70,7 +71,7 @@ export function AddPerson() {
         <DialogContent title="Nueva persona" description="Para niños u otras personas que no usan la app: tú llevas su diario y sus objetivos.">
           <form
             className="grid grid-cols-2 gap-3"
-            action={(fd) =>
+            onSubmit={submitForm((fd) =>
               start(async () => {
                 try {
                   await addManagedPerson({
@@ -87,7 +88,7 @@ export function AddPerson() {
                   err(e);
                 }
               })
-            }
+            )}
           >
             <Field label="Nombre" className="col-span-2">
               <Input name="name" required maxLength={60} autoFocus />
@@ -155,7 +156,7 @@ export function InviteMember() {
     <div className="space-y-3">
       <form
         className="grid grid-cols-[1fr_auto] gap-2 sm:grid-cols-[1fr_9rem_auto] sm:items-end"
-        action={(fd) =>
+        onSubmit={submitForm((fd) =>
           start(async () => {
             try {
               const r = await inviteToGroup({ email: String(fd.get("email")), role: String(fd.get("role")) as "member" });
@@ -164,7 +165,7 @@ export function InviteMember() {
               err(e);
             }
           })
-        }
+        )}
       >
         <Field label="Correo" className="col-span-2 sm:col-span-1">
           <Input name="email" type="email" required placeholder="ana@ejemplo.com" />

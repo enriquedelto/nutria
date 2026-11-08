@@ -1,4 +1,5 @@
 "use client";
+import { submitForm } from "@/lib/forms";
 import { useEffect, useRef, useState } from "react";
 import { useSafeTransition } from "@/lib/use-safe-transition";
 import { Play, Plus, Square, Trash2 } from "lucide-react";
@@ -36,13 +37,13 @@ export function ExerciseForm({ personId, today, activities }: { personId: string
     <form
       ref={ref}
       className="grid gap-2 sm:grid-cols-[1fr_6rem_9rem_auto] sm:items-end"
-      action={(fd) =>
+      onSubmit={submitForm((fd) =>
         start(async () => {
           await logExercise(personId, { date: String(fd.get("date")), activityCode: String(fd.get("activity")), minutes: Number(fd.get("minutes")), kcal: fd.get("kcal") ? Number(fd.get("kcal")) : null });
           toast.success("Ejercicio guardado");
           ref.current?.reset();
         })
-      }
+      )}
     >
       <Field label="Actividad">
         <Select name="activity" required>
@@ -85,7 +86,7 @@ export function DeleteExercise({ personId, id }: { personId: string; id: string 
 export function StepsForm({ personId, today, current }: { personId: string; today: string; current: number | null }) {
   const [pending, start] = useSafeTransition();
   return (
-    <form className="flex items-end gap-2" action={(fd) => start(async () => void (await logSteps(personId, String(fd.get("date")), Number(fd.get("steps")))))}>
+    <form className="flex items-end gap-2" onSubmit={submitForm((fd) => start(async () => void (await logSteps(personId, String(fd.get("date")), Number(fd.get("steps"))))))}>
       <Field label="Pasos" className="flex-1">
         <Input name="steps" type="number" min={0} max={150000} defaultValue={current ?? undefined} inputMode="numeric" required />
       </Field>
@@ -182,7 +183,7 @@ export function SleepForm({ personId, today }: { personId: string; today: string
   return (
     <form
       className="grid gap-3 sm:grid-cols-2"
-      action={(fd) =>
+      onSubmit={submitForm((fd) =>
         start(async () => {
           const date = String(fd.get("date"));
           const prev = new Date(Date.parse(`${date}T12:00:00Z`) - 86_400_000).toISOString().slice(0, 10);
@@ -193,7 +194,7 @@ export function SleepForm({ personId, today }: { personId: string; today: string
           await logSleep(personId, { date, bedtime: new Date(`${bedDate}T${bed}:00`).toISOString(), wakeTime: new Date(`${date}T${wake}:00`).toISOString(), quality, note: String(fd.get("note") || "") || null });
           toast.success("Sueño guardado");
         })
-      }
+      )}
     >
       <Field label="Noche que termina el">
         <Input name="date" type="date" defaultValue={today} max={today} required />
@@ -246,7 +247,7 @@ export function PeriodControls({ personId, today, open }: { personId: string; to
       Terminó la regla (hoy)
     </Button>
   ) : (
-    <form className="flex items-end gap-2" action={(fd) => start(() => logPeriod(personId, { startDate: String(fd.get("start")), flow: fd.get("flow") ? Number(fd.get("flow")) : null }))}>
+    <form className="flex items-end gap-2" onSubmit={submitForm((fd) => start(() => logPeriod(personId, { startDate: String(fd.get("start")), flow: fd.get("flow") ? Number(fd.get("flow")) : null })))}>
       <Field label="Empezó la regla">
         <Input name="start" type="date" defaultValue={today} max={today} required />
       </Field>
@@ -296,13 +297,13 @@ export function SymptomForm({ personId }: { personId: string }) {
   return (
     <form
       className="space-y-3"
-      action={(fd) =>
+      onSubmit={submitForm((fd) =>
         start(async () => {
           await logSymptom(personId, { occurredAt: new Date(String(fd.get("at"))).toISOString(), symptom, intensity, note: String(fd.get("note") || "") || null });
           toast.success("Síntoma anotado");
           setSymptom("");
         })
-      }
+      )}
     >
       <div className="flex flex-wrap gap-1.5">
         {COMMON_SYMPTOMS.map((s) => (
@@ -371,7 +372,7 @@ export function MedicationDialog({ personId, med, trigger }: { personId: string;
           <DialogContent title={med ? "Editar medicamento" : "Nuevo medicamento"} description="Recibirás un aviso a cada hora. Las alertas con alimentos son orientativas.">
             <form
               className="space-y-3"
-              action={(fd) =>
+              onSubmit={submitForm((fd) =>
                 start(async () => {
                   await saveMedication(
                     personId,
@@ -390,7 +391,7 @@ export function MedicationDialog({ personId, med, trigger }: { personId: string;
                   );
                   setOpen(false);
                 })
-              }
+              )}
             >
               <div className="grid grid-cols-2 gap-2">
                 <Field label="Nombre" className="col-span-2">

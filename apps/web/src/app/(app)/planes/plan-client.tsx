@@ -1,4 +1,5 @@
 "use client";
+import { submitForm } from "@/lib/forms";
 import { errorText } from "@/lib/errors";
 import { useMemo, useState } from "react";
 import { useSafeTransition } from "@/lib/use-safe-transition";
@@ -339,7 +340,7 @@ function AddDialog({ planId, target, slots, recipes, onClose }: { planId: string
         {free ? (
           <form
             className="space-y-3"
-            action={(fd) => add({ date: target.date, mealSlot: target.slot, title: String(fd.get("title")), note: String(fd.get("ing") || "").split("\n").map((l) => l.trim()).filter(Boolean).map((l) => (l.startsWith("- ") ? l : `- ${l}`)).join("\n") || null })}
+            onSubmit={submitForm((fd) => add({ date: target.date, mealSlot: target.slot, title: String(fd.get("title")), note: String(fd.get("ing") || "").split("\n").map((l) => l.trim()).filter(Boolean).map((l) => (l.startsWith("- ") ? l : `- ${l}`)).join("\n") || null }))}
           >
             <Field label="Plato">
               <Input name="title" required maxLength={200} placeholder="Tortilla de patatas y ensalada" autoFocus />
@@ -480,7 +481,7 @@ function GenerateDialog({ week, personIds, slots, defaultSlots, members, recipes
           {!draft ? (
             <form
               className="space-y-3"
-              action={(fd) =>
+              onSubmit={submitForm((fd) =>
                 start(async () => {
                   try {
                     const r = await generatePlanDraft({
@@ -497,7 +498,7 @@ function GenerateDialog({ week, personIds, slots, defaultSlots, members, recipes
                     err(e);
                   }
                 })
-              }
+              )}
             >
               <Field label="Comidas a planificar">
                 <div className="flex flex-wrap gap-2">

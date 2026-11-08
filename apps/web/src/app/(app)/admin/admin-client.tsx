@@ -1,4 +1,5 @@
 "use client";
+import { submitForm } from "@/lib/forms";
 import { errorText } from "@/lib/errors";
 import { useState } from "react";
 import { useSafeTransition } from "@/lib/use-safe-transition";
@@ -69,7 +70,7 @@ export function InviteHousehold() {
           ) : (
             <form
               className="space-y-3"
-              action={(fd) =>
+              onSubmit={submitForm((fd) =>
                 start(async () => {
                   try {
                     setLink(await inviteNewHousehold(String(fd.get("email"))));
@@ -77,7 +78,7 @@ export function InviteHousehold() {
                     err(e);
                   }
                 })
-              }
+              )}
             >
               <Field label="Correo">
                 <Input name="email" type="email" required />

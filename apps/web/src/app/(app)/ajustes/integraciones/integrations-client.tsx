@@ -1,4 +1,5 @@
 "use client";
+import { submitForm } from "@/lib/forms";
 import { errorText } from "@/lib/errors";
 import { useState } from "react";
 import { useSafeTransition } from "@/lib/use-safe-transition";
@@ -46,12 +47,12 @@ export function NewToken() {
     <div className="space-y-3">
       <form
         className="grid gap-2 sm:grid-cols-[1fr_auto_8rem_auto] sm:items-end"
-        action={(fd) =>
+        onSubmit={submitForm((fd) =>
           start(async () => {
             const t = await createApiToken({ name: String(fd.get("name")), scopes, expiresDays: fd.get("exp") ? Number(fd.get("exp")) : null });
             setToken(t);
           })
-        }
+        )}
       >
         <Field label="Nombre">
           <Input name="name" required maxLength={40} placeholder="Claude Code, Home Assistant…" />
@@ -116,7 +117,7 @@ export function NewWebhook({ events }: { events: string[] }) {
     <div className="space-y-3">
       <form
         className="space-y-2"
-        action={(fd) =>
+        onSubmit={submitForm((fd) =>
           start(async () => {
             try {
               setSecret(await createWebhook({ url: String(fd.get("url")), events: sel }));
@@ -124,7 +125,7 @@ export function NewWebhook({ events }: { events: string[] }) {
               toast.error(errorText(e, "URL no válida"));
             }
           })
-        }
+        )}
       >
         <Field label="URL de destino">
           <Input name="url" type="url" required placeholder="https://homeassistant.local:8123/api/webhook/nutria" />
@@ -172,7 +173,7 @@ export function OpenGymConnect({ personId, defaultUrl }: { personId: string; def
   return (
     <form
       className="grid gap-2 sm:grid-cols-[1fr_10rem_auto] sm:items-end"
-      action={(fd) =>
+      onSubmit={submitForm((fd) =>
         start(async () => {
           try {
             await connectOpenGym(personId, String(fd.get("url")), String(fd.get("code")));
@@ -181,7 +182,7 @@ export function OpenGymConnect({ personId, defaultUrl }: { personId: string; def
             toast.error(errorText(e, "No se pudo emparejar"));
           }
         })
-      }
+      )}
     >
       <Field label="Dirección de openGym">
         <Input name="url" type="url" required defaultValue={defaultUrl} />

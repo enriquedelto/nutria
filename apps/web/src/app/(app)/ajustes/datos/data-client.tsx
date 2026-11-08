@@ -1,4 +1,5 @@
 "use client";
+import { submitForm } from "@/lib/forms";
 import { errorText } from "@/lib/errors";
 import { useRef, useState } from "react";
 import { useSafeTransition } from "@/lib/use-safe-transition";
@@ -55,14 +56,14 @@ export function DeleteAccount({ email }: { email: string }) {
           <DialogContent title="Borrar la cuenta" description="Se borran tu usuario, tu persona y todos sus datos (diario, salud, fotos, IA). Las personas que gestionas y no tienen otro gestor también se borran. No se puede deshacer.">
             <form
               className="space-y-3"
-              action={(fd) =>
+              onSubmit={submitForm((fd) =>
                 start(async () => {
                   if (String(fd.get("confirm")).trim().toLowerCase() !== email.toLowerCase()) return void toast.error("Escribe tu email exacto para confirmar");
                   const { error } = await authClient.deleteUser({ password: String(fd.get("password")) });
                   if (error) return void toast.error(error.message ?? "No se pudo borrar");
                   window.location.assign("/login");
                 })
-              }
+              )}
             >
               <Field label={`Escribe ${email}`}>
                 <Input name="confirm" autoComplete="off" required />

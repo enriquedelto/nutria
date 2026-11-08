@@ -1,4 +1,5 @@
 "use client";
+import { submitForm } from "@/lib/forms";
 import { errorText } from "@/lib/errors";
 import { useState } from "react";
 import { useSafeTransition } from "@/lib/use-safe-transition";
@@ -31,7 +32,7 @@ export function RecipeForm({ initial, recipeId, estimateId }: { initial?: Recipe
   return (
     <form
       className="space-y-4"
-      action={(fd) =>
+      onSubmit={submitForm((fd) =>
         start(async () => {
           let section: string | null = null;
           const ingredients: RecipeIn["ingredients"] = [];
@@ -76,7 +77,7 @@ export function RecipeForm({ initial, recipeId, estimateId }: { initial?: Recipe
             toast.error(errorText(e, "No se pudo guardar"));
           }
         })
-      }
+      )}
     >
       <div className="grid gap-3 sm:grid-cols-[1fr_7rem_7rem_7rem]">
         <Field label="Título">

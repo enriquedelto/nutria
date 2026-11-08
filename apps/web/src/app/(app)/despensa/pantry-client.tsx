@@ -1,4 +1,5 @@
 "use client";
+import { submitForm } from "@/lib/forms";
 import { errorText } from "@/lib/errors";
 import { useRef, useState } from "react";
 import { useSafeTransition } from "@/lib/use-safe-transition";
@@ -27,7 +28,7 @@ export function AddPantry({ defaultLocation = "despensa" }: { defaultLocation?: 
       <form
         ref={form}
         className="grid grid-cols-2 gap-2 sm:grid-cols-[1fr_5rem_5rem_8rem_8rem_auto] sm:items-end"
-        action={(fd) =>
+        onSubmit={submitForm((fd) =>
           start(async () => {
             try {
               await addPantryItem({ name: String(fd.get("name")), quantity: Number(fd.get("qty") || 1), unit: String(fd.get("unit")) as "ud", location: loc, expires: String(fd.get("exp") || "") || null });
@@ -36,7 +37,7 @@ export function AddPantry({ defaultLocation = "despensa" }: { defaultLocation?: 
               toast.error(errorText(e, "Error"));
             }
           })
-        }
+        )}
       >
         <Field label="Producto" className="col-span-2 sm:col-span-1">
           <Input name="name" required maxLength={120} placeholder="Yogures naturales" />

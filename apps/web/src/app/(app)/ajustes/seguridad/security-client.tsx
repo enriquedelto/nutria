@@ -1,4 +1,5 @@
 "use client";
+import { submitForm } from "@/lib/forms";
 import { useEffect, useState } from "react";
 import { useSafeTransition } from "@/lib/use-safe-transition";
 import { useRouter } from "next/navigation";
@@ -16,13 +17,13 @@ export function ChangePassword() {
   return (
     <form
       className="grid gap-2 sm:grid-cols-[1fr_1fr_auto] sm:items-end"
-      action={(fd) =>
+      onSubmit={submitForm((fd) =>
         start(async () => {
           const { error } = await authClient.changePassword({ currentPassword: String(fd.get("current")), newPassword: String(fd.get("next")), revokeOtherSessions: true });
           if (error) toast.error(err(error, "No se pudo cambiar"));
           else toast.success("Contraseña cambiada. Se han cerrado las demás sesiones.");
         })
-      }
+      )}
     >
       <Field label="Contraseña actual">
         <Input name="current" type="password" autoComplete="current-password" required />
@@ -108,14 +109,14 @@ export function TwoFactor({ enabled }: { enabled: boolean }) {
         {qr ? <img src={qr} alt="Código QR para la app de autenticación" className="size-48 rounded-xl bg-white p-2" /> : null}
         <form
           className="space-y-2"
-          action={(fd) =>
+          onSubmit={submitForm((fd) =>
             start(async () => {
               const { error } = await authClient.twoFactor.verifyTotp({ code: String(fd.get("code")).replace(/\s/g, "") });
               if (error) return void toast.error(err(error, "Código incorrecto"));
               setStep("codes");
               router.refresh();
             })
-          }
+          )}
         >
           <p className="text-sm text-ink-2">Escanea el código con Google Authenticator, 1Password, Aegis… y escribe el código de 6 cifras.</p>
           <a href={uri} className="block text-xs text-herb underline">

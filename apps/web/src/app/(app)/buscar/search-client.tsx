@@ -1,4 +1,5 @@
 "use client";
+import { submitForm } from "@/lib/forms";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useSafeTransition } from "@/lib/use-safe-transition";
 import { useRouter, useSearchParams } from "next/navigation";
@@ -188,7 +189,7 @@ function QuickAdd({ ctx, onClose }: { ctx: DayContext; onClose: () => void }) {
       <DialogContent title="Registro rápido" description="Solo calorías y macros, sin buscar el alimento.">
         <form
           className="space-y-3"
-          action={(fd) =>
+          onSubmit={submitForm((fd) =>
             start(async () => {
               const num = (k: string) => Number(fd.get(k) || 0);
               await sendOrQueue("/api/diary", {
@@ -202,7 +203,7 @@ function QuickAdd({ ctx, onClose }: { ctx: DayContext; onClose: () => void }) {
               router.refresh();
               onClose();
             })
-          }
+          )}
         >
           <Field label="Descripción">
             <Input name="name" placeholder="p. ej. Menú del día" maxLength={120} />

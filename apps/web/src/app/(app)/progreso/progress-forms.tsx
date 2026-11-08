@@ -1,4 +1,5 @@
 "use client";
+import { submitForm } from "@/lib/forms";
 import { errorText } from "@/lib/errors";
 import { useRef, useState } from "react";
 import { useSafeTransition } from "@/lib/use-safe-transition";
@@ -19,13 +20,13 @@ export function WeightForm({ personId, today }: { personId: string; today: strin
     <form
       ref={ref}
       className="grid grid-cols-[1fr_1fr_auto] items-end gap-2 sm:grid-cols-[9rem_7rem_7rem_auto]"
-      action={(fd) =>
+      onSubmit={submitForm((fd) =>
         start(async () => {
           await logWeight(personId, { date: String(fd.get("date")), kg: Number(fd.get("kg")), bodyFatPct: fd.get("bf") ? Number(fd.get("bf")) : null });
           toast.success("Peso guardado");
           ref.current?.reset();
         })
-      }
+      )}
     >
       <Field label="Fecha" className="col-span-3 sm:col-span-1">
         <Input name="date" type="date" defaultValue={today} max={today} required />
@@ -89,10 +90,10 @@ export function GoalForm({ personId, current }: { personId: string; current: { t
       {open ? (
         <Dialog open onOpenChange={setOpen}>
           <DialogContent title="Meta de peso" description="La previsión te dirá cuándo llegarías al ritmo actual.">
-            <form className="space-y-3" action={(fd) => start(async () => {
+            <form className="space-y-3" onSubmit={submitForm((fd) => start(async () => {
               await setGoal(personId, { type: "weight", targetValue: Number(fd.get("kg")), targetDate: (fd.get("date") as string) || null });
               setOpen(false);
-            })}>
+            }))}>
               <Field label="Peso objetivo (kg)">
                 <Input name="kg" type="number" step="0.1" min={20} max={300} required defaultValue={current?.targetValue} />
               </Field>
@@ -122,12 +123,12 @@ export function MeasurementsForm({ personId, today }: { personId: string; today:
       {open ? (
         <Dialog open onOpenChange={setOpen}>
           <DialogContent title="Medidas (cm)">
-            <form className="space-y-3" action={(fd) => start(async () => {
+            <form className="space-y-3" onSubmit={submitForm((fd) => start(async () => {
               const sites: Record<string, number> = {};
               for (const [k] of SITES) if (fd.get(k)) sites[k] = Number(fd.get(k));
               await logMeasurements(personId, String(fd.get("date")), sites);
               setOpen(false);
-            })}>
+            }))}>
               <Field label="Fecha"><Input name="date" type="date" defaultValue={today} max={today} /></Field>
               <div className="grid grid-cols-2 gap-3">
                 {SITES.map(([k, label]) => (

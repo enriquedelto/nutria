@@ -1,4 +1,5 @@
 "use client";
+import { submitForm } from "@/lib/forms";
 import { useRef, useState } from "react";
 import { useSafeTransition } from "@/lib/use-safe-transition";
 import { Loader2, Plus, Sparkles, Trash2 } from "lucide-react";
@@ -49,12 +50,12 @@ export function MemoryClient({
           <form
             ref={form}
             className="grid gap-3 sm:grid-cols-[10rem_1fr_auto] sm:items-end"
-            action={(fd) =>
+            onSubmit={submitForm((fd) =>
               start(async () => {
                 await addMemory(personId, String(fd.get("category")), String(fd.get("content")));
                 form.current?.reset();
               })
-            }
+            )}
           >
             <Field label="Categoría">
               <Select name="category">

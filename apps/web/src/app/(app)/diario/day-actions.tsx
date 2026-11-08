@@ -1,4 +1,5 @@
 "use client";
+import { submitForm } from "@/lib/forms";
 import { useState } from "react";
 import { useSafeTransition } from "@/lib/use-safe-transition";
 import { CheckCircle2, Copy, Save, Smile } from "lucide-react";
@@ -35,14 +36,14 @@ export function DayActions({ personId, date, today, complete, hasEntries, meals 
           <DialogContent title="Guardar plantilla" description="Reutiliza una comida habitual con un toque.">
             <form
               className="space-y-3"
-              action={(fd) =>
+              onSubmit={submitForm((fd) =>
                 start(async () => {
                   const m = meals.find((x) => x.key === fd.get("slot"))!;
                   await saveTemplate(personId, String(fd.get("name")), m.key, m.items);
                   toast.success("Plantilla guardada");
                   setTpl(false);
                 })
-              }
+              )}
             >
               <Field label="Comida">
                 <Select name="slot">
@@ -105,13 +106,13 @@ export function FeelingButton({ personId, date, slot, current }: { personId: str
           <DialogContent title="¿Cómo te sentó?" description="Sirve para encontrar patrones de hambre, saciedad y ánimo.">
             <form
               className="space-y-4"
-              action={(fd) =>
+              onSubmit={submitForm((fd) =>
                 start(async () => {
                   const n = (k: string) => (fd.get(k) ? Number(fd.get(k)) : null);
                   await logFeeling(personId, { date, mealSlot: slot, hungerBefore: n("hunger"), satietyAfter: n("satiety"), mood: n("mood"), note: String(fd.get("note") || "") || null });
                   setOpen(false);
                 })
-              }
+              )}
             >
               <Scale name="hunger" label="Hambre antes" low="Nada" high="Mucha" value={current?.hungerBefore ?? null} />
               <Scale name="satiety" label="Saciedad después" low="Me quedé con hambre" high="Muy lleno" value={current?.satietyAfter ?? null} />

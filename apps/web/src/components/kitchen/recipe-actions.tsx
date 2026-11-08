@@ -1,4 +1,5 @@
 "use client";
+import { submitForm } from "@/lib/forms";
 import { errorText } from "@/lib/errors";
 import { useState } from "react";
 import { useSafeTransition } from "@/lib/use-safe-transition";
@@ -75,7 +76,7 @@ export function LogRecipe({ personId, foodId, servingGrams, title, slots, defaul
           <DialogContent title={`Registrar «${title}»`}>
             <form
               className="space-y-3"
-              action={(fd) =>
+              onSubmit={submitForm((fd) =>
                 start(async () => {
                   const servings = Number(fd.get("servings"));
                   if (batch && fd.get("fromBatch")) {
@@ -88,7 +89,7 @@ export function LogRecipe({ personId, foodId, servingGrams, title, slots, defaul
                   toast.success("Añadido al diario");
                   setOpen(false);
                 })
-              }
+              )}
             >
               <div className="grid grid-cols-2 gap-2">
                 <Field label="Raciones">
@@ -140,13 +141,13 @@ export function CookDialog({ recipeId, servings, freezable, timezone }: { recipe
           <DialogContent title="¿Cuánto has cocinado?" description="Descuento los ingredientes de la despensa. Si sobra, lo guardo como tuppers para registrarlos después.">
             <form
               className="space-y-3"
-              action={(fd) =>
+              onSubmit={submitForm((fd) =>
                 start(async () => {
                   const r = await cookAction({ recipeId, servings: Number(fd.get("servings")), batchPortions: Number(fd.get("batch") || 0), location: String(fd.get("loc")) as "nevera", timezone });
                   toast.success(`${r.used.length ? `Despensa actualizada (${r.used.length} productos)` : "Hecho"}${r.batchId ? " · tuppers guardados" : ""}`);
                   setOpen(false);
                 })
-              }
+              )}
             >
               <div className="grid grid-cols-3 gap-2">
                 <Field label="Raciones">
