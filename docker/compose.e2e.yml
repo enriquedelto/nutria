@@ -13,8 +13,9 @@ x-app: &app
     AI_BACKEND: mock
     SKIP_PREMIGRATE_SNAPSHOT: "1"
     OFF_USER_AGENT: Nutria-e2e/0.1
-  tmpfs:
-    - /data/uploads
+  # Shared by web and worker (imports, photos); the image creates it owned by node. down -v removes it.
+  volumes:
+    - uploads:/data/uploads
   depends_on:
     postgres:
       condition: service_healthy
@@ -51,3 +52,6 @@ services:
     depends_on:
       migrate:
         condition: service_completed_successfully
+
+volumes:
+  uploads:

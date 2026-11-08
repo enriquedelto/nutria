@@ -115,9 +115,11 @@ async function Content() {
           ))}
         </div>
       </Step>
-
+      {/* Sin prefetch: lo precargado al entrar sería anterior a guardar el perfil. */}
       <Button asChild size="lg" className="w-full">
-        <Link href="/hoy">Empezar</Link>
+        <Link href="/hoy" prefetch={false}>
+          Empezar
+        </Link>
       </Button>
     </div>
   );
