@@ -92,6 +92,10 @@ export const twoFactor = pgTable(
     userId: text()
       .notNull()
       .references(() => user.id, { onDelete: "cascade" }),
+    // better-auth 1.7: pending enrolment and brute-force lockout.
+    verified: boolean().default(true),
+    failedVerificationCount: integer().default(0),
+    lockedUntil: timestamp({ withTimezone: true }),
   },
   (t) => [index().on(t.userId), index().on(t.secret)],
 );
