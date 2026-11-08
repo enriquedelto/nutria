@@ -19,6 +19,7 @@ import {
   medications,
   notifications,
   personAccess,
+  prices,
   personAchievements,
   persons,
   symptomLogs,
@@ -242,6 +243,14 @@ describe("datos", () => {
     src.push(gz.subarray(0, 10));
     setTimeout(() => src.destroy(new Error("other side closed")), 10);
     await expect(core.importOffDump(db, src, { gzip: true })).rejects.toThrow(/other side closed/);
+  });
+  it("rastreo de tienda: productos repetidos en varias categorías y dos pasadas el mismo día", async () => {
+    const p = (id: string, price: number) => ({ id, name: `Producto ${id}`, price, url: `https://tienda/${id}` });
+    const fake = { code: "mercadona", name: "Mercadona", product: async () => null, toCart: async () => ({ mode: "links" as const, lines: [] }), async *crawl() { yield p("1", 1.5); yield p("2", 2); yield p("1", 1.5); } };
+    expect(await core.crawlStore(db, "mercadona", { provider: fake as never })).toBe(2);
+    expect(await core.crawlStore(db, "mercadona", { provider: fake as never })).toBe(2);
+    const rows = await db.select().from(prices).where(eq(prices.source, "store"));
+    expect(rows).toHaveLength(2);
   });
   it("tolera valores fuera del rango de real (7e-47, 1e40)", async () => {
     const tsv = ["code\tproduct_name\tbrands\tcountries_tags\tenergy-kcal_100g\tproteins_100g\tsalt_100g", "8410000000003\tTofu raro\tMarca\ten:spain\t120\t7e-47\t1e40"].join("\n");

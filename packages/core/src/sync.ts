@@ -14,6 +14,7 @@ import {
   STORE_PROVIDERS,
   tsvParser,
   type StoreProduct,
+  type StoreProvider,
 } from "@nutria/integrations";
 import { macroColumns, normalizeCiqual, normalizeOff, todayIn, type CiqualRow, type FoodInput } from "@nutria/nutrition";
 import { recomputeDay } from "./summaries";
@@ -274,15 +275,18 @@ export async function pairOpenGym(db: Database, input: { userId: string; personI
 /* ------------------------------- store crawl ------------------------------ */
 
 /** Crawl a store catalogue into foods(source=store) + today's prices. */
-export async function crawlStore(db: Database, storeCode: string, opts: { warehouse?: string; limit?: number } = {}) {
+export async function crawlStore(db: Database, storeCode: string, opts: { warehouse?: string; limit?: number; provider?: StoreProvider } = {}) {
   const make = STORE_PROVIDERS[storeCode];
-  if (!make) throw new Error(`Tienda no soportada: ${storeCode}`);
-  const provider = make();
+  if (!make && !opts.provider) throw new Error(`Tienda no soportada: ${storeCode}`);
+  const provider = opts.provider ?? make!();
   const [store] = await db.select().from(stores).where(eq(stores.code, storeCode)).limit(1);
   if (!store) throw new Error(`Tienda ${storeCode} no sembrada`);
   const today = todayIn();
   let n = 0;
   let batch: StoreProduct[] = [];
+  // The same product hangs from several categories: keep the first one (a batch with duplicates
+  // fails with "ON CONFLICT DO UPDATE command cannot affect row a second time").
+  const seen = new Set<string>();
   const flush = async () => {
     if (!batch.length) return;
     const rows = await upsertFoods(
@@ -314,6 +318,9 @@ export async function crawlStore(db: Database, storeCode: string, opts: { wareho
       })),
     );
     const ids = new Map(rows.map((r) => [r.sourceId, r.id]));
+    // One store price per product and day: a second crawl the same day replaces it.
+    const foodIds = [...ids.values()];
+    if (foodIds.length) await db.delete(prices).where(and(inArray(prices.foodId, foodIds), eq(prices.storeId, store.id), eq(prices.observedOn, today), eq(prices.source, "store")));
     await db.insert(prices).values(
       batch.map((p) => ({ foodId: ids.get(`${storeCode}:${p.id}`) ?? null, barcode: p.barcode ?? null, storeId: store.id, price: p.price.toFixed(2), pricePerKg: p.pricePerKg != null ? p.pricePerKg.toFixed(2) : null, packGrams: p.packGrams ?? null, source: "store", observedOn: today })),
     );
@@ -321,6 +328,8 @@ export async function crawlStore(db: Database, storeCode: string, opts: { wareho
     batch = [];
   };
   for await (const p of provider.crawl({ warehouse: opts.warehouse })) {
+    if (seen.has(p.id)) continue;
+    seen.add(p.id);
     batch.push(p);
     if (batch.length >= 200) await flush();
     if (opts.limit && n + batch.length >= opts.limit) break;
