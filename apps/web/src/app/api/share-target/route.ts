@@ -9,7 +9,8 @@ const URL_RE = /https?:\/\/[^\s]+/i;
  */
 export async function POST(req: Request) {
   const user = await getApiUser(req);
-  const to = (path: string) => Response.redirect(new URL(path, req.url), 303);
+  // Relative Location: req.url carries the internal host behind Docker/Caddy.
+  const to = (path: string) => new Response(null, { status: 303, headers: { Location: path } });
   if (!user) return to("/login?next=/registrar");
   const form = await req.formData();
   const files = form.getAll("files").filter((f): f is File => f instanceof File && f.size > 0 && f.size < 20 * 1024 * 1024);

@@ -25,6 +25,11 @@ async function signUp(page: Page, who: typeof ADMIN) {
   await page.getByRole("button", { name: "Crear cuenta" }).click();
 }
 
+test("sin sesión, las páginas privadas llevan al login", async ({ page }) => {
+  await page.goto("/diario");
+  await expect(page).toHaveURL(//login?next=%2Fdiario/);
+});
+
 test("el primer registro crea la cuenta de administración", async () => {
   const page = adminPage;
   await page.goto("/registro");
