@@ -101,7 +101,7 @@ async function Content({ searchParams }: { searchParams: Promise<Record<string, 
         </div>
 
         <Card id="nutrientes" className="h-fit lg:sticky lg:top-20">
-          <CardHeader title="Nutrientes" subtitle="Total del día frente a tus objetivos" />
+          <CardHeader title="Nutrientes" subtitle="Total del día frente a tus objetivos" action={<Link href="/informe" className="text-xs text-herb underline">Informe</Link>} />
           {Object.entries(CATEGORY_TITLES).map(([cat, title]) => {
             const list = NUTRIENTS.filter((n) => n.category === cat);
             return (

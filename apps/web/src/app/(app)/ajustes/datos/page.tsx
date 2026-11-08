@@ -1,4 +1,5 @@
 import { Suspense } from "react";
+import Link from "next/link";
 import { Download } from "lucide-react";
 import { and, desc, eq, imports } from "@nutria/db";
 import { PageHeader } from "@/components/page-header";
@@ -61,7 +62,7 @@ async function Content() {
             </a>
           ))}
         </div>
-        <p className="mt-3 text-xs text-ink-3">Para un informe imprimible (o PDF) para tu nutricionista, abre el Diario y usa «Imprimir».</p>
+        <p className="mt-3 text-xs text-ink-3">Para tu nutricionista: <Link href="/informe" className="text-herb underline">informe imprimible o en PDF</Link> con medias, micronutrientes, peso y síntomas.</p>
       </Card>
       <Card className="border-danger/40">
         <CardHeader title="Zona peligrosa" />
