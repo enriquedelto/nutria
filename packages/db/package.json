@@ -21,12 +21,12 @@
     "drizzle-orm": "^0.45.4",
     "postgres": "^4.1.0",
     "uuid": "^13.0.2",
-    "@nutria/nutrition": "workspace:*"
+    "@nutria/nutrition": "workspace:*",
+    "tsx": "^4.23.15"
   },
   "devDependencies": {
     "@electric-sql/pglite": "^0.5.15",
     "drizzle-kit": "^0.31.11",
-    "tsx": "^4.23.15",
     "typescript": "^5"
   }
 }

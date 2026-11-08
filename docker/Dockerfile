@@ -22,6 +22,8 @@ COPY . .
 ARG APP_VERSION=dev
 ENV APP_VERSION=$APP_VERSION
 RUN pnpm --filter @nutria/web build && rm -rf apps/web/.next/cache
+# Runtime only needs production deps (tsx included): drop compilers, linters and test tools.
+RUN --mount=type=cache,id=pnpm,target=/pnpm/store CI=1 pnpm install --prod --frozen-lockfile --offline
 
 FROM base AS runtime
 # yt-dlp + ffmpeg: video recipes. pg_dump: snapshot before migrating. tini: signals.
