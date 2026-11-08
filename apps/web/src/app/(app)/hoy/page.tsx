@@ -31,7 +31,7 @@ async function Today() {
         <MacroSummary totals={day.totals} target={day.target} exerciseKcal={day.exerciseKcal} unit={day.energyUnit} />
         {!day.target ? (
           <p className="mt-3 text-sm text-ink-2">
-            Completa tu <Link className="text-herb underline" href="/ajustes/perfil">perfil</Link> para calcular objetivos.
+            Completa tu <Link className="text-herb underline" href="/ajustes">perfil</Link> para calcular objetivos.
           </p>
         ) : null}
       </Card>

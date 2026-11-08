@@ -21,7 +21,7 @@ export function SignupForm({ token, email, first, professional }: { token: strin
         { headers: token ? { "x-nutria-invite": token } : {} },
       );
       if (error) return setError(error.message ?? "No se pudo crear la cuenta.");
-      router.replace(professional ? "/familia" : "/ajustes/perfil?bienvenida=1");
+      router.replace(professional ? "/familia" : "/bienvenida");
       router.refresh();
     });
 
