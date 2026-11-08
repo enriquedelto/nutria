@@ -7,7 +7,9 @@ import {
   eq,
   foods,
   foodServings,
+  gte,
   inArray,
+  isNotNull,
   mealPlanItems,
   mealPlans,
   pantryItems,
@@ -21,6 +23,7 @@ import {
   sql,
   type Database,
 } from "@nutria/db";
+import { openPrices } from "@nutria/integrations";
 import { aggregateShopping, guessCategory, ingredientKey, macroColumns, parseIngredient, recipeNutrition, type NeedItem, type NutrientMap } from "@nutria/nutrition";
 
 export interface RecipeInput {
@@ -49,6 +52,31 @@ export async function matchIngredient(db: Database, name: string, groupId: strin
   return found.find((f) => f.source === "ciqual" || f.source === "custom") ?? found[0] ?? null;
 }
 
+/**
+ * Fill in prices from Open Prices (crowd-sourced receipts) for foods with a barcode and no price
+ * in the last 60 days: the median €/kg of the latest EUR observations. Network failures are ignored.
+ */
+export async function refreshOpenPrices(db: Database, foodIds: string[], f: typeof fetch = fetch) {
+  if (!foodIds.length) return 0;
+  const since = new Date(Date.now() - 60 * 86_400_000).toISOString().slice(0, 10);
+  const recent = await db.selectDistinct({ foodId: prices.foodId }).from(prices).where(and(inArray(prices.foodId, foodIds), gte(prices.observedOn, since), sql`${prices.pricePerKg} is not null`));
+  const have = new Set(recent.map((r) => r.foodId));
+  const todo = (await db.select({ id: foods.id, barcode: foods.barcode }).from(foods).where(and(inArray(foods.id, foodIds.filter((id) => !have.has(id))), isNotNull(foods.barcode)))).slice(0, 20);
+  let n = 0;
+  await Promise.all(
+    todo.map(async (food) => {
+      const obs = (await openPrices(food.barcode!, f).catch(() => [])).filter((o) => o.currency === "EUR" && o.pricePerKg != null);
+      if (!obs.length) return;
+      const sorted = obs.map((o) => o.pricePerKg!).sort((a, b) => a - b);
+      const perKg = sorted[Math.floor(sorted.length / 2)]!;
+      const latest = obs[0]!;
+      await db.insert(prices).values({ foodId: food.id, barcode: food.barcode, price: latest.price.toFixed(2), pricePerKg: perKg.toFixed(2), packGrams: latest.packGrams, source: "open_prices", observedOn: latest.date.slice(0, 10) });
+      n++;
+    }),
+  );
+  return n;
+}
+
 /** Latest known €/kg per food (any store), for recipe cost. */
 async function pricePerKg(db: Database, foodIds: string[]) {
   if (!foodIds.length) return new Map<string, number>();
@@ -73,7 +101,9 @@ export async function saveRecipe(db: Database, input: { groupId: string; userId:
       return { i, ing, p, food, grams: ing.grams ?? p.grams };
     }),
   );
-  const costs = await pricePerKg(db, parsed.map((x) => x.food?.id).filter((x): x is string => !!x));
+  const matched = parsed.map((x) => x.food?.id).filter((x): x is string => !!x);
+  await refreshOpenPrices(db, matched);
+  const costs = await pricePerKg(db, matched);
   const nut = recipeNutrition(
     parsed.map((x) => ({ grams: x.grams, optional: x.ing.optional ?? x.p.optional, per100: x.food ? { ...x.food.nutrients, ...(x.food.kcal != null ? { energy_kcal: x.food.kcal } : {}) } : null, pricePerKg: x.food ? (costs.get(x.food.id) ?? null) : null })),
     r.servings,

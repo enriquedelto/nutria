@@ -10,6 +10,7 @@ import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Field, Input, Select, Textarea } from "@/components/ui/input";
 import { fileToJpeg } from "@/lib/image";
+import { submitForm } from "@/lib/forms";
 import { nutrientName } from "@/lib/format";
 
 const MAIN = ["energy_kcal", "protein", "carbs", "sugars", "fat", "sat_fat", "fiber", "salt"] as const;
@@ -76,7 +77,7 @@ export function NewFoodForm({ personId, barcode, label, aiEnabled }: { personId:
     });
 
   return (
-    <form action={submit} className="space-y-4">
+    <form onSubmit={submitForm(submit)} className="space-y-4">
       {aiEnabled ? (
         <Card className="flex flex-wrap items-center justify-between gap-3 bg-herb-soft/40">
           <p className="text-sm">Haz una foto de la tabla nutricional y la IA rellena el formulario.</p>

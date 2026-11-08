@@ -113,6 +113,24 @@ test("receta manual con nutrición calculada", async () => {
   await expect(page.getByRole("heading", { name: "Garbanzos con espinacas" })).toBeVisible();
 });
 
+test("coste de receta con precios de Open Prices", async () => {
+  const page = adminPage;
+  await page.goto("/buscar/nuevo?barcode=8437000000017");
+  await page.getByLabel("Nombre").fill("Quinoa ecológica Nutria");
+  await expect(page.getByLabel("Código de barras")).toHaveValue("8437000000017");
+  await page.getByLabel("kcal", { exact: true }).fill("360");
+  await page.getByRole("button", { name: /Crear|Guardar/ }).click();
+  await expect(page.getByText("Alimento creado")).toBeVisible();
+  await page.goto("/recetas/nueva");
+  await page.getByLabel("Título").fill("Quinoa sola");
+  await page.getByLabel("Raciones").fill("2");
+  await page.getByLabel("Ingredientes").fill("500 g de quinoa ecológica nutria");
+  await page.getByLabel("Pasos").fill("Cuece la quinoa.");
+  await page.getByRole("button", { name: /Guardar/ }).click();
+  await expect(page).toHaveURL(/\/recetas\/[0-9a-f-]{36}$/);
+  await expect(page.getByText(/Coste:\s*1,20\s€\s*por ración/)).toBeVisible();
+});
+
 test("plan semanal: añadir la receta y mandarla a la compra", async () => {
   const page = adminPage;
   await page.goto("/planes");

@@ -152,14 +152,25 @@ export interface OpenPrice {
   currency: string;
   date: string;
   locationName?: string | null;
+  /** €/kg (or €/l) when the price is per kg or the pack size is known in g/ml. */
+  pricePerKg: number | null;
+  packGrams: number | null;
 }
 
 export async function openPrices(barcode: string, f: typeof fetch = fetch): Promise<OpenPrice[]> {
-  const r = await f(`https://prices.openfoodfacts.org/api/v1/prices?product_code=${encodeURIComponent(barcode)}&order_by=-date&size=10`, {
+  const base = (process.env.OPEN_PRICES_URL ?? "https://prices.openfoodfacts.org").replace(/\/$/, "");
+  const r = await f(`${base}/api/v1/prices?product_code=${encodeURIComponent(barcode)}&order_by=-date&size=10`, {
     headers: { "User-Agent": process.env.OFF_USER_AGENT ?? "Nutria/0.1", Accept: "application/json" },
     signal: AbortSignal.timeout(8000),
   });
   if (!r.ok) return [];
-  const j = (await r.json()) as { items?: { price: number; currency: string; date: string; location?: { osm_name?: string } }[] };
-  return (j.items ?? []).map((i) => ({ price: i.price, currency: i.currency, date: i.date, locationName: i.location?.osm_name ?? null }));
+  type Item = { price: number; currency: string; date: string; price_per?: string | null; location?: { osm_name?: string }; product?: { product_quantity?: number | null; product_quantity_unit?: string | null } | null };
+  const j = (await r.json()) as { items?: Item[] };
+  return (j.items ?? []).map((i) => {
+    const q = i.product?.product_quantity;
+    const unit = (i.product?.product_quantity_unit ?? "g").toLowerCase();
+    const packGrams = q && q > 0 ? (unit === "kg" || unit === "l" ? q * 1000 : unit === "g" || unit === "ml" ? q : null) : null;
+    const pricePerKg = i.price_per === "KILOGRAM" ? i.price : packGrams ? Math.round((i.price / (packGrams / 1000)) * 100) / 100 : null;
+    return { price: i.price, currency: i.currency, date: i.date, locationName: i.location?.osm_name ?? null, pricePerKg, packGrams: i.price_per === "KILOGRAM" ? null : packGrams };
+  });
 }

@@ -1,6 +1,7 @@
 // Fake external services for E2E (compose.e2e.yml → service "fakes", port 8080):
 //  - Webhook receiver: POST /hook accepts only signed requests; GET /hook/last shows the last one.
 //  - Minimal openGym: pairing code 123456 → token; /api/me and /api/data with one workout and one weigh-in today.
+//  - Open Prices: GET /api/v1/prices?product_code=8437000000017.
 import { createServer } from "node:http";
 
 const TOKEN = "og-e2e-token";
@@ -44,6 +45,11 @@ createServer(async (req, res) => {
         bodyweight: [{ d: today(), w: 61.8, t: start }],
       },
     });
+  }
+  // Open Prices: one receipt for the e2e barcode (2,40 € the 500 g pack → 4,80 €/kg).
+  if (url.pathname === "/api/v1/prices") {
+    const items = url.searchParams.get("product_code") === "8437000000017" ? [{ price: 2.4, currency: "EUR", date: today(), price_per: null, product: { product_quantity: 500, product_quantity_unit: "g" } }] : [];
+    return send(res, 200, { items, total: items.length });
   }
   send(res, 404, { error: "no encontrado" });
 }).listen(8080, () => console.log("fakes listo en :8080"));

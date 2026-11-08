@@ -7,6 +7,7 @@ import { randomBytes } from "node:crypto";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import {
   aiEstimates,
+  and,
   dailySummaries,
   diaryEntries,
   eq,
@@ -251,6 +252,26 @@ describe("datos", () => {
     expect(await core.crawlStore(db, "mercadona", { provider: fake as never })).toBe(2);
     const rows = await db.select().from(prices).where(eq(prices.source, "store"));
     expect(rows).toHaveLength(2);
+  });
+  it("Open Prices: mediana €/kg en EUR, sin repetir si ya hay precio reciente y sin romper si la red falla", async () => {
+    const [f] = await db.insert(foods).values({ source: "off", sourceId: "8410000000077", barcode: "8410000000077", name: "Garbanzos cocidos", kcal: 120, nutrients: { energy_kcal: 120 } }).returning();
+    const items = [
+      { price: 1.0, currency: "EUR", date: "2026-10-01", product: { product_quantity: 400, product_quantity_unit: "g" } },
+      { price: 3.0, currency: "EUR", date: "2026-09-20", price_per: "KILOGRAM" },
+      { price: 9.9, currency: "USD", date: "2026-09-01", product: { product_quantity: 400, product_quantity_unit: "g" } },
+      { price: 1.4, currency: "EUR", date: "2026-08-01", product: { product_quantity: 0.4, product_quantity_unit: "kg" } },
+    ];
+    let calls = 0;
+    const fake = (async (url: string) => { calls++; expect(url).toContain("product_code=8410000000077"); return new Response(JSON.stringify({ items })); }) as unknown as typeof fetch;
+    expect(await core.refreshOpenPrices(db, [f!.id], fake)).toBe(1);
+    const [row] = await db.select().from(prices).where(and(eq(prices.foodId, f!.id), eq(prices.source, "open_prices")));
+    expect(Number(row?.pricePerKg)).toBe(3); // 2.5, 3, 3.5 → 3
+    expect(row?.observedOn).toBe("2026-10-01");
+    expect(await core.refreshOpenPrices(db, [f!.id], fake)).toBe(0);
+    expect(calls).toBe(1);
+    const broken = (async () => { throw new Error("sin red"); }) as unknown as typeof fetch;
+    const [g] = await db.insert(foods).values({ source: "off", barcode: "8410000000078", name: "Lentejas", kcal: 110, nutrients: {} }).returning();
+    expect(await core.refreshOpenPrices(db, [g!.id], broken)).toBe(0);
   });
   it("tolera valores fuera del rango de real (7e-47, 1e40)", async () => {
     const tsv = ["code\tproduct_name\tbrands\tcountries_tags\tenergy-kcal_100g\tproteins_100g\tsalt_100g", "8410000000003\tTofu raro\tMarca\ten:spain\t120\t7e-47\t1e40"].join("\n");
