@@ -133,3 +133,30 @@ test("administración: usuarios y uso de la IA", async () => {
   await expect(page.getByText(SECOND.email)).toBeVisible();
   await expect(page.getByText("meal_text")).toBeVisible();
 });
+
+const ROUTES = [
+  "/hoy", "/diario", "/buscar", "/buscar/nuevo", "/registrar", "/coach", "/coach/memoria", "/progreso", "/informe",
+  "/salud", "/salud/medicacion", "/salud/sintomas", "/salud/analiticas", "/salud/ayuno", "/salud/ejercicio", "/salud/sueno", "/salud/ciclo", "/salud/condiciones",
+  "/recetas", "/recetas/nueva", "/recetas/importar", "/planes", "/despensa", "/compra", "/familia", "/retos", "/mas", "/admin",
+  "/ajustes", "/ajustes/objetivos", "/ajustes/comidas", "/ajustes/pantalla", "/ajustes/notificaciones", "/ajustes/seguridad", "/ajustes/integraciones", "/ajustes/datos",
+];
+
+test("todas las páginas cargan sin errores de servidor", async () => {
+  const page = adminPage;
+  const errors: string[] = [];
+  page.on("pageerror", (e) => errors.push(`${page.url()}: ${e.message}`));
+  // Detail pages: first recipe, first person and the current plan's review.
+  await page.goto("/recetas");
+  const recipe = await page.locator('a[href^="/recetas/"]').filter({ hasNotText: /nueva|importar/i }).first().getAttribute("href");
+  await page.goto("/familia");
+  const person = await page.locator('a[href^="/familia/"]').first().getAttribute("href");
+  await page.goto("/planes");
+  const retro = await page.locator('a[href$="/repaso"]').first().getAttribute("href");
+  const all = [...ROUTES, ...[recipe, recipe && `${recipe}/editar`, recipe && `${recipe}/cocinar`, person, retro].filter((x): x is string => !!x)];
+  for (const r of all) {
+    const res = await page.goto(r);
+    expect(res?.status(), r).toBeLessThan(500);
+    await expect(page.getByText(/Internal Server Error|Application error|Algo ha fallado/i), r).toHaveCount(0);
+  }
+  expect(errors).toEqual([]);
+});
