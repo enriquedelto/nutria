@@ -34,11 +34,11 @@ const TOOL_LABELS: Record<string, string> = {
 
 const SUGGESTIONS = ["¿Qué como ahora con lo que me queda hoy?", "¿Cómo voy esta semana con la proteína?", "Dame ideas de cena rápida y con hierro", "¿Por qué no bajo de peso?"];
 
-export function Chat({ personId, conversationId: initialId, initial, personName }: { personId: string; conversationId: string | null; initial: ChatMessage[]; personName: string }) {
+export function Chat({ personId, conversationId: initialId, initial, personName, prompt }: { personId: string; conversationId: string | null; initial: ChatMessage[]; personName: string; prompt?: string }) {
   const router = useRouter();
   const [conversationId, setConversationId] = useState(initialId);
   const [messages, setMessages] = useState<ChatMessage[]>(initial);
-  const [input, setInput] = useState("");
+  const [input, setInput] = useState(prompt ?? "");
   const [images, setImages] = useState<B64Image[]>([]);
   const [streaming, setStreaming] = useState(false);
   const [tool, setTool] = useState<string | null>(null);

@@ -69,7 +69,7 @@ async function Content({ searchParams }: { searchParams: Promise<Record<string, 
             </Link>
           ) : null}
         </div>
-        <Chat key={current ?? "new"} personId={ctx.person.id} conversationId={current} initial={initial} personName={ctx.person.isSelf ? ctx.user.name : ctx.person.name} />
+        <Chat key={current ?? "new"} personId={ctx.person.id} conversationId={current} initial={initial} personName={ctx.person.isSelf ? ctx.user.name : ctx.person.name} prompt={!current && sp.q ? sp.q.slice(0, 500) : undefined} />
       </div>
     </div>
   );
