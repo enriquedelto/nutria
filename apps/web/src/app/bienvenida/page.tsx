@@ -2,6 +2,7 @@ import { Suspense } from "react";
 import Link from "next/link";
 import { BellRing, ChefHat, MessageCircle, ScanBarcode, Smartphone, Users } from "lucide-react";
 import { and, eq, listAccessiblePersons, persons } from "@nutria/db";
+import { latestWeight } from "@nutria/core";
 import { ALLERGEN_TAGS } from "@nutria/nutrition";
 import { ProfileForm } from "@/app/(app)/ajustes/profile-form";
 import { PushToggle } from "@/app/(app)/ajustes/notificaciones/notify-client";
@@ -44,6 +45,7 @@ async function Content() {
     );
   }
 
+  const weight = await latestWeight(db(), own.id);
   return (
     <div className="space-y-8">
       <div>
@@ -52,7 +54,7 @@ async function Content() {
       </div>
 
       <Step n={1} title="Tus datos">
-        <p className="text-sm text-ink-2">Con la edad, la altura, la actividad y el objetivo se calculan tus calorías, macros y micronutrientes (IR de la EFSA). Si apuntas alergias, la app te avisará al escanear.</p>
+        <p className="text-sm text-ink-2">Con la edad, la altura, el peso, la actividad y el objetivo se calculan tus calorías, macros y micronutrientes (IR de la EFSA). Si apuntas alergias, la app te avisará al escanear.</p>
         <Card>
           <ProfileForm
             personId={own.id}
@@ -65,6 +67,7 @@ async function Content() {
               sex: own.sex,
               birthDate: own.birthDate,
               heightCm: own.heightCm,
+              weightKg: weight?.kg ?? null,
               activityLevel: own.activityLevel,
               goalType: own.goalType,
               weeklyRateKg: own.weeklyRateKg,

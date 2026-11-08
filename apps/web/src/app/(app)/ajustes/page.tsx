@@ -1,5 +1,6 @@
 import { Suspense } from "react";
 import { eq, persons } from "@nutria/db";
+import { latestWeight } from "@nutria/core";
 import { ALLERGEN_TAGS } from "@nutria/nutrition";
 import { PageHeader } from "@/components/page-header";
 import { Card } from "@/components/ui/card";
@@ -16,6 +17,7 @@ async function Content() {
   const ctx = await getPersonContext();
   const [p] = await db().select().from(persons).where(eq(persons.id, ctx.person.id)).limit(1);
   if (!p) return null;
+  const weight = await latestWeight(db(), p.id);
   const canEdit = ctx.person.role === "owner" || ctx.person.role === "manager";
   return (
     <Card>
@@ -31,6 +33,7 @@ async function Content() {
             sex: p.sex,
             birthDate: p.birthDate,
             heightCm: p.heightCm,
+            weightKg: weight?.kg ?? null,
             activityLevel: p.activityLevel,
             goalType: p.goalType,
             weeklyRateKg: p.weeklyRateKg,

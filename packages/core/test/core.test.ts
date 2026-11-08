@@ -24,6 +24,7 @@ import {
   targetSets,
   user,
   webhooks,
+  tdeeEstimates,
   weightLogs,
   type Database,
 } from "@nutria/db";
@@ -81,7 +82,29 @@ describe("objetivos", () => {
     await db.update(targetSets).set({ mode: "fixed", kcal: 1999 }).where(eq(targetSets.id, t1!.id));
     const t2 = await core.recomputeTargets(db, personId);
     expect(t2!.kcal).toBe(1999);
+    // «Recalcular» explícito (force): vuelve a calcular y deja el modo en calculado.
+    const t3 = await core.recomputeTargets(db, personId, { force: true });
+    expect(t3!.kcal).toBe(t1!.kcal);
+    expect(t3!.mode).toBe("dynamic");
+  });
+  it("dice qué falta del perfil (el peso cuenta)", async () => {
+    expect(await core.missingProfileFields(db, personId)).toEqual([]);
+    const [p] = await db.insert(persons).values({ displayName: "Sin datos" }).returning();
+    expect(await core.missingProfileFields(db, p!.id)).toEqual(["sexo", "fecha de nacimiento", "altura", "peso"]);
+    expect(await core.recomputeTargets(db, p!.id)).toBeNull();
+    await db.delete(persons).where(eq(persons.id, p!.id));
+  });
+  it("en modo adaptativo usa el TDEE real reciente aunque se recalcule por un cambio de perfil", async () => {
+    const t1 = await core.recomputeTargets(db, personId);
+    await db.update(targetSets).set({ mode: "adaptive" }).where(eq(targetSets.id, t1!.id));
+    const today = new Date().toISOString().slice(0, 10);
+    await db.insert(tdeeEstimates).values({ personId, date: today, formulaTdee: 2700, adaptiveTdee: 3200, confidence: 1, windowDays: 28, loggedDays: 28, underLoggingSuspected: false, suggestedKcal: 2700 });
+    const t2 = await core.recomputeTargets(db, personId);
+    expect(t2!.source).toBe("adaptive");
+    expect(t2!.kcal).toBeGreaterThan(t1!.kcal);
+    await db.delete(tdeeEstimates).where(eq(tdeeEstimates.personId, personId));
     await db.update(targetSets).set({ mode: "dynamic" }).where(eq(targetSets.id, t1!.id));
+    await core.recomputeTargets(db, personId);
   });
 });
 

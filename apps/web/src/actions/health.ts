@@ -27,7 +27,7 @@ import {
   weightLogs,
   type AccessScope,
 } from "@nutria/db";
-import { latestWeight, recomputeDay, recomputeTargets } from "@nutria/core";
+import { latestWeight, missingProfileFields, recomputeDay, recomputeTargets } from "@nutria/core";
 import { detectSubstance, exerciseKcal, stepsKcal } from "@nutria/nutrition";
 import { db } from "@/lib/db";
 import { emit } from "@/lib/events";
@@ -326,8 +326,14 @@ export async function deleteTargetSet(personId: string, id: string) {
   refresh();
 }
 
+/** Explicit "Recalcular": says what is missing instead of silently doing nothing. */
 export async function recalcTargets(personId: string) {
   await guard(personId, "diary");
-  await recomputeTargets(db(), personId);
+  const missing = await missingProfileFields(db(), personId);
+  if (missing.length) throw new UserError(`Para calcular los objetivos falta: ${missing.join(", ")}. Complétalo en Ajustes → Perfil.`);
+  const [before] = await db().select({ mode: targetSets.mode }).from(targetSets).where(and(eq(targetSets.personId, personId), eq(targetSets.isDefault, true))).limit(1);
+  const t = await recomputeTargets(db(), personId, { force: true });
+  if (!t) throw new UserError("No se pudieron calcular los objetivos");
   refresh();
+  return { kcal: Math.round(t.kcal), protein: Math.round(t.protein), carbs: Math.round(t.carbs), fat: Math.round(t.fat), wasFixed: before?.mode === "fixed", adaptive: t.source === "adaptive" };
 }

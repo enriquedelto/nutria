@@ -48,11 +48,32 @@ test("bienvenida: guardar el perfil calcula objetivos", async () => {
   await page.getByLabel("Sexo (para los cálculos)").selectOption({ index: 1 });
   await page.getByLabel("Fecha de nacimiento").fill("1990-05-20");
   await page.getByLabel("Altura (cm)").fill("168");
+  await page.getByLabel("Peso actual (kg)").fill("62.5");
   await page.getByRole("button", { name: "Guardar perfil" }).click();
-  await expect(page.getByText("Perfil guardado")).toBeVisible();
+  await expect(page.getByText("Perfil guardado. Objetivos recalculados.")).toBeVisible();
   await page.getByRole("link", { name: "Empezar" }).click();
   await expect(page).toHaveURL(/\/hoy/);
   await expect(page.getByText("Completa tu perfil")).toHaveCount(0);
+});
+
+test("objetivos: «Recalcular» calcula con el perfil, también si estaban fijados", async () => {
+  const page = adminPage;
+  await page.goto("/ajustes/objetivos");
+  await page.getByRole("button", { name: "Recalcular" }).click();
+  const toastText = page.getByText(/Objetivos recalculados: \d+ kcal/);
+  await expect(toastText).toBeVisible();
+  const kcal = Number((await toastText.textContent())!.match(/(\d+) kcal/)![1]);
+  // Fijarlos a mano con otras calorías y recalcular: vuelven a los de la fórmula.
+  await page.getByRole("button", { name: "Editar" }).first().click();
+  const dialog = page.getByRole("dialog");
+  await dialog.getByLabel("Modo").selectOption("fixed");
+  await dialog.getByLabel("Calorías").fill("1500");
+  await dialog.getByRole("button", { name: "Guardar" }).click();
+  await expect(page.getByText(/^1500 kcal/)).toBeVisible();
+  await page.getByRole("button", { name: "Recalcular" }).click();
+  await expect(page.getByText("Estaban fijados a mano")).toBeVisible();
+  await expect(page.getByText(new RegExp(`^${kcal} kcal`))).toBeVisible();
+  await expect(page.getByText("calculado", { exact: true })).toBeVisible();
 });
 
 test("registro por IA (simulada) llega al diario", async () => {
@@ -218,7 +239,7 @@ test("exportar JSON/CSV e importar un CSV", async () => {
     await page.reload();
     await expect(page.getByText(/2 alimentos/)).toBeVisible({ timeout: 2000 });
   }).toPass({ timeout: 60_000 });
-  await expect(page.getByText("Cronometer")).toBeVisible();
+  await expect(page.getByText("· Cronometer")).toBeVisible();
   await page.goto("/diario?fecha=2026-11-01");
   await expect(page.getByText("Yogur importado")).toBeVisible();
 });
@@ -239,8 +260,8 @@ test("profesional: solo lectura de lo compartido y notas", async ({ browser }) =
   const pro = await (await browser.newContext()).newPage();
   await pro.goto(url.pathname);
   await signUp(pro, PRO);
-  await expect(pro).toHaveURL(/\/bienvenida/);
-  await pro.goto("/familia");
+  // Un profesional no tiene diario propio: entra directo a las personas que sigue.
+  await expect(pro).toHaveURL(/\/familia/);
   await expect(pro.getByText("Personas que sigues")).toBeVisible();
   await pro.getByRole("link", { name: /Ana Prueba/ }).click();
   await expect(pro.getByText(/Profesional/).first()).toBeVisible();

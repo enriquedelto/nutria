@@ -14,8 +14,10 @@ import {
   persons,
   pushSubscriptions,
   webhooks,
+  weightLogs,
 } from "@nutria/db";
-import { audit, notify, pairOpenGym, recomputeTargets, WEBHOOK_EVENTS } from "@nutria/core";
+import { todayIn } from "@nutria/nutrition";
+import { audit, latestWeight, missingProfileFields, notify, pairOpenGym, recomputeTargets, WEBHOOK_EVENTS } from "@nutria/core";
 import { encrypt, newToken } from "@nutria/integrations";
 import { db } from "@/lib/db";
 import { enqueue } from "@/lib/jobs";
@@ -45,6 +47,8 @@ const Profile = z.object({
   sex: z.enum(["female", "male"]).nullable(),
   birthDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).nullable(),
   heightCm: z.number().min(40).max(250).nullable(),
+  /** Current weight: logged as today's weigh-in when it changes (the formulas use the latest one). */
+  weightKg: z.number().min(2).max(400).nullable().optional(),
   activityLevel: z.enum(["sedentary", "light", "moderate", "active", "very_active"]),
   goalType: z.enum(["lose", "maintain", "gain"]),
   weeklyRateKg: z.number().min(-1.5).max(1),
@@ -66,9 +70,15 @@ export async function updateProfile(personId: string, input: z.input<typeof Prof
   }
   // Losing/gaining with rate 0 makes no sense; maintain forces 0.
   const weeklyRateKg = v.goalType === "maintain" ? 0 : v.goalType === "lose" ? -Math.abs(v.weeklyRateKg || 0.5) : Math.abs(v.weeklyRateKg || 0.25);
-  await db().update(persons).set({ ...v, weeklyRateKg }).where(eq(persons.id, personId));
+  const { weightKg, ...fields } = v;
+  await db().update(persons).set({ ...fields, weeklyRateKg }).where(eq(persons.id, personId));
+  if (weightKg != null) {
+    const last = await latestWeight(db(), personId);
+    if (!last || Math.abs(last.kg - weightKg) >= 0.05) await db().insert(weightLogs).values({ personId, date: todayIn(v.timezone), kg: weightKg, source: "manual", measuredAt: new Date() });
+  }
   await recomputeTargets(db(), personId).catch(() => undefined);
   refresh();
+  return { missing: await missingProfileFields(db(), personId) };
 }
 
 const Settings = z.object({

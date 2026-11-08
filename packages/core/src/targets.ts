@@ -42,15 +42,38 @@ export async function personProfile(db: Database, personId: string): Promise<{ p
   };
 }
 
+/** Profile fields the formulas still need (Spanish labels, empty when complete). */
+export async function missingProfileFields(db: Database, personId: string) {
+  const [p] = await db.select({ sex: persons.sex, birthDate: persons.birthDate, heightCm: persons.heightCm }).from(persons).where(eq(persons.id, personId)).limit(1);
+  if (!p) return ["persona"];
+  const w = await latestWeight(db, personId);
+  return [!p.sex && "sexo", !p.birthDate && "fecha de nacimiento", !p.heightCm && "altura", !w && "peso"].filter((x): x is string => !!x);
+}
+
+/** TDEE from the latest confident adaptive estimate (≤ 21 days old), blended like the weekly job. */
+async function recentAdaptiveTdee(db: Database, personId: string, formulaTdee: number, bmrKcal: number) {
+  const [e] = await db.select().from(tdeeEstimates).where(eq(tdeeEstimates.personId, personId)).orderBy(desc(tdeeEstimates.date)).limit(1);
+  if (!e || e.adaptiveTdee == null || e.confidence < 0.5 || Date.now() - Date.parse(e.date) > 21 * 86_400_000) return undefined;
+  const conf = e.underLoggingSuspected ? e.confidence * 0.3 : e.confidence;
+  const plausible = Math.min(Math.max(e.adaptiveTdee, bmrKcal), formulaTdee * 1.6);
+  return Math.round(conf * plausible + (1 - conf) * formulaTdee);
+}
+
 /**
  * (Re)compute the default target set from formulas + active conditions. Respects mode "fixed"
- * (manual targets are never overwritten) and pinned macros.
+ * (manual targets are never overwritten unless `force`, which switches them back to calculated),
+ * mode "adaptive" (keeps using the latest real-TDEE estimate) and pinned macros.
  */
-export async function recomputeTargets(db: Database, personId: string, opts: { overrideTdee?: number; source?: "formula" | "adaptive" } = {}) {
+export async function recomputeTargets(db: Database, personId: string, opts: { overrideTdee?: number; source?: "formula" | "adaptive"; force?: boolean } = {}) {
   const pp = await personProfile(db, personId);
   if (!pp) return null;
   const [current] = await db.select().from(targetSets).where(and(eq(targetSets.personId, personId), eq(targetSets.isDefault, true))).limit(1);
-  if (current?.mode === "fixed") return current;
+  if (current?.mode === "fixed" && !opts.force) return current;
+  if (current?.mode === "adaptive" && opts.overrideTdee == null) {
+    const f = computeMacroTargets(pp.profile);
+    const tdeeReal = await recentAdaptiveTdee(db, personId, f.tdee, f.bmr);
+    if (tdeeReal != null) opts = { ...opts, overrideTdee: tdeeReal, source: "adaptive" };
+  }
   const conds = await db.select({ code: personConditions.conditionCode, config: personConditions.config }).from(personConditions).where(and(eq(personConditions.personId, personId), eq(personConditions.active, true)));
   const macros = computeMacroTargets(pp.profile, opts.overrideTdee);
   let micros = computeMicroTargets(pp.profile, macros.kcal);
@@ -64,7 +87,11 @@ export async function recomputeTargets(db: Database, personId: string, opts: { o
   }
   const values = { ...main, fiber: t.fiber, micros, source: conds.length ? "condition" : (opts.source ?? "formula") };
   if (current) {
-    const [u] = await db.update(targetSets).set(values).where(eq(targetSets.id, current.id)).returning();
+    const [u] = await db
+      .update(targetSets)
+      .set({ ...values, ...(current.mode === "fixed" ? { mode: "dynamic" } : {}) })
+      .where(eq(targetSets.id, current.id))
+      .returning();
     return u!;
   }
   const [n] = await db.insert(targetSets).values({ personId, name: "Diario", isDefault: true, mode: "dynamic", ...values }).returning();

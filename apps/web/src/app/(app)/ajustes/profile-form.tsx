@@ -15,6 +15,7 @@ export type ProfileValues = {
   sex: "female" | "male" | null;
   birthDate: string | null;
   heightCm: number | null;
+  weightKg: number | null;
   activityLevel: "sedentary" | "light" | "moderate" | "active" | "very_active";
   goalType: "lose" | "maintain" | "gain";
   weeklyRateKg: number;
@@ -63,8 +64,9 @@ export function ProfileForm({ personId, initial, allergens, timezones, isChild }
         e.preventDefault();
         start(async () => {
           try {
-            await updateProfile(personId, v);
-            toast.success("Perfil guardado. Objetivos recalculados.");
+            const r = await updateProfile(personId, v);
+            if (r.missing.length) toast.warning(`Perfil guardado. Para calcular tus objetivos falta: ${r.missing.join(", ")}.`);
+            else toast.success("Perfil guardado. Objetivos recalculados.");
           } catch (err) {
             toast.error(errorText(err, "Error"));
           }
@@ -95,6 +97,9 @@ export function ProfileForm({ personId, initial, allergens, timezones, isChild }
         </Field>
         <Field label="Altura (cm)">
           <Input type="number" inputMode="numeric" min={40} max={250} value={v.heightCm ?? ""} onChange={(e) => set("heightCm", e.target.value ? Number(e.target.value) : null)} />
+        </Field>
+        <Field label="Peso actual (kg)" hint="Se guarda como pesaje de hoy si cambia; el historial está en Progreso">
+          <Input type="number" inputMode="decimal" min={2} max={400} step={0.1} value={v.weightKg ?? ""} onChange={(e) => set("weightKg", e.target.value ? Number(e.target.value) : null)} />
         </Field>
         <Field label="Zona horaria">
           <Select value={v.timezone} onChange={(e) => set("timezone", e.target.value)}>

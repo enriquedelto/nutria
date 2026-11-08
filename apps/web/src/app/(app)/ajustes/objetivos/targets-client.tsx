@@ -146,8 +146,10 @@ export function Recalc({ personId }: { personId: string }) {
   const [pending, start] = useSafeTransition();
   return (
     <Button size="sm" variant="soft" disabled={pending} onClick={() => start(async () => {
-      await recalcTargets(personId);
-      toast.success("Objetivos recalculados con tu perfil actual");
+      const r = await recalcTargets(personId);
+      toast.success(`Objetivos recalculados: ${r.kcal} kcal · P ${r.protein} g · H ${r.carbs} g · G ${r.fat} g`, {
+        description: r.wasFixed ? "Estaban fijados a mano; vuelven a calcularse con tu perfil." : r.adaptive ? "Con tu gasto real (TDEE adaptativo)." : "Con tu perfil actual.",
+      });
     })}>
       <RefreshCw className={pending ? "animate-spin" : ""} /> Recalcular
     </Button>
