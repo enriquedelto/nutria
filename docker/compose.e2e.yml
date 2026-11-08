@@ -53,5 +53,14 @@ services:
       migrate:
         condition: service_completed_successfully
 
+  # Fake webhook receiver + openGym (docker/e2e-fakes.mjs), reachable as http://fakes:8080.
+  fakes:
+    image: nutria-app:latest
+    command: ["node", "/fakes/e2e-fakes.mjs"]
+    volumes:
+      - ./e2e-fakes.mjs:/fakes/e2e-fakes.mjs:ro
+    ports:
+      - "127.0.0.1:8132:8080"
+
 volumes:
   uploads:

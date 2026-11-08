@@ -298,6 +298,76 @@ test("repaso semanal: valorar platos y aprender gustos", async () => {
   await expect(page.getByText(/ya se usó para actualizar los gustos/)).toBeVisible();
 });
 
+// 1×1 PNG para las subidas de imagen (la IA es simulada).
+const PNG = Buffer.from("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==", "base64");
+
+test("webhooks: salida firmada (Home Assistant) y peso de entrada con token", async () => {
+  const page = adminPage;
+  await page.goto("/ajustes/integraciones");
+  await page.getByLabel("URL de destino").fill("http://fakes:8080/hook");
+  await page.getByRole("button", { name: "Peso registrado" }).click();
+  await page.getByRole("button", { name: "Añadir webhook" }).click();
+  await expect(page.getByText(/Secreto de firma/)).toBeVisible();
+  await page.getByRole("button", { name: "Probar" }).click();
+  // El receptor falso solo responde 200 si la petición viene firmada.
+  await expect(async () => {
+    await page.reload();
+    await expect(page.getByText("(HTTP 200)")).toBeVisible({ timeout: 2000 });
+  }).toPass({ timeout: 60_000 });
+
+  await page.getByLabel("Nombre").fill("Báscula");
+  await page.getByRole("button", { name: "escribir" }).click();
+  await page.getByRole("button", { name: "Crear" }).click();
+  const secret = page.getByText("Cópialo ahora").locator("..").locator("code");
+  await expect(secret).toHaveText(/\S{20,}/);
+  const token = (await secret.textContent())!.trim();
+  const res = await page.request.post("/api/hooks/weight", { headers: { authorization: `Bearer ${token}` }, data: { kg: 63.4, id: "bascula-1" } });
+  expect(res.status(), await res.text()).toBeLessThan(300);
+  const again = await page.request.post("/api/hooks/weight", { headers: { authorization: `Bearer ${token}` }, data: { kg: 63.4, id: "bascula-1" } });
+  expect(again.status()).toBeLessThan(300); // idempotente
+  await page.goto("/ajustes/datos");
+  const href = await page.getByRole("link", { name: "Todo (JSON)" }).getAttribute("href");
+  const pesos = ((await (await page.request.get(href!)).json()) as { data: { pesos: { kg: number; source: string }[] } }).data.pesos;
+  expect(pesos.filter((p) => p.kg === 63.4)).toHaveLength(1);
+});
+
+test("openGym: emparejar con código e importar entreno y pesaje", async () => {
+  const page = adminPage;
+  await page.goto("/ajustes/integraciones");
+  await page.getByLabel("Dirección de openGym").fill("http://fakes:8080");
+  await page.getByLabel("Código de emparejamiento").fill("000000");
+  await page.getByRole("button", { name: "Conectar" }).click();
+  await expect(page.getByText("Código de emparejamiento no válido o caducado")).toBeVisible();
+  await page.getByLabel("Código de emparejamiento").fill("123456");
+  await page.getByRole("button", { name: "Conectar" }).click();
+  await expect(page.getByText(/openGym conectado/)).toBeVisible();
+  await expect(async () => {
+    await page.goto("/salud/ejercicio");
+    await expect(page.getByText("Pierna (openGym e2e)")).toBeVisible({ timeout: 2000 });
+  }).toPass({ timeout: 60_000 });
+  await page.goto("/ajustes/datos");
+  const href = await page.getByRole("link", { name: "Todo (JSON)" }).getAttribute("href");
+  const pesos = ((await (await page.request.get(href!)).json()) as { data: { pesos: { kg: number; source: string }[] } }).data.pesos;
+  expect(pesos.some((p) => p.kg === 61.8 && p.source === "opengym")).toBe(true);
+});
+
+test("IA en la cocina (simulada): sustituciones y foto de la nevera", async () => {
+  const page = adminPage;
+  await page.goto("/recetas");
+  await page.getByRole("link", { name: /Garbanzos con espinacas/ }).first().click();
+  await page.getByRole("button", { name: "Sin lactosa" }).click();
+  await page.getByRole("button", { name: "Sugerir" }).click();
+  await expect(page.getByText("yogur griego")).toBeVisible();
+
+  await page.goto("/despensa");
+  await page.locator('input[type=file][accept="image/*"]').setInputFiles({ name: "nevera.png", mimeType: "image/png", buffer: PNG });
+  const dialog = page.getByRole("dialog");
+  await expect(dialog.getByRole("button", { name: "Guardar 1" })).toBeVisible();
+  await dialog.getByRole("button", { name: "Guardar 1" }).click();
+  await expect(page.getByText("1 productos guardados")).toBeVisible();
+  await expect(page.getByText("Leche").first()).toBeVisible();
+});
+
 const ROUTES = [
   "/hoy", "/diario", "/buscar", "/buscar/nuevo", "/registrar", "/coach", "/coach/memoria", "/progreso", "/informe",
   "/salud", "/salud/medicacion", "/salud/sintomas", "/salud/analiticas", "/salud/ayuno", "/salud/ejercicio", "/salud/sueno", "/salud/ciclo", "/salud/condiciones",
