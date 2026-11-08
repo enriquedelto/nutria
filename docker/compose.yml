@@ -2,13 +2,11 @@
 # La web escucha solo en 127.0.0.1:${NUTRIA_PORT}; Caddy / tailscale serve la publican.
 name: nutria
 
+# Solo "migrate" construye la imagen; web y worker reutilizan la local (pull_policy: never),
+# así se exporta una vez y no tres.
 x-app: &app
   image: nutria-app:latest
-  build:
-    context: ..
-    dockerfile: docker/Dockerfile
-    args:
-      APP_VERSION: ${APP_VERSION:-dev}
+  pull_policy: never
   env_file: .env
   environment:
     DATABASE_URL: postgres://nutria:${POSTGRES_PASSWORD}@postgres:5432/nutria
@@ -41,6 +39,12 @@ services:
   # Migraciones (con snapshot previo) + datos de referencia; termina y deja paso a web y worker.
   migrate:
     <<: *app
+    pull_policy: build
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile
+      args:
+        APP_VERSION: ${APP_VERSION:-dev}
     command: ["sh", "-c", "pnpm db:migrate && pnpm db:seed"]
     restart: "no"
 
