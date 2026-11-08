@@ -39,7 +39,6 @@ services:
   # Migraciones (con snapshot previo) + datos de referencia; termina y deja paso a web y worker.
   migrate:
     <<: *app
-    pull_policy: build
     build:
       context: ..
       dockerfile: docker/Dockerfile
