@@ -7,8 +7,10 @@ coverage/
 .env
 .env.*
 !.env.example
-data/
-uploads/
+/data/
+docker/data/
+.data/
+/uploads/
 .DS_Store
 playwright-report/
 test-results/
