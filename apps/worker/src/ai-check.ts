@@ -4,8 +4,9 @@
  */
 import { createProvider, toAiError } from "@nutria/ai";
 
-const p = createProvider();
+const backend = process.env.AI_BACKEND ?? "subscription";
 try {
+  const p = createProvider();
   const r = await p.run({
     feature: "check",
     system: "Responde exactamente con la palabra OK.",
@@ -21,6 +22,6 @@ try {
   process.exit(0);
 } catch (e) {
   const err = toAiError(e);
-  console.error(`IA NO disponible (${p.backend}): ${err.code ?? ""} ${err.message}`);
+  console.error(`IA NO disponible (${backend}): [${err.code}] ${err.message}`);
   process.exit(1);
 }
