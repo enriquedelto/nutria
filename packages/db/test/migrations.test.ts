@@ -27,3 +27,19 @@ describe("migraciones", () => {
     expect(r.rows.length).toBe(1);
   });
 });
+
+describe("seed", () => {
+  it("carga catálogos de referencia de forma idempotente", async () => {
+    const { seedReference } = await import("../src/seed/run");
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    await seedReference(t.db as any);
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    await seedReference(t.db as any);
+    const r = await t.db.execute(sql`select (select count(*) from nutrients)::int as n, (select count(*) from nutrient_references)::int as d, (select count(*) from drug_food_interactions)::int as i, (select count(*) from activities)::int as a`);
+    const row = r.rows[0] as { n: number; d: number; i: number; a: number };
+    expect(row.n).toBeGreaterThan(50);
+    expect(row.d).toBeGreaterThan(300);
+    expect(row.i).toBeGreaterThan(15);
+    expect(row.a).toBeGreaterThan(30);
+  });
+});

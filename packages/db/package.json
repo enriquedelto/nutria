@@ -19,7 +19,8 @@
   "dependencies": {
     "drizzle-orm": "^0.45.4",
     "postgres": "^4.1.0",
-    "uuid": "^13.0.2"
+    "uuid": "^13.0.2",
+    "@nutria/nutrition": "workspace:*"
   },
   "devDependencies": {
     "@electric-sql/pglite": "^0.5.15",

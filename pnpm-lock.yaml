@@ -236,6 +236,9 @@ importers:
 
   packages/db:
     dependencies:
+      '@nutria/nutrition':
+        specifier: workspace:*
+        version: link:../nutrition
       drizzle-orm:
         specifier: ^0.45.4
         version: 0.45.4(@electric-sql/pglite@0.5.15)(postgres@4.1.0)
@@ -270,9 +273,6 @@ importers:
 
   packages/nutrition:
     dependencies:
-      '@nutria/db':
-        specifier: workspace:*
-        version: link:../db
       zod:
         specifier: ^4.6.7
         version: 4.6.7
