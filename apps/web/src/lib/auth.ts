@@ -6,7 +6,7 @@ import { nextCookies } from "better-auth/next-js";
 import { twoFactor } from "better-auth/plugins/two-factor";
 import { passkey } from "@better-auth/passkey";
 import { count, schema } from "@nutria/db";
-import { audit, findInvitation, isFirstUser, onUserCreated } from "@nutria/core";
+import { audit, deleteOrphanedManagedPersons, findInvitation, isFirstUser, onUserCreated } from "@nutria/core";
 import { db } from "./db";
 
 export const INVITE_HEADER = "x-nutria-invite";
@@ -39,7 +39,13 @@ function createAuth() {
         role: { type: "string", input: false, defaultValue: "member" },
         locale: { type: "string", input: false, defaultValue: "es" },
       },
-      deleteUser: { enabled: true },
+      deleteUser: {
+        enabled: true,
+        beforeDelete: async (u) => {
+          const removed = await deleteOrphanedManagedPersons(db(), u.id);
+          await audit(db(), { userId: null, action: "user.delete", resource: "user", resourceId: u.id, meta: { removedPersons: removed.length } });
+        },
+      },
     },
     session: {
       expiresIn: 60 * 60 * 24 * 30,

@@ -2,6 +2,7 @@
 import { and, auditLog, count, eq, groupMembers, groups, invitations, isNull, personAccess, persons, sql, user, type Database } from "@nutria/db";
 import { newToken, sha256 } from "@nutria/integrations";
 import { ensureMealSlots } from "./reminders";
+import { rowsOf } from "./util";
 
 export async function createInvitation(db: Database, input: { email: string; invitedBy: string; groupId?: string | null; groupRole?: "admin" | "member"; personId?: string | null; accessRole?: "viewer" | "professional" | "manager"; scopes?: string[]; days?: number }) {
   const t = newToken("inv");
@@ -72,4 +73,18 @@ export async function createManagedPerson(db: Database, input: { userId: string;
 
 export async function audit(db: Database, row: { userId?: string | null; personId?: string | null; action: string; resource: string; resourceId?: string | null; ip?: string | null; requestId?: string | null; meta?: Record<string, unknown> }) {
   await db.insert(auditLog).values({ ...row, meta: row.meta ?? {} });
+}
+
+/**
+ * Before deleting a user: remove managed persons (no account of their own) that nobody else
+ * manages, so children's health data does not linger orphaned. Returns the deleted ids.
+ */
+export async function deleteOrphanedManagedPersons(db: Database, userId: string): Promise<string[]> {
+  const rows = await db.execute(sql`
+    delete from persons p
+    where p.user_id is null
+      and exists (select 1 from person_access a where a.person_id = p.id and a.user_id = ${userId} and a.role in ('owner','manager'))
+      and not exists (select 1 from person_access a where a.person_id = p.id and a.user_id <> ${userId} and a.role in ('owner','manager'))
+    returning p.id`);
+  return rowsOf<{ id: string }>(rows).map((r) => r.id);
 }
