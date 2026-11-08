@@ -360,7 +360,10 @@ test("IA en la cocina (simulada): sustituciones y foto de la nevera", async () =
   await expect(page.getByText("yogur griego")).toBeVisible();
 
   await page.goto("/despensa");
-  await page.locator('input[type=file][accept="image/*"]').setInputFiles({ name: "nevera.png", mimeType: "image/png", buffer: PNG });
+  // Como una persona: pulsar el botón abre el selector (y garantiza que la página ya está hidratada).
+  const chooser = page.waitForEvent("filechooser");
+  await page.getByRole("button", { name: "Foto de la nevera" }).click();
+  await (await chooser).setFiles({ name: "nevera.png", mimeType: "image/png", buffer: PNG });
   const dialog = page.getByRole("dialog");
   await expect(dialog.getByRole("button", { name: "Guardar 1" })).toBeVisible();
   await dialog.getByRole("button", { name: "Guardar 1" }).click();
