@@ -144,7 +144,12 @@ export const handlers: Handlers = {
     return { found: !!f };
   },
 
-  [JOBS.ciqualImport]: async ({ url }, { db, boss, signal }) => {
+  [JOBS.ciqualImport]: async ({ url, force }, { db, boss, signal }) => {
+    // Scheduled daily so a fresh install loads it as soon as ANSES is reachable; skip once loaded.
+    if (!force) {
+      const [c] = await db.select({ n: sql<number>`count(*)::int` }).from(foods).where(eq(foods.source, "ciqual"));
+      if ((c?.n ?? 0) > 1000) return { skipped: "ya importado", foods: c!.n };
+    }
     const r = await fetch(url ?? CIQUAL_ZIP_URL, { signal });
     if (!r.ok) throw new Error(`Descarga CIQUAL ${r.status}`);
     const files = unzipSync(new Uint8Array(await r.arrayBuffer()));

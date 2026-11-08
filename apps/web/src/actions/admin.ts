@@ -53,7 +53,8 @@ export type RunnableJob = keyof typeof RUNNABLE;
 export async function runJobNow(job: RunnableJob) {
   const me = await admin();
   const name = RUNNABLE[z.enum(Object.keys(RUNNABLE) as [RunnableJob, ...RunnableJob[]]).parse(job)];
-  await enqueue(name, {} as never, { singletonKey: `manual:${name}` });
+  // Manual runs are explicit: re-import even if data is already there.
+  await enqueue(name, (name === JOBS.ciqualImport ? { force: true } : {}) as never, { singletonKey: `manual:${name}` });
   await audit(db(), { userId: me.id, action: "run_job", resource: "job", resourceId: name });
   refresh();
 }

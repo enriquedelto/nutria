@@ -37,7 +37,7 @@ export interface JobPayloads {
   "opengym.sync-all": Record<string, never>;
   "off.mirror": { url?: string; countries?: string[] };
   "off.refresh-product": { barcode: string };
-  "ciqual.import": { url?: string };
+  "ciqual.import": { url?: string; force?: boolean };
   "foods.translate": { batchSize?: number };
   "store.crawl": { store: string };
   "gamification.evaluate": { personId?: string };
@@ -60,6 +60,7 @@ export const SCHEDULES: { name: JobName; cron: string }[] = [
   { name: JOBS.gamification, cron: "30 23 * * *" },
   { name: JOBS.correlations, cron: "0 4 * * 0" },
   { name: JOBS.offMirror, cron: "0 3 * * 0" },
+  { name: JOBS.ciqualImport, cron: "30 4 * * *" },
   { name: JOBS.translateFoods, cron: "0 5 * * *" },
   { name: JOBS.storeCrawl, cron: "0 2 * * 3" },
   { name: JOBS.cleanup, cron: "0 4 * * *" },
