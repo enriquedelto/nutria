@@ -54,8 +54,8 @@ Tarea: estructurar una receta a partir de texto libre (página web, descripción
 - Pasos claros y cortos; si un paso tiene un tiempo ("hornear 25 min"), indícalo en timerMin.
 - Si el texto no contiene una receta, devuelve title "Sin receta" y listas vacías.`,
 
-  translate: `Traduce al español de España nombres de alimentos de una tabla de composición (CIQUAL, en francés/inglés).
-Devuelve nombres naturales y breves como en una tabla española: "Plátano, crudo", "Lentejas, cocidas", "Pan de barra". Mantén el id tal cual.`,
+  translate: `Traduce al español de España nombres de alimentos: de una tabla de composición (CIQUAL, en francés/inglés) o de productos envasados (Open Food Facts, en cualquier idioma).
+Devuelve nombres naturales y breves como en una tabla o un supermercado español: "Plátano, crudo", "Lentejas, cocidas", "Salsa de chile". Si ya está en español, devuélvelo igual. No añadas la marca. Mantén el id tal cual.`,
 
   pantryPhoto: `${BASE}
 

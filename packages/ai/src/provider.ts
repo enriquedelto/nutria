@@ -267,7 +267,8 @@ export class SubscriptionProvider implements AiProvider {
           on.text?.(ev.delta.text);
         }
       } else if (m.type === "assistant") {
-        if (m.error === "rate_limit") throw new AiError("Límite de la suscripción alcanzado", "rate_limit", true);
+        // The subscription limit lasts hours: retrying only makes the person wait longer.
+        if (m.error === "rate_limit") throw new AiError("Límite de la suscripción alcanzado", "rate_limit", false);
         if (m.error === "overloaded" || m.error === "server_error") throw new AiError("Servicio de IA saturado", "overloaded", true);
         if (m.error === "authentication_failed" || m.error === "oauth_org_not_allowed") throw new AiError("Token de suscripción no válido", "auth");
         for (const b of m.message.content) {

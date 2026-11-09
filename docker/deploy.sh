@@ -7,6 +7,18 @@ HOST="${1:-nuc}"
 VERSION="$(git rev-parse --short HEAD)"
 git diff --quiet || echo "Aviso: hay cambios sin commit; se despliega HEAD ($VERSION)"
 git archive --format=tar HEAD | ssh "$HOST" 'mkdir -p ~/nutria && tar -x -C ~/nutria'
+# tar no borra: quita en el NUC los archivos versionados que estaban en el despliegue anterior y ya no
+# están en HEAD (lista en ~/nutria/.deployed-files). Solo toca rutas de esa lista; nunca .env ni data/.
+git ls-files | ssh "$HOST" 'cd ~/nutria && cat > .deployed-files.new
+  if [ -f .deployed-files ]; then
+    sort .deployed-files > .df-old; sort .deployed-files.new > .df-new
+    comm -23 .df-old .df-new | while IFS= read -r f; do
+      case "$f" in ""|/*|*..*|docker/.env|docker/data/*) continue ;; esac
+      [ -f "$f" ] && rm -f -- "$f" && echo "borrado: $f"
+    done
+    rm -f .df-old .df-new
+  fi
+  mv .deployed-files.new .deployed-files'
 ssh "$HOST" "set -e; cd ~/nutria/docker
   test -f .env || { echo 'Falta ~/nutria/docker/.env (copia .env.example)'; exit 1; }
   mkdir -p data/uploads data/backups data/postgres data/whisper

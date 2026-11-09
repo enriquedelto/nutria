@@ -14,7 +14,7 @@ export async function getDay(personId: string, date: string) {
     d.select().from(diaryEntries).where(and(eq(diaryEntries.personId, personId), eq(diaryEntries.date, date))).orderBy(asc(diaryEntries.createdAt)),
     d.select({ ml: sql<number>`coalesce(sum(${waterLogs.ml}),0)::int` }).from(waterLogs).where(and(eq(waterLogs.personId, personId), eq(waterLogs.date, date))),
     targetsForDate(d, personId, date),
-    d.select({ kcal: sql<number>`coalesce(sum(${exerciseLogs.kcal}),0)::float`, n: sql<number>`count(*)::int` }).from(exerciseLogs).where(and(eq(exerciseLogs.personId, personId), eq(exerciseLogs.date, date))),
+    d.select({ kcal: sql<number>`coalesce(sum(${exerciseLogs.kcal}),0)::float`, n: sql<number>`count(*)::int`, min: sql<number>`coalesce(sum(${exerciseLogs.durationMin}),0)::int`, names: sql<string[]>`coalesce(array_agg(${exerciseLogs.name} order by ${exerciseLogs.startedAt} nulls last), '{}')` }).from(exerciseLogs).where(and(eq(exerciseLogs.personId, personId), eq(exerciseLogs.date, date))),
     d.select({ steps: stepLogs.steps, kcal: stepLogs.kcal }).from(stepLogs).where(and(eq(stepLogs.personId, personId), eq(stepLogs.date, date))).limit(1),
   ]);
   const totals: NutrientMap = sumNutrients(entries.map((e) => ({ ...e.nutrients, energy_kcal: e.kcal, protein: e.protein, carbs: e.carbs, fat: e.fat, fiber: e.fiber })));
@@ -43,6 +43,8 @@ export async function getDay(personId: string, date: string) {
     waterGoalMl: settings.waterGoalMl ?? 2000,
     exerciseKcal: exercise[0]?.kcal ?? 0,
     exerciseCount: exercise[0]?.n ?? 0,
+    exerciseMin: exercise[0]?.min ?? 0,
+    exerciseNames: exercise[0]?.names ?? [],
     steps: steps[0] ?? null,
     energyUnit: settings.energyUnit ?? "kcal",
   };

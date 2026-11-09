@@ -5,7 +5,7 @@ import { z } from "zod";
 import { and, dailySummaries, eq, foodFavorites, foods, isNull, mealTemplates, or, persons, waterLogs, type MealTemplateItem } from "@nutria/db";
 import { copyMeal, deleteEntries, recomputeDay, undoAiAction, updateEntry } from "@nutria/core";
 import { db } from "@/lib/db";
-import { addDiaryItems, type AddPayload } from "@/lib/diary-service";
+import { addDiaryItems, translateIfNeeded, type AddPayload } from "@/lib/diary-service";
 import { assertAccess, getApiUser } from "@/lib/session";
 
 async function user() {
@@ -34,6 +34,7 @@ export async function editEntry(personId: string, id: string, patch: { grams?: n
     if (!f) throw new UserError("Ese alimento no está disponible");
   }
   await updateEntry(db(), personId, id, patch);
+  if (patch.foodId) void translateIfNeeded([patch.foodId]);
   refresh();
 }
 

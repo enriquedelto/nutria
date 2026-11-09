@@ -155,10 +155,49 @@ describe("openGym", () => {
         { id: "no-existe", name: "Ejercicio", sets: [] },
       ],
       prs: ["Sentadilla con barra alta"],
+      durationEstimated: true,
     });
-    expect(exercises[0]!.durationMin).toBe(45);
+    expect(exercises[0]!.durationMin).toBe(20);
     expect(weights).toHaveLength(1);
     expect(weights[0]!.kg).toBeCloseTo(80.74, 1);
+  });
+  it("usa el formato real de openGym: ejercicios propios con «n», alias, calentamientos y series por tiempo", () => {
+    const sets = (n: number) => Array.from({ length: n }, () => ({ w: 50, r: 10, done: true }));
+    const { exercises } = mapOpenGymState(
+      {
+        unit: "kg",
+        customEx: [{ id: "immtk1", n: "flexión cervical frontal" }],
+        exAliases: { "1436": "Sentadilla alta" },
+        workouts: [
+          {
+            id: "w3",
+            d: "2026-09-02",
+            start: 1788368400000,
+            end: 1788368400000,
+            entries: [
+              { id: "1436", sets: [{ w: 20, r: 10, done: true, warmup: true }, ...sets(4)] },
+              { id: "immtk1", sets: [{ w: 5, r: 15, rpe: 8, done: true }] },
+              { id: "plank", sets: [{ w: 0, sec: 45, done: true }] },
+              { id: "1435", sets: sets(10) },
+            ],
+          },
+        ],
+      },
+      75,
+    );
+    const ex = exercises[0]!;
+    expect(ex.sets).toBe(16); // the warm-up does not count
+    expect(ex.durationMin).toBe(40); // 16 working sets × 2.5 min
+    expect(ex.details.durationEstimated).toBe(true);
+    expect(ex.details.exercises.map((e) => e.name)).toEqual(["Sentadilla alta", "Flexión cervical frontal", "Ejercicio", "Sentadilla con barra baja"]);
+    expect(ex.details.exercises[0]!.sets[0]).toEqual({ kg: 20, reps: 10, warmup: true });
+    expect(ex.details.exercises[1]!.sets[0]).toEqual({ kg: 5, reps: 15, rpe: 8 });
+    expect(ex.details.exercises[2]!.sets[0]).toEqual({ kg: null, reps: null, sec: 45 });
+  });
+  it("con hora de inicio y fin usa la duración real", () => {
+    const { exercises } = mapOpenGymState({ workouts: [{ id: "w4", d: "2026-10-26", start: 0, end: 47 * 60000, entries: [{ id: "1436", sets: [{ w: 60, r: 8 }] }] }] }, 75);
+    expect(exercises[0]!.durationMin).toBe(47);
+    expect(exercises[0]!.details.durationEstimated).toBeUndefined();
   });
 });
 

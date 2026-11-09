@@ -25,7 +25,7 @@ export async function aiCtx(user: CurrentUser, personId: string | null | undefin
 const STATUS: Record<AiError["code"], number> = { quota: 429, rate_limit: 503, overloaded: 503, refusal: 422, invalid_output: 502, auth: 503, aborted: 499, unknown: 502 };
 const MESSAGE: Record<AiError["code"], string> = {
   quota: "Has llegado al límite de uso de IA por hoy.",
-  rate_limit: "La IA está saturada ahora mismo; prueba en un minuto.",
+  rate_limit: "La IA ha llegado al límite de uso de la suscripción. Prueba dentro de un rato; el resto de la app funciona con normalidad.",
   overloaded: "La IA está saturada ahora mismo; prueba en un minuto.",
   refusal: "La IA no ha podido responder a esa petición.",
   invalid_output: "La IA devolvió una respuesta incompleta; inténtalo otra vez.",

@@ -1,3 +1,5 @@
+import { mkdirSync, writeFileSync } from "node:fs";
+import { join } from "node:path";
 import { expect, test, type Page } from "@playwright/test";
 
 /**
@@ -484,22 +486,119 @@ const ROUTES = [
   "/ajustes", "/ajustes/objetivos", "/ajustes/comidas", "/ajustes/pantalla", "/ajustes/notificaciones", "/ajustes/seguridad", "/ajustes/integraciones", "/ajustes/datos",
 ];
 
-test("todas las páginas cargan sin errores de servidor", async () => {
-  const page = adminPage;
-  const errors: string[] = [];
-  page.on("pageerror", (e) => errors.push(`${page.url()}: ${e.message}`));
-  // Detail pages: first recipe, first person and the current plan's review.
+/** Every route, plus detail pages: first recipe, first person and the current plan's review. */
+async function allRoutes(page: Page) {
   await page.goto("/recetas");
   const recipe = await page.locator('a[href^="/recetas/"]').filter({ hasNotText: /nueva|importar/i }).first().getAttribute("href");
   await page.goto("/familia");
   const person = await page.locator('a[href^="/familia/"]').first().getAttribute("href");
   await page.goto("/planes");
   const retro = await page.locator('a[href$="/repaso"]').first().getAttribute("href");
-  const all = [...ROUTES, ...[recipe, recipe && `${recipe}/editar`, recipe && `${recipe}/cocinar`, person, retro].filter((x): x is string => !!x)];
+  return [...ROUTES, ...[recipe, recipe && `${recipe}/editar`, recipe && `${recipe}/cocinar`, person, retro].filter((x): x is string => !!x)];
+}
+
+test("todas las páginas cargan sin errores de servidor", async () => {
+  const page = adminPage;
+  const errors: string[] = [];
+  page.on("pageerror", (e) => errors.push(`${page.url()}: ${e.message}`));
+  const all = await allRoutes(page);
   for (const r of all) {
     const res = await page.goto(r);
     expect(res?.status(), r).toBeLessThan(500);
     await expect(page.getByText(/Internal Server Error|Application error|Algo ha fallado/i), r).toHaveCount(0);
   }
   expect(errors).toEqual([]);
+});
+
+/**
+ * Phone pass over every page: no horizontal overflow, no client errors, no 5xx, and every dialog
+ * (Radix triggers) opens and closes cleanly. With E2E_EXPLORE_DIR it also writes a report with
+ * softer findings (icon buttons without a name, images without alt, slow pages) and screenshots.
+ */
+test("en el móvil, ninguna página desborda ni da errores", async ({ browser }) => {
+  test.setTimeout(300_000);
+  const ctx = await browser.newContext({ storageState: await adminPage.context().storageState(), viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true, deviceScaleFactor: 2 });
+  const page = await ctx.newPage();
+  const dir = process.env.E2E_EXPLORE_DIR;
+  if (dir) mkdirSync(dir, { recursive: true });
+  const hard: string[] = [];
+  const report: { route: string; kind: string; detail: string }[] = [];
+  let route = "";
+  page.on("pageerror", (e) => hard.push(`${route}: pageerror ${e.message}`));
+  page.on("response", (r) => {
+    if (r.status() >= 500) hard.push(`${route}: ${r.status()} ${r.url()}`);
+    else if (r.status() >= 400 && !/\/api\/auth\//.test(r.url())) report.push({ route, kind: "http", detail: `${r.status()} ${r.url()}` });
+  });
+  page.on("console", (m) => {
+    if (m.type() === "error") report.push({ route, kind: "console", detail: m.text().slice(0, 300) });
+  });
+  const overflow = () =>
+    page.evaluate(() => {
+      const w = window.innerWidth;
+      if (document.documentElement.scrollWidth <= w + 1) return [];
+      const scrolls = (el: Element | null): boolean => {
+        for (let p = el; p && p !== document.body; p = p.parentElement) {
+          const o = getComputedStyle(p).overflowX;
+          if (o === "auto" || o === "scroll" || o === "hidden" || o === "clip") return true;
+        }
+        return false;
+      };
+      const out: string[] = [];
+      for (const el of document.body.querySelectorAll("*")) {
+        const r = el.getBoundingClientRect();
+        if (r.width === 0 || r.right <= w + 1 || scrolls(el.parentElement)) continue;
+        if ([...el.children].some((c) => c.getBoundingClientRect().right > w + 1)) continue;
+        const id = el.tagName.toLowerCase() + (el.className && typeof el.className === "string" ? "." + el.className.trim().split(/\s+/).slice(0, 4).join(".") : "");
+        out.push(`${id} «${(el.textContent ?? "").trim().slice(0, 40)}» right=${Math.round(r.right)}`);
+        if (out.length >= 5) break;
+      }
+      return out.length ? out : [`scrollWidth=${document.documentElement.scrollWidth}`];
+    });
+  const soft = () =>
+    page.evaluate(() => {
+      const out: string[] = [];
+      for (const b of document.querySelectorAll("button, a[href]")) {
+        const el = b as HTMLElement;
+        if (!el.offsetParent) continue;
+        const name = (el.getAttribute("aria-label") ?? "") + (el.getAttribute("title") ?? "") + (el.innerText ?? "").trim();
+        const labelled = el.getAttribute("aria-labelledby");
+        if (!name && !labelled) out.push(`sin nombre: <${el.tagName.toLowerCase()} class="${(el.className || "").toString().slice(0, 60)}">`);
+      }
+      for (const i of document.querySelectorAll("img:not([alt])")) out.push(`img sin alt: ${(i as HTMLImageElement).src.slice(0, 80)}`);
+      return out;
+    });
+
+  for (const r of await allRoutes(page)) {
+    route = r;
+    const t0 = Date.now();
+    const res = await page.goto(r, { waitUntil: "networkidle" });
+    const ms = Date.now() - t0;
+    expect(res?.status(), r).toBeLessThan(500);
+    if (ms > 2500) report.push({ route: r, kind: "lento", detail: `${ms} ms` });
+    for (const o of await overflow()) hard.push(`${r}: desborda ${o}`);
+    if (dir) {
+      for (const x of await soft()) report.push({ route: r, kind: "a11y", detail: x });
+      await page.screenshot({ path: join(dir, `${r.replace(/\//g, "_") || "_"}.png`), fullPage: true });
+    }
+    // Open and close each dialog trigger (bounded) and check the sheet fits too.
+    const triggers = page.locator('button[aria-haspopup="dialog"]:visible');
+    const n = Math.min(await triggers.count(), 6);
+    for (let i = 0; i < n; i++) {
+      const t = triggers.nth(i);
+      const label = ((await t.getAttribute("aria-label")) ?? (await t.innerText())).trim().slice(0, 40);
+      route = `${r} [${label}]`;
+      await t.click();
+      const dlg = page.getByRole("dialog");
+      await expect(dlg.first(), route).toBeVisible();
+      const wide = await dlg.first().evaluate((d) => d.scrollWidth > d.clientWidth + 1);
+      if (wide) hard.push(`${route}: el diálogo desborda en horizontal`);
+      if (dir) await page.screenshot({ path: join(dir, `${r.replace(/\//g, "_")}__dlg${i}.png`) });
+      await page.keyboard.press("Escape");
+      await expect(dlg, route).toHaveCount(0);
+      route = r;
+    }
+  }
+  if (dir) writeFileSync(join(dir, "report.json"), JSON.stringify({ hard, report }, null, 2));
+  await ctx.close();
+  expect(hard).toEqual([]);
 });

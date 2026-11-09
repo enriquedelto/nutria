@@ -5,6 +5,7 @@ import type { PgBoss } from "pg-boss";
 import {
   aiEstimates,
   and,
+  diaryEntries,
   eq,
   foods,
   insights,
@@ -165,13 +166,36 @@ export const handlers: Handlers = {
     return { foods: n };
   },
 
-  [JOBS.translateFoods]: async ({ batchSize }, { db }) => {
+  [JOBS.translateFoods]: async ({ batchSize, usedOnly }, { db }) => {
     const provider = aiAvailable();
     if (!provider) return { skipped: "sin IA configurada" };
     const admin = await db.execute<{ id: string }>(sql`select id from "user" where role = 'admin' order by created_at limit 1`);
     const adminId = rowsOf<{ id: string }>(admin)[0]?.id;
     if (!adminId) return { skipped: "sin admin" };
     let done = 0;
+    // First the foods people actually use (any source: OFF products can be named in any language);
+    // diary entries keep a copy of the name, so the untouched copies are renamed too.
+    for (let round = 0; round < 5; round++) {
+      const used = rowsOf<{ id: string; name: string }>(
+        await db.execute(sql`
+          select f.id, f.name from foods f
+          where f.name_es is null and (
+            exists (select 1 from diary_entries d where d.food_id = f.id)
+            or exists (select 1 from recipe_ingredients r where r.food_id = f.id)
+            or exists (select 1 from food_favorites v where v.food_id = f.id))
+          limit 40`),
+      );
+      if (!used.length) break;
+      const out = await translateFoodNames({ db, userId: adminId, provider }, used);
+      const old = new Map(used.map((u) => [u.id, u.name]));
+      for (const t of out) {
+        await db.update(foods).set({ nameEs: t.nameEs }).where(eq(foods.id, t.id));
+        if (t.nameEs !== old.get(t.id)) await db.update(diaryEntries).set({ name: t.nameEs }).where(and(eq(diaryEntries.foodId, t.id), eq(diaryEntries.name, old.get(t.id)!)));
+      }
+      done += out.length;
+      if (out.length === 0) break;
+    }
+    if (usedOnly) return { translated: done };
     for (let round = 0; round < 20; round++) {
       const pending = await db.select({ id: foods.id, name: foods.name }).from(foods).where(and(eq(foods.source, "ciqual"), isNull(foods.nameEs))).limit(batchSize ?? 80);
       if (!pending.length) break;

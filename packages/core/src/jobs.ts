@@ -38,7 +38,8 @@ export interface JobPayloads {
   "off.mirror": { url?: string; countries?: string[] };
   "off.refresh-product": { barcode: string };
   "ciqual.import": { url?: string; force?: boolean };
-  "foods.translate": { batchSize?: number };
+  /** usedOnly: just the foods already in diaries, recipes or favourites (quick, after logging one). */
+  "foods.translate": { batchSize?: number; usedOnly?: boolean };
   /** Without `store` (the weekly cron sends {}), crawls Mercadona. */
   "store.crawl": { store?: string };
   "gamification.evaluate": { personId?: string };

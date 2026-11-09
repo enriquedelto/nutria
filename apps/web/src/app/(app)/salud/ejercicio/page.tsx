@@ -9,41 +9,55 @@ import { Badge } from "@/components/ui/badge";
 import { Card, CardHeader } from "@/components/ui/card";
 import { Empty, Skeleton } from "@/components/ui/empty";
 import { db } from "@/lib/db";
-import { n0, relativeDay } from "@/lib/format";
+import { dateShort, n0, relativeDay } from "@/lib/format";
+import { trainingProgress, workoutExercises, type TrainingSet } from "@/lib/data/training";
+import { Sparkline } from "@/components/charts/sparkline";
 import { requireScope } from "@/lib/session";
 
 export const metadata = { title: "Ejercicio y pasos" };
 
-type WorkoutSet = { kg: number | null; reps: number | null };
-type WorkoutExercise = { id: string; name: string; sets: WorkoutSet[] };
+type WorkoutSet = TrainingSet;
 
 const kgText = (kg: number) => `${Number(kg.toFixed(1)).toLocaleString("es-ES")} kg`;
+/** Reps, or seconds for timed sets. */
+const amount = (s: WorkoutSet) => (s.sec ? `${s.sec} s` : String(s.reps ?? "?"));
 
-/** «3×8 · 60 kg» when every set is the same, otherwise «8×60 kg, 8×60 kg, 6×65 kg». */
-function setsText(sets: WorkoutSet[]) {
-  if (!sets.length) return "";
-  const same = sets.every((s) => s.kg === sets[0]!.kg && s.reps === sets[0]!.reps);
+/**
+ * «3×8 · 60 kg» when every working set is the same, otherwise «8×60 kg, 8×60 kg, 6×65 kg»;
+ * timed sets read «3×30 s», and warm-ups are counted apart («+1 calentamiento»).
+ */
+function setsText(all: WorkoutSet[]) {
+  const sets = all.filter((s) => !s.warmup);
+  const warm = all.length - sets.length;
+  const extra = warm ? ` · +${warm} ${warm === 1 ? "calentamiento" : "calentamientos"}` : "";
+  if (!sets.length) return warm ? extra.slice(3) : "";
+  const same = sets.every((s) => s.kg === sets[0]!.kg && s.reps === sets[0]!.reps && s.sec === sets[0]!.sec);
   if (same) {
     const s = sets[0]!;
-    return `${sets.length}×${s.reps ?? "?"}${s.kg ? ` · ${kgText(s.kg)}` : ""}`;
+    return `${sets.length}×${amount(s)}${s.kg ? ` · ${kgText(s.kg)}` : ""}${extra}`;
   }
-  return sets.map((s) => `${s.reps ?? "?"}${s.kg ? `×${kgText(s.kg)}` : ""}`).join(", ");
+  return sets.map((s) => `${amount(s)}${s.kg ? `×${kgText(s.kg)}` : ""}`).join(", ") + extra;
 }
 
-function workoutExercises(details: Record<string, unknown>): WorkoutExercise[] {
-  return Array.isArray(details.exercises) ? (details.exercises as WorkoutExercise[]).filter((e) => e && typeof e.name === "string" && Array.isArray(e.sets)) : [];
-}
 
 async function Content() {
   const ctx = await requireScope("body");
   const pid = ctx.person.id;
   const today = todayIn(ctx.person.timezone);
   const from = addDays(today, -27);
-  const [acts, logs, steps] = await Promise.all([
+  const [acts, logs, steps, history] = await Promise.all([
     db().select().from(activities).orderBy(asc(activities.category), asc(activities.nameEs)),
     db().select().from(exerciseLogs).where(and(eq(exerciseLogs.personId, pid), gte(exerciseLogs.date, from))).orderBy(desc(exerciseLogs.date), desc(exerciseLogs.createdAt)),
     db().select().from(stepLogs).where(and(eq(stepLogs.personId, pid), gte(stepLogs.date, from))).orderBy(asc(stepLogs.date)),
+    db()
+      .select({ date: exerciseLogs.date, volumeKg: exerciseLogs.volumeKg, details: exerciseLogs.details })
+      .from(exerciseLogs)
+      .where(and(eq(exerciseLogs.personId, pid), gte(exerciseLogs.date, addDays(today, -730))))
+      .orderBy(asc(exerciseLogs.date)),
   ]);
+  const progress = trainingProgress(history, today);
+  const recentWeeks = progress.weekly.filter((w) => w.sessions > 0);
+  const hasVolume = progress.weekly.some((w) => w.volumeKg > 0);
   const days = Array.from({ length: 28 }, (_, i) => addDays(from, i));
   const kcalBy = new Map<string, number>();
   for (const l of logs) kcalBy.set(l.date, (kcalBy.get(l.date) ?? 0) + l.kcal);
@@ -76,7 +90,11 @@ async function Content() {
                     <div className="flex items-center gap-3">
                       <span className="w-20 text-ink-3">{relativeDay(l.date, today)}</span>
                       <span className="flex-1">
-                        {l.name} <span className="text-ink-3">· {n0(l.durationMin)} min</span>
+                        {l.name}{" "}
+                        <span className="text-ink-3" title={l.details.durationEstimated ? "Duración estimada por el número de series (openGym no tenía la hora)" : undefined}>
+                          · {l.details.durationEstimated ? "~" : ""}
+                          {n0(l.durationMin)} min
+                        </span>
                         {l.volumeKg ? <span className="text-ink-3"> · {n0(l.volumeKg)} kg de volumen</span> : null}
                       </span>
                       <span className="num">{n0(l.kcal)} kcal</span>
@@ -108,6 +126,40 @@ async function Content() {
           )}
         </Card>
       </div>
+      {progress.lifts.length || hasVolume ? (
+        <Card>
+          <CardHeader
+            title="Progreso del entreno"
+            subtitle={`Últimos 6 meses: ${progress.weekly.reduce((a, w) => a + w.sessions, 0)} sesiones · ${recentWeeks.length} de ${progress.weekly.length} semanas con entreno`}
+          />
+          {hasVolume ? <SeriesChart data={progress.weekly.map((w) => ({ date: w.date, value: w.volumeKg ? Math.round(w.volumeKg / 100) / 10 : null }))} color="var(--persimmon)" unit="t por semana" /> : null}
+          {progress.lifts.length ? (
+            <div className="mt-4">
+              <h3 className="mb-2 text-sm font-semibold">Mejores marcas</h3>
+              <ul className="divide-y divide-line text-sm">
+                {progress.lifts.map((x) => (
+                  <li key={x.id} className="flex items-center gap-3 py-2">
+                    <div className="min-w-0 flex-1">
+                      <p className="truncate font-medium">{x.name}</p>
+                      <p className="text-xs text-ink-3">
+                        <span className="num">
+                          {n0(x.best.kg)} kg × {x.best.reps}
+                        </span>{" "}
+                        · 1RM estimado <span className="num">{n0(x.best.e1rm)} kg</span> · {dateShort(x.best.date)}{x.best.date.slice(0, 4) !== today.slice(0, 4) ? ` ${x.best.date.slice(0, 4)}` : ""} · {x.sessions} sesiones
+                      </p>
+                    </div>
+                    <Sparkline values={x.trend} className="h-8 w-20 shrink-0" color="var(--persimmon)" />
+                    <span className={`num w-16 shrink-0 text-right text-xs ${x.change == null ? "text-ink-3" : x.change >= 0 ? "text-ok" : "text-danger"}`} title="Cambio del 1RM estimado frente a hace 3 meses">
+                      {x.change == null ? "—" : `${x.change > 0 ? "+" : ""}${n0(x.change)} kg`}
+                    </span>
+                  </li>
+                ))}
+              </ul>
+              <p className="mt-2 text-xs text-ink-3">1RM estimado con la fórmula de Epley a partir de tu mejor serie (1–12 repeticiones). La cifra de la derecha compara tu última sesión con lo mejor de hace más de 3 meses.</p>
+            </div>
+          ) : null}
+        </Card>
+      ) : null}
       <Card>
         <CardHeader title="Pasos" subtitle={stepsBy.get(today) ? `Hoy: ${n0(stepsBy.get(today))}` : undefined} />
         <SeriesChart data={days.map((d) => ({ date: d, value: stepsBy.get(d) ?? null }))} target={8000} unit="pasos" />

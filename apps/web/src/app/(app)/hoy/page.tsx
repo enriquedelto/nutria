@@ -110,13 +110,15 @@ async function Today() {
       day.exerciseCount || day.steps ? (
         <Card key="actividad" className="flex flex-wrap items-center gap-6">
           {day.exerciseCount ? (
-            <div className="flex items-center gap-3">
-              <Dumbbell className="size-5 text-ink-3" />
-              <div>
+            <Link href="/salud/ejercicio" className="flex min-w-0 items-center gap-3 rounded-xl hover:bg-paper-2">
+              <Dumbbell className="size-5 shrink-0 text-ink-3" />
+              <div className="min-w-0">
                 <p className="num font-semibold">{n0(day.exerciseKcal)} kcal</p>
-                <p className="text-xs text-ink-3">{day.exerciseCount} sesión(es)</p>
+                <p className="truncate text-xs text-ink-3">
+                  {day.exerciseNames.length ? day.exerciseNames.join(" + ") : `${day.exerciseCount} ${day.exerciseCount === 1 ? "sesión" : "sesiones"}`} · {n0(day.exerciseMin)} min
+                </p>
               </div>
-            </div>
+            </Link>
           ) : null}
           {day.steps ? (
             <div className="flex items-center gap-3">

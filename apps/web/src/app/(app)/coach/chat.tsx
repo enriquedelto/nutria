@@ -9,6 +9,7 @@ import { VoiceInput } from "@/components/voice-input";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/input";
 import { fileToJpeg, type B64Image } from "@/lib/image";
+import { useElapsed } from "@/lib/use-elapsed";
 import { cn } from "@/lib/utils";
 
 export type ChatProposal = { kind: string; summary: string; status?: string };
@@ -26,20 +27,6 @@ function Reveal({ text }: { text: string }) {
     return () => clearTimeout(id);
   }, [n, text]);
   return <Markdown text={text.slice(0, n)} />;
-}
-
-function useElapsed(running: boolean) {
-  const [s, setS] = useState(0);
-  useEffect(() => {
-    if (!running) return;
-    const t0 = Date.now();
-    const id = setInterval(() => setS(Math.floor((Date.now() - t0) / 1000)), 1000);
-    return () => {
-      clearInterval(id);
-      setS(0);
-    };
-  }, [running]);
-  return s;
 }
 
 const TOOL_LABELS: Record<string, string> = {

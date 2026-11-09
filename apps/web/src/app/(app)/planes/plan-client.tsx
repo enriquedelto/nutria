@@ -3,6 +3,7 @@ import { submitForm } from "@/lib/forms";
 import { errorText } from "@/lib/errors";
 import { useMemo, useState } from "react";
 import { useSafeTransition } from "@/lib/use-safe-transition";
+import { useElapsed } from "@/lib/use-elapsed";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Check, ChefHat, Copy, Loader2, NotebookPen, Plus, Printer, ShoppingCart, Sparkles, Trash2, Users } from "lucide-react";
@@ -462,11 +463,15 @@ function StartPlan(props: { week: string; members: Member[]; currentPersonId: st
 
 type Draft = Awaited<ReturnType<typeof generatePlanDraft>>;
 
+/** Rotating status while the plan is generated (~1 min); just feedback, not real progress. */
+const PLAN_STEPS = ["Mirando objetivos y gustos…", "Revisando despensa y recetas…", "Equilibrando la semana…", "Ajustando cantidades…", "Repasando el menú…", "Casi listo…"];
+
 function GenerateDialog({ week, personIds, slots, defaultSlots, members, recipes }: { week: string; personIds: string[]; slots: Slot[]; defaultSlots: string[]; members: Member[]; recipes: Recipe[] }) {
   const [open, setOpen] = useState(false);
   const [pending, start] = useSafeTransition();
   const [chosen, setChosen] = useState<string[]>(() => defaultSlots.filter((s) => s !== "breakfast"));
   const [draft, setDraft] = useState<Draft | null>(null);
+  const elapsed = useElapsed(pending && !draft);
   const names = new Map(members.map((m) => [m.id, m.name]));
   const recipeIds = new Set(recipes.map((r) => r.id));
   const slotLabel = (k: string) => slots.find((s) => s.key === k)?.label ?? k;
@@ -527,7 +532,8 @@ function GenerateDialog({ week, personIds, slots, defaultSlots, members, recipes
               <Button type="submit" className="w-full" disabled={pending || !chosen.length}>
                 {pending ? (
                   <>
-                    <Loader2 className="animate-spin" /> Pensando el menú…
+                    <Loader2 className="animate-spin" /> {PLAN_STEPS[Math.min(PLAN_STEPS.length - 1, Math.floor(elapsed / 12))]}
+                    {elapsed >= 2 ? <span className="num text-xs opacity-80">{elapsed} s</span> : null}
                   </>
                 ) : (
                   <>
@@ -535,6 +541,11 @@ function GenerateDialog({ week, personIds, slots, defaultSlots, members, recipes
                   </>
                 )}
               </Button>
+              {pending ? (
+                <p className="text-center text-xs text-ink-3" role="status">
+                  Suele tardar alrededor de un minuto. No cierres esta pantalla mientras tanto.
+                </p>
+              ) : null}
             </form>
           ) : (
             <div className="space-y-3">
