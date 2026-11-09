@@ -36,6 +36,20 @@
       "when": 1794171792096,
       "tag": "0004_invitation_access_days",
       "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1794261625859,
+      "tag": "0005_measurements_unique",
+      "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1794262028528,
+      "tag": "0006_food_group",
+      "breakpoints": true
     }
   ]
 }

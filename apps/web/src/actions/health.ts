@@ -20,6 +20,7 @@ import {
   medications,
   personConditions,
   sleepLogs,
+  sql,
   stepLogs,
   supplementSchedules,
   symptomLogs,
@@ -28,7 +29,7 @@ import {
   weightLogs,
   type AccessScope,
 } from "@nutria/db";
-import { addSupplementPlan, latestWeight, missingProfileFields, recomputeDay, recomputeTargets, takeSupplement, untakeSupplement } from "@nutria/core";
+import { acceptTdeeEstimate, addSupplementPlan, latestWeight, missingProfileFields, recomputeDay, recomputeTargets, takeSupplement, untakeSupplement } from "@nutria/core";
 import { detectSubstance, exerciseKcal, stepsKcal, SUPPLEMENT_BY_CODE } from "@nutria/nutrition";
 import { db } from "@/lib/db";
 import { emit } from "@/lib/events";
@@ -69,7 +70,11 @@ export async function logMeasurements(personId: string, date: string, sites: Rec
   const rows = Object.entries(sites)
     .filter(([, cm]) => Number.isFinite(cm) && cm > 0 && cm < 300)
     .map(([site, cm]) => ({ personId, date: day.parse(date), site: z.string().max(30).parse(site), cm }));
-  if (rows.length) await db().insert(bodyMeasurements).values(rows);
+  if (rows.length)
+    await db()
+      .insert(bodyMeasurements)
+      .values(rows)
+      .onConflictDoUpdate({ target: [bodyMeasurements.personId, bodyMeasurements.date, bodyMeasurements.site], set: { cm: sql`excluded.cm` } });
   refresh();
 }
 
@@ -86,10 +91,7 @@ export async function setGoal(personId: string, input: { type: string; targetVal
 /** Accept the adaptive TDEE suggestion: new targets keep pinned macros. */
 export async function acceptTdee(personId: string, estimateId: string) {
   await guard(personId, "body");
-  const [e] = await db().select().from(tdeeEstimates).where(and(eq(tdeeEstimates.id, uuid.parse(estimateId)), eq(tdeeEstimates.personId, personId))).limit(1);
-  if (!e?.adaptiveTdee) throw new UserError("Estimación no disponible");
-  await recomputeTargets(db(), personId, { overrideTdee: e.adaptiveTdee, source: "adaptive" });
-  await db().update(tdeeEstimates).set({ acceptedAt: new Date() }).where(eq(tdeeEstimates.id, e.id));
+  if (!(await acceptTdeeEstimate(db(), personId, uuid.parse(estimateId)))) throw new UserError("Estimación no disponible");
   refresh();
 }
 

@@ -3,6 +3,7 @@ import { AlertTriangle } from "lucide-react";
 import { and, asc, avg, bodyMeasurements, dailySummaries, desc, eq, goals, gte, progressPhotos, tdeeEstimates, weightLogs } from "@nutria/db";
 import { addDays, continuous, daysToGoal, forecastWeight, todayIn, trendWeights } from "@nutria/nutrition";
 import { WeightChart, type WeightPoint } from "@/components/charts/weight-chart";
+import Link from "next/link";
 import { PageHeader } from "@/components/page-header";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardHeader } from "@/components/ui/card";
@@ -168,7 +169,7 @@ async function Content() {
 export default function ProgresoPage() {
   return (
     <>
-      <PageHeader title="Progreso" />
+      <PageHeader title="Progreso" actions={<Link href="/progreso/informe" className="text-sm font-medium text-herb">Informe semanal</Link>} />
       <Suspense fallback={<Skeleton className="h-96" />}>
         <Content />
       </Suspense>

@@ -27,6 +27,7 @@ export async function supplementFood(db: Database, personId: string, userId: str
       source: "custom",
       sourceId,
       kind: "supplement",
+      foodGroup: "suplementos",
       name: info.name,
       nameEs: info.name,
       groupId: p?.groupId ?? null,

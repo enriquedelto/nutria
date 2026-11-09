@@ -52,13 +52,30 @@ export async function missingProfileFields(db: Database, personId: string) {
   return [!p.sex && "sexo", !p.birthDate && "fecha de nacimiento", !p.heightCm && "altura", !w && "peso"].filter((x): x is string => !!x);
 }
 
+/** Blend a stored estimate with the formula exactly like adaptiveTdee() does (= the suggested kcal). */
+export function blendedTdee(e: { adaptiveTdee: number | null; confidence: number; underLoggingSuspected: boolean }, formulaTdee: number, bmrKcal: number) {
+  if (e.adaptiveTdee == null) return formulaTdee;
+  const conf = e.underLoggingSuspected ? e.confidence * 0.3 : e.confidence;
+  const plausible = Math.min(Math.max(e.adaptiveTdee, bmrKcal), formulaTdee * 1.6);
+  return Math.round(conf * plausible + (1 - conf) * formulaTdee);
+}
+
 /** TDEE from the latest confident adaptive estimate (≤ 21 days old), blended like the weekly job. */
 async function recentAdaptiveTdee(db: Database, personId: string, formulaTdee: number, bmrKcal: number) {
   const [e] = await db.select().from(tdeeEstimates).where(eq(tdeeEstimates.personId, personId)).orderBy(desc(tdeeEstimates.date)).limit(1);
   if (!e || e.adaptiveTdee == null || e.confidence < 0.5 || Date.now() - Date.parse(e.date) > 21 * 86_400_000) return undefined;
-  const conf = e.underLoggingSuspected ? e.confidence * 0.3 : e.confidence;
-  const plausible = Math.min(Math.max(e.adaptiveTdee, bmrKcal), formulaTdee * 1.6);
-  return Math.round(conf * plausible + (1 - conf) * formulaTdee);
+  return blendedTdee(e, formulaTdee, bmrKcal);
+}
+
+/** Apply a weekly estimate: the same TDEE the suggestion showed (blended, not the raw adaptive value). */
+export async function acceptTdeeEstimate(db: Database, personId: string, estimateId: string) {
+  const [e] = await db.select().from(tdeeEstimates).where(and(eq(tdeeEstimates.id, estimateId), eq(tdeeEstimates.personId, personId))).limit(1);
+  const pp = await personProfile(db, personId);
+  if (!e?.adaptiveTdee || !pp) return null;
+  const f = computeMacroTargets(pp.profile);
+  const t = await recomputeTargets(db, personId, { overrideTdee: blendedTdee(e, e.formulaTdee ?? f.tdee, f.bmr), source: "adaptive" });
+  await db.update(tdeeEstimates).set({ acceptedAt: new Date() }).where(eq(tdeeEstimates.id, e.id));
+  return t;
 }
 
 /**

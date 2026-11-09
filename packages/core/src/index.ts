@@ -7,6 +7,7 @@ export * from "./supplements";
 export * from "./diary";
 export * from "./notify";
 export * from "./sync";
+export * from "./food-groups";
 export * from "./gamification";
 export * from "./reminders";
 export * from "./insights";

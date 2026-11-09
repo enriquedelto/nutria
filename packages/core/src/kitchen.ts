@@ -155,7 +155,7 @@ export async function saveRecipe(db: Database, input: { groupId: string; userId:
     // Catalogue food mirroring the recipe (per 100 g of cooked dish).
     const per100: NutrientMap = nut.per100;
     const m = macroColumns(per100);
-    const foodValues = { source: "recipe" as const, sourceId: `recipe:${recipe.id}`, name: recipe.title, nameEs: recipe.title, groupId: input.groupId, createdBy: input.userId, imageUrl: recipe.imageUrl, nutrients: per100, kcal: m.kcal, protein: m.protein, carbs: m.carbs, fat: m.fat, fiber: m.fiber };
+    const foodValues = { source: "recipe" as const, foodGroup: "platos", sourceId: `recipe:${recipe.id}`, name: recipe.title, nameEs: recipe.title, groupId: input.groupId, createdBy: input.userId, imageUrl: recipe.imageUrl, nutrients: per100, kcal: m.kcal, protein: m.protein, carbs: m.carbs, fat: m.fat, fiber: m.fiber };
     const [food] = await tx
       .insert(foods)
       .values(foodValues)

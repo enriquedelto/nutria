@@ -175,6 +175,39 @@ test("coste de receta con precios de Open Prices", async () => {
   await expect(page.getByText(/Coste:\s*1,20\s€\s*por ración/)).toBeVisible();
 });
 
+test("explorar: filtros en la URL, ficha con su precio y a la compra", async () => {
+  const page = adminPage;
+  await page.goto("/buscar");
+  await page.getByRole("tab", { name: "Explorar" }).click();
+  await expect(page).toHaveURL(/ver=explorar/);
+  await page.getByRole("combobox", { name: "Origen" }).selectOption("mine");
+  await page.getByRole("button", { name: "Con precio", exact: true }).click();
+  await page.getByRole("button", { name: "Otros", exact: true }).click();
+  await expect(page).toHaveURL(/origen=mine/);
+  await expect(page).toHaveURL(/precio=1/);
+  await expect(page).toHaveURL(/grupo=otros/);
+  // Price shown in the list (Open Prices fake: 2,40 € → 4,80 €/kg).
+  await expect(page.getByRole("button", { name: /Quinoa ecológica Nutria.*4,80/ })).toBeVisible();
+  await page.getByRole("combobox", { name: "Ordenar por" }).selectOption("protein_price");
+  await page.getByRole("button", { name: /Más filtros/ }).click();
+  await page.getByLabel("kcal máx.").fill("100");
+  await page.getByRole("button", { name: "Aplicar" }).click();
+  await expect(page.getByText("Nada con estos filtros")).toBeVisible();
+  // Reload keeps the filters (URL state), then clear the advanced ones.
+  await page.reload();
+  await expect(page.getByText("Nada con estos filtros")).toBeVisible();
+  await page.getByRole("button", { name: /Más filtros \(1 activos\)/ }).click();
+  await page.getByRole("button", { name: "Quitar filtros" }).click();
+  await page.getByRole("button", { name: /Quinoa ecológica Nutria/ }).click();
+  await page.getByRole("link", { name: /Ficha completa/ }).click();
+  await expect(page).toHaveURL(/\/alimentos\/[0-9a-f-]{36}$/);
+  await expect(page.getByRole("heading", { name: "Quinoa ecológica Nutria" })).toBeVisible();
+  await expect(page.getByText(/Open Prices/).first()).toBeVisible();
+  await expect(page.getByText(/4,80\s€\/kg/).first()).toBeVisible();
+  await page.getByRole("button", { name: "A la compra" }).click();
+  await expect(page.getByText("Quinoa ecológica Nutria en la lista de la compra")).toBeVisible();
+});
+
 test("diario: cambiar una entrada por otro alimento buscándolo", async () => {
   const page = adminPage;
   await page.goto("/diario");
@@ -522,7 +555,7 @@ test("IA en la cocina (simulada): sustituciones y foto de la nevera", async () =
 });
 
 const ROUTES = [
-  "/hoy", "/diario", "/buscar", "/buscar/nuevo", "/registrar", "/coach", "/coach/memoria", "/progreso", "/informe",
+  "/hoy", "/diario", "/buscar", "/buscar/nuevo", "/registrar", "/coach", "/coach/memoria", "/progreso", "/progreso/informe", "/informe",
   "/salud", "/salud/medicacion", "/salud/suplementos", "/salud/sintomas", "/salud/analiticas", "/salud/ayuno", "/salud/ejercicio", "/salud/sueno", "/salud/ciclo", "/salud/condiciones",
   "/recetas", "/recetas/nueva", "/recetas/importar", "/planes", "/despensa", "/compra", "/familia", "/retos", "/mas", "/admin",
   "/ajustes", "/ajustes/objetivos", "/ajustes/comidas", "/ajustes/pantalla", "/ajustes/notificaciones", "/ajustes/seguridad", "/ajustes/integraciones", "/ajustes/datos",

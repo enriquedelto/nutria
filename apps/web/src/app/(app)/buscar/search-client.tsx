@@ -2,7 +2,7 @@
 import { submitForm } from "@/lib/forms";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useSafeTransition } from "@/lib/use-safe-transition";
-import { useRouter, useSearchParams } from "next/navigation";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { Barcode, Loader2, Plus, Search, Sparkles, Zap } from "lucide-react";
 import { toast } from "sonner";
@@ -16,12 +16,25 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { n0 } from "@/lib/format";
 import { newClientId, sendOrQueue } from "@/lib/offline-queue";
 import type { FoodBrief } from "@/lib/data/foods";
+import { Explore } from "./explore";
 
 type Listed = FoodBrief & { lastGrams?: number };
 
-export function SearchClient({ ctx, lists }: { ctx: DayContext; lists: { recent: Listed[]; frequent: Listed[]; favorites: Listed[] } }) {
+const TABS = ["recientes", "frecuentes", "favoritos", "explorar"] as const;
+type Tab = (typeof TABS)[number];
+
+export function SearchClient({ ctx, lists, hasAllergens }: { ctx: DayContext; lists: { recent: Listed[]; frequent: Listed[]; favorites: Listed[] }; hasAllergens: boolean }) {
   const params = useSearchParams();
   const router = useRouter();
+  const pathname = usePathname();
+  const ver = params.get("ver");
+  const tab: Tab = TABS.includes(ver as Tab) ? (ver as Tab) : lists.recent.length ? "recientes" : "favoritos";
+  const exploring = tab === "explorar";
+  const setTab = (t: string) => {
+    const sp = new URLSearchParams(params.toString());
+    sp.set("ver", t);
+    router.replace(`${pathname}?${sp}`, { scroll: false });
+  };
   const [q, setQ] = useState("");
   const [results, setResults] = useState<FoodBrief[] | null>(null);
   const [loading, setLoading] = useState(false);
@@ -34,7 +47,7 @@ export function SearchClient({ ctx, lists }: { ctx: DayContext; lists: { recent:
   const search = useCallback(
     async (text: string) => {
       abort.current?.abort();
-      if (text.trim().length < 2) return setResults(null);
+      if (exploring || text.trim().length < 2) return setResults(null);
       const ac = (abort.current = new AbortController());
       setLoading(true);
       try {
@@ -47,7 +60,7 @@ export function SearchClient({ ctx, lists }: { ctx: DayContext; lists: { recent:
         if (!ac.signal.aborted) setLoading(false);
       }
     },
-    [ctx.personId],
+    [ctx.personId, exploring],
   );
 
   useEffect(() => {
@@ -110,7 +123,7 @@ export function SearchClient({ ctx, lists }: { ctx: DayContext; lists: { recent:
       >
         <div className="relative flex-1">
           <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-ink-3" />
-          <Input autoFocus value={q} onChange={(e) => setQ(e.target.value)} placeholder="Buscar alimento, marca o código" className="pl-9" enterKeyHint="search" aria-label="Buscar alimento" />
+          <Input autoFocus value={q} onChange={(e) => setQ(e.target.value)} placeholder={exploring ? "Filtrar por nombre o marca" : "Buscar alimento, marca o código"} className="pl-9" enterKeyHint="search" aria-label="Buscar alimento" />
           {loading ? <Loader2 className="absolute right-3 top-1/2 size-4 -translate-y-1/2 animate-spin text-ink-3" /> : null}
         </div>
         <Button type="button" size="icon" variant="outline" onClick={() => setScan(true)} aria-label="Escanear código">
@@ -143,12 +156,16 @@ export function SearchClient({ ctx, lists }: { ctx: DayContext; lists: { recent:
           </Empty>
         )
       ) : (
-        <Tabs defaultValue={lists.recent.length ? "recientes" : "favoritos"}>
+        <Tabs value={tab} onValueChange={setTab}>
           <TabsList>
             <TabsTrigger value="recientes">Recientes</TabsTrigger>
             <TabsTrigger value="frecuentes">Frecuentes</TabsTrigger>
             <TabsTrigger value="favoritos">Favoritos</TabsTrigger>
+            <TabsTrigger value="explorar">Explorar</TabsTrigger>
           </TabsList>
+          <TabsContent value="explorar" className="mt-3">
+            {exploring ? <Explore personId={ctx.personId} q={q} hasAllergens={hasAllergens} onOpen={(id) => setOpen({ id })} /> : null}
+          </TabsContent>
           {(["recientes", "frecuentes", "favoritos"] as const).map((k) => {
             const list = k === "recientes" ? lists.recent : k === "frecuentes" ? lists.frequent : lists.favorites;
             return (

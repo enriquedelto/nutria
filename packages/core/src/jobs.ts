@@ -13,6 +13,7 @@ export const JOBS = {
   offRefreshProduct: "off.refresh-product",
   ciqualImport: "ciqual.import",
   translateFoods: "foods.translate",
+  foodGroups: "foods.groups",
   storeCrawl: "store.crawl",
   gamification: "gamification.evaluate",
   correlations: "insights.correlations",
@@ -40,6 +41,7 @@ export interface JobPayloads {
   "ciqual.import": { url?: string; force?: boolean };
   /** usedOnly: just the foods already in diaries, recipes or favourites (quick, after logging one). */
   "foods.translate": { batchSize?: number; usedOnly?: boolean };
+  "foods.groups": Record<string, never>;
   /** Without `store` (the weekly cron sends {}), crawls Mercadona. */
   "store.crawl": { store?: string };
   "gamification.evaluate": { personId?: string };
@@ -64,6 +66,7 @@ export const SCHEDULES: { name: JobName; cron: string }[] = [
   { name: JOBS.offMirror, cron: "0 3 * * 0" },
   { name: JOBS.ciqualImport, cron: "30 4 * * *" },
   { name: JOBS.translateFoods, cron: "0 5 * * *" },
+  { name: JOBS.foodGroups, cron: "45 5 * * *" },
   { name: JOBS.storeCrawl, cron: "0 2 * * 3" },
   { name: JOBS.cleanup, cron: "0 4 * * *" },
 ];

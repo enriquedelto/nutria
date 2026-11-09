@@ -45,6 +45,7 @@ import {
   weeklyAdaptiveTdee,
   type JobName,
   type JobPayloads,
+  assignFoodGroups,
 } from "@nutria/core";
 import { CIQUAL_ZIP_FALLBACK_URL, CIQUAL_ZIP_URL, decodeLatin1, extractVideo, parseCiqual } from "@nutria/integrations";
 import { addDays, todayIn, weekStart } from "@nutria/nutrition";
@@ -266,6 +267,8 @@ export const handlers: Handlers = {
       throw e;
     }
   },
+
+  [JOBS.foodGroups]: async (_d, { db }) => ({ foods: await assignFoodGroups(db) }),
 
   [JOBS.cleanup]: async (_d, { db }) => {
     const ago = (d: number) => new Date(Date.now() - d * 86_400_000);

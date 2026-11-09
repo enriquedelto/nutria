@@ -111,7 +111,7 @@ export const bodyMeasurements = pgTable(
     cm: real().notNull(),
     ...timestamps(),
   },
-  (t) => [index().on(t.personId, t.date)],
+  (t) => [index().on(t.personId, t.date), uniqueIndex("body_measurements_day_site_uq").on(t.personId, t.date, t.site)],
 );
 
 export const progressPhotos = pgTable(

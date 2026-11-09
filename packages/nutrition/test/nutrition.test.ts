@@ -126,6 +126,12 @@ describe("objetivos", () => {
     expect(tiny.kcal).toBeGreaterThanOrEqual(1200);
     expect(tiny.floorApplied).toBe(true);
   });
+  it("ritmo 0 con objetivo de ganar o perder usa el ritmo por defecto", () => {
+    const keep = computeMacroTargets({ ...p, goalType: "maintain", weeklyRateKg: 0 });
+    expect(computeMacroTargets({ ...p, goalType: "gain", weeklyRateKg: 0 }).kcal - keep.kcal).toBe(275);
+    expect(computeMacroTargets({ ...p, goalType: "lose", weeklyRateKg: 0 }).kcal - keep.kcal).toBe(-550);
+    expect(computeMacroTargets({ ...p, goalType: "maintain", weeklyRateKg: 0.5 }).kcal).toBe(keep.kcal);
+  });
   it("embarazo: sin déficit y con kcal extra; IR específicas", () => {
     const t = computeMacroTargets({ ...p, sex: "female", goalType: "maintain", weeklyRateKg: -0.5, pregnancy: "trimester3" });
     const base = computeMacroTargets({ ...p, sex: "female", goalType: "maintain", weeklyRateKg: 0 });

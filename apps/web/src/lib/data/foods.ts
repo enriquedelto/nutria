@@ -1,5 +1,5 @@
 import "server-only";
-import { additives, and, desc, diaryEntries, eq, foodFavorites, foodServings, foods, gte, inArray, isNull, medications, ne, or, personConditions, persons, sql } from "@nutria/db";
+import { additives, and, desc, diaryEntries, eq, foodFavorites, foodServings, foods, gte, inArray, isNull, medications, ne, or, personConditions, persons, prices, sql, stores } from "@nutria/db";
 import { allergenAlerts, checkInteractions, conditionFoodAlerts, DRUG_FOOD_INTERACTIONS, rankAlternatives, scaleNutrients, specificCategory } from "@nutria/nutrition";
 import { db } from "../db";
 
@@ -96,4 +96,17 @@ export async function quickLists(personId: string) {
   const map = new Map(rows.map((f) => [f.id, brief(f)]));
   const pick = <T extends { foodId: string | null }>(xs: T[]) => xs.map((x) => ({ ...map.get(x.foodId!)!, lastGrams: "grams" in x ? Number((x as { grams: number }).grams) : undefined })).filter((x) => x.id);
   return { recent: pick(recent), frequent: pick(frequent), favorites: pick(favs), favoriteIds: favs.map((f) => f.foodId!) };
+}
+
+/** Price history of a food (by id or barcode), newest first, with the store name. */
+export async function foodPrices(food: { id: string; barcode: string | null }, groupId: string | null) {
+  const match = food.barcode ? or(eq(prices.foodId, food.id), eq(prices.barcode, food.barcode)) : eq(prices.foodId, food.id);
+  const rows = await db()
+    .select({ id: prices.id, price: prices.price, pricePerKg: prices.pricePerKg, observedOn: prices.observedOn, source: prices.source, store: stores.name })
+    .from(prices)
+    .leftJoin(stores, eq(stores.id, prices.storeId))
+    .where(and(match, groupId ? or(isNull(prices.groupId), eq(prices.groupId, groupId)) : isNull(prices.groupId)))
+    .orderBy(desc(prices.observedOn), desc(prices.createdAt))
+    .limit(200);
+  return rows.map((r) => ({ ...r, price: Number(r.price), pricePerKg: r.pricePerKg != null ? Number(r.pricePerKg) : null }));
 }

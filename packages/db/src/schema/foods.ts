@@ -110,6 +110,8 @@ export const foods = pgTable(
     traces: text().array().notNull().default(sql`'{}'::text[]`),
     categories: text().array().notNull().default(sql`'{}'::text[]`),
     labels: text().array().notNull().default(sql`'{}'::text[]`), // vegan, gluten-free…
+    /** Browsing group (FOOD_GROUPS key in @nutria/nutrition, "no_alimento" for non-food); filled by food.groups. */
+    foodGroup: text(),
     ingredientsText: text(),
     countries: text().array().notNull().default(sql`'{}'::text[]`),
     /** 0..1 estimate of data completeness (OFF quality signals / AI confidence). */
@@ -126,6 +128,7 @@ export const foods = pgTable(
     index("foods_group_idx").on(t.groupId),
     index("foods_name_trgm_idx").using("gin", sql`f_unaccent(lower(coalesce(${t.nameEs}, ${t.name}) || ' ' || coalesce(${t.brand}, ''))) gin_trgm_ops`),
     index("foods_categories_idx").using("gin", t.categories),
+    index("foods_food_group_idx").on(t.foodGroup, t.popularity.desc()),
   ],
 );
 

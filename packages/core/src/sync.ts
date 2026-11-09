@@ -16,7 +16,7 @@ import {
   type StoreProduct,
   type StoreProvider,
 } from "@nutria/integrations";
-import { macroColumns, normalizeCiqual, normalizeOff, todayIn, type CiqualRow, type FoodInput } from "@nutria/nutrition";
+import { groupOf, macroColumns, normalizeCiqual, normalizeOff, todayIn, type CiqualRow, type FoodInput } from "@nutria/nutrition";
 import { recomputeDay } from "./summaries";
 import { latestWeight } from "./targets";
 import { applyPlannedDays, plannedDaysFromWeek } from "./sport";
@@ -67,6 +67,7 @@ function foodRow(input: FoodInput) {
     traces: f.traces,
     categories: f.categories,
     labels: f.labels,
+    foodGroup: groupOf(f) ?? "otros",
     ingredientsText: f.ingredientsText,
     countries: f.countries,
     completeness: realValue(f.completeness),
@@ -111,6 +112,7 @@ export async function upsertFoods(db: Database, items: FoodInput[]) {
         traces: sql`excluded.traces`,
         categories: sql`excluded.categories`,
         labels: sql`excluded.labels`,
+        foodGroup: sql`excluded.food_group`,
         ingredientsText: sql`excluded.ingredients_text`,
         countries: sql`excluded.countries`,
         completeness: sql`excluded.completeness`,

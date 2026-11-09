@@ -7,6 +7,8 @@ import { quickLists } from "@/lib/data/foods";
 import { dateLong, isDate } from "@/lib/format";
 import { closestSlot } from "@/lib/slots";
 import { requireScope } from "@/lib/session";
+import { eq, persons } from "@nutria/db";
+import { db } from "@/lib/db";
 import { SearchClient } from "./search-client";
 
 export const metadata = { title: "Buscar" };
@@ -15,7 +17,7 @@ async function Content({ searchParams }: { searchParams: Promise<Record<string, 
   const sp = await searchParams;
   const ctx = await requireScope("diary");
   const date = isDate(sp.fecha) ? sp.fecha : todayIn(ctx.person.timezone);
-  const [day, lists] = await Promise.all([getDay(ctx.person.id, date), quickLists(ctx.person.id)]);
+  const [day, lists, [allergy]] = await Promise.all([getDay(ctx.person.id, date), quickLists(ctx.person.id), db().select({ allergens: persons.allergens }).from(persons).where(eq(persons.id, ctx.person.id)).limit(1)]);
   const slots = day.meals.filter((m) => m.key !== "other").map((m) => ({ key: m.key, label: m.label }));
   const wanted = sp.comida ?? closestSlot(day.meals, ctx.person.timezone);
   const slot = slots.some((s) => s.key === wanted) ? wanted : (slots[0]?.key ?? "lunch");
@@ -33,6 +35,7 @@ async function Content({ searchParams }: { searchParams: Promise<Record<string, 
           favoriteIds: lists.favoriteIds,
         }}
         lists={lists}
+        hasAllergens={(allergy?.allergens.length ?? 0) > 0}
       />
     </>
   );

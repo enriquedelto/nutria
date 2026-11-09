@@ -103,7 +103,9 @@ export function computeMacroTargets(p: PersonProfile, overrideTdee?: number): Ma
   const b = bmr(p);
   const t = overrideTdee ?? tdee(p);
   const pregnant = !!p.pregnancy;
-  const rate = pregnant || p.age < 18 ? 0 : (p.weeklyRateKg ?? (p.goalType === "lose" ? -0.5 : p.goalType === "gain" ? 0.25 : 0));
+  // weekly_rate_kg defaults to 0 in the DB: 0 with a lose/gain goal means "not set", not "no change".
+  const defaultRate = p.goalType === "lose" ? -0.5 : p.goalType === "gain" ? 0.25 : 0;
+  const rate = pregnant || p.age < 18 || p.goalType === "maintain" ? 0 : p.weeklyRateKg ? p.weeklyRateKg : defaultRate;
   let kcal = t + (rate * KCAL_PER_KG) / 7 + pregnancyExtraKcal(p.pregnancy);
   const floor = p.sex === "male" ? 1500 : 1200;
   let floorApplied = false;

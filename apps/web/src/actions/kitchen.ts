@@ -306,3 +306,20 @@ export async function sendToStore(listId: string, storeCode: string) {
   const r = await make().toCart(lines);
   return { ...r, names: Object.fromEntries(items.filter((i) => i.storeProductId).map((i) => [i.storeProductId!.split(":")[1]!, i.name])), unlinked: items.filter((i) => !i.storeProductId).length };
 }
+
+/** "A la compra" from a food page: adds it to the open shopping list (creates one if needed). */
+export async function addFoodToShopping(foodId: string) {
+  const { groupId } = await kitchenGuard();
+  const [f] = await db()
+    .select({ id: foods.id, name: foods.name, nameEs: foods.nameEs })
+    .from(foods)
+    .where(and(eq(foods.id, uuid.parse(foodId)), sql`(${foods.groupId} is null or ${foods.groupId} = ${groupId})`))
+    .limit(1);
+  if (!f) throw new UserError("Alimento no encontrado");
+  const l = await openShoppingList(db(), groupId);
+  const name = (f.nameEs ?? f.name).slice(0, 120);
+  await db().insert(shoppingItems).values({ listId: l.id, foodId: f.id, name, category: guessCategory(name) });
+  await changed(l.id);
+  refresh();
+  return name;
+}

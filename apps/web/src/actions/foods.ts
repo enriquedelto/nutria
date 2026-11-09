@@ -3,7 +3,7 @@ import { UserError } from "@/lib/errors";
 import { refresh } from "next/cache";
 import { z } from "zod";
 import { and, eq, foodServings, foods } from "@nutria/db";
-import { completeDerived } from "@nutria/nutrition";
+import { completeDerived, groupOf } from "@nutria/nutrition";
 import { db } from "@/lib/db";
 import { assertAccess, getApiUser } from "@/lib/session";
 import { personFor } from "@/lib/api";
@@ -33,6 +33,7 @@ export async function createFood(personId: string, input: z.input<typeof FoodInp
     .values({
       source: "custom",
       kind: v.kind,
+      foodGroup: groupOf({ name: v.name, kind: v.kind }) ?? "otros",
       name: v.name,
       nameEs: v.name,
       brand: v.brand ?? null,

@@ -2,7 +2,8 @@
 import { errorText } from "@/lib/errors";
 import { useEffect, useMemo, useState } from "react";
 import { useSafeTransition } from "@/lib/use-safe-transition";
-import { AlertTriangle, Heart, Info, Loader2, ShieldAlert } from "lucide-react";
+import Link from "next/link";
+import { AlertTriangle, ChevronRight, Heart, Info, Loader2, ShieldAlert } from "lucide-react";
 import { toast } from "sonner";
 import { scaleNutrients, type NutrientMap } from "@nutria/nutrition";
 import { toggleFavorite } from "@/actions/diary";
@@ -141,6 +142,9 @@ export function AddFoodDialog({ foodId, ctx, defaultGrams, onClose, onAdded }: {
                 <p className="num text-sm text-ink-2">
                   Por 100 g: {n0(detail.food.kcal)} kcal · P {n0(detail.food.protein)} · H {n0(detail.food.carbs)} · G {n0(detail.food.fat)}
                 </p>
+                <Link href={`/alimentos/${detail.food.id}`} className="inline-flex items-center text-sm font-medium text-herb">
+                  Ficha completa <ChevronRight className="size-4" />
+                </Link>
               </div>
               <button
                 type="button"
