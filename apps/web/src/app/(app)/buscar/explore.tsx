@@ -1,5 +1,5 @@
 "use client";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import {
@@ -76,16 +76,22 @@ export function Explore({ personId, q, hasAllergens, onOpen }: { personId: strin
     return sp.toString();
   }, [params, q]);
 
+  // Several quick taps before the URL updates must not drop each other: start from the last one sent.
+  const latest = useRef(params.toString());
+  useEffect(() => {
+    latest.current = params.toString();
+  }, [params]);
   const set = (patch: Record<string, string | null>) => {
-    const sp = new URLSearchParams(params.toString());
+    const sp = new URLSearchParams(latest.current);
     for (const [k, v] of Object.entries(patch)) {
       if (v) sp.set(k, v);
       else sp.delete(k);
     }
     sp.set("ver", "explorar");
+    latest.current = sp.toString();
     router.replace(`${pathname}?${sp}`, { scroll: false });
   };
-  const toggle = (k: string) => set({ [k]: params.get(k) === "1" ? null : "1" });
+  const toggle = (k: string) => set({ [k]: new URLSearchParams(latest.current).get(k) === "1" ? null : "1" });
 
   const load = async (from: number, signal?: AbortSignal) => {
     setLoading(true);
