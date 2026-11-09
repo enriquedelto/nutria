@@ -57,6 +57,16 @@ Tarea: estructurar una receta a partir de texto libre (página web, descripción
   translate: `Traduce al español de España nombres de alimentos: de una tabla de composición (CIQUAL, en francés/inglés) o de productos envasados (Open Food Facts, en cualquier idioma).
 Devuelve nombres naturales y breves como en una tabla o un supermercado español: "Plátano, crudo", "Lentejas, cocidas", "Salsa de chile". Si ya está en español, devuélvelo igual. No añadas la marca. Mantén el id tal cual.`,
 
+  receipt: `${BASE}
+
+Tarea: leer un ticket de compra (foto o PDF) para guardar los precios.
+- Una línea por producto con su importe final. Si hay una línea de descuento o promoción, réstala del producto al que se aplica (discount) y no la pongas como línea aparte.
+- Productos a peso ("0,532 kg x 2,49 €/kg"): quantity = kg, unit = "kg", unitPrice = €/kg. Si pone "2 x 1,15", quantity = 2 y unitPrice = 1,15.
+- "name": nombre claro en español sin abreviaturas del ticket ("LECHE SEMI HDO 1L" → "Leche semidesnatada 1 l"); conserva marca y tamaño si aparecen.
+- No copies datos de pago, tarjetas, número de cliente, nombre del cajero ni NIF del cliente: no se guardan.
+- cropBottom: en la última imagen, la fracción de la altura justo debajo de la línea del total (lo de debajo suele ser el pago). null si es PDF o no lo ves claro.
+- Si algo no se lee, no lo inventes: deja null o baja la confianza.`,
+
   pantryPhoto: `${BASE}
 
 Tarea: identificar alimentos visibles en una foto de la nevera, despensa o del ticket/compra.

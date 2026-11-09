@@ -133,7 +133,7 @@ export function ShoppingClient({ listId, items, categories, planId, store }: { l
             <h2 className="text-xs font-semibold uppercase tracking-wide text-ink-3">En el carro ({done.length})</h2>
             <Button size="sm" disabled={pending} onClick={() => start(async () => {
               const r = await finishShopping(listId, true);
-              toast.success(`Compra terminada: ${plural(r.bought, "producto", "productos")} a la despensa${r.moved ? `, ${r.moved} pendientes pasan a la próxima` : ""}`);
+              toast.success(`Compra terminada: ${plural(r.bought, "producto", "productos")} a la despensa${r.moved ? `, ${r.moved} pendientes pasan a la próxima` : ""}`, { action: { label: "Adjuntar ticket", onClick: () => router.push(`/compra/tickets?lista=${listId}`) }, duration: 10_000 });
             })}>
               <Check /> Terminar compra
             </Button>

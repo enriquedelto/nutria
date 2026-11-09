@@ -227,6 +227,16 @@ export async function translateFoodNames(c: FeatureCtx, items: { id: string; nam
   return data.items.filter((i) => ids.has(i.id) && i.nameEs.trim());
 }
 
+/* ------------------------------- receipts -------------------------------- */
+
+/** Receipt photo(s) or PDF → lines, store header and date for the review screen (household-scoped). */
+export async function readReceipt(c: FeatureCtx & { groupId: string }, doc: { pdf?: string; images?: Images }) {
+  const content: AiContent[] = [...(doc.pdf ? [{ type: "pdf" as const, data: doc.pdf }] : []), ...(doc.images ?? []), { type: "text", text: "Lee el ticket." }];
+  const { data, model } = await call(c, "receipt", PROMPTS.receipt, content, S.ReceiptReading, "medium");
+  const estimateId = await saveEstimate(c, { kind: "receipt", input: { groupId: c.groupId, pdf: !!doc.pdf, photos: doc.images?.length ?? 0 }, output: data, confidence: data.confidence, model });
+  return { estimateId, ...data };
+}
+
 /* -------------------------------- pantry --------------------------------- */
 
 export async function pantryFromPhoto(c: FeatureCtx & { groupId: string }, images: Images) {

@@ -7,7 +7,7 @@ import { Card, CardHeader } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/empty";
 import { db } from "@/lib/db";
 import { getPersonContext } from "@/lib/session";
-import { CodeLine, IntegrationActions, NewToken, NewWebhook, OpenGymConnect, RevokeToken, WebhookActions } from "./integrations-client";
+import { CodeLine, DisconnectAccount, IntegrationActions, NewToken, NewWebhook, OpenGymConnect, OpenPricesConnect, RevokeToken, WebhookActions } from "./integrations-client";
 import { plural } from "@/lib/format";
 
 export const metadata = { title: "Integraciones" };
@@ -36,6 +36,8 @@ async function Content() {
   ]);
   const og = accounts.filter((a) => a.provider === "opengym");
   const ogHere = og.find((a) => a.personId === ctx.person.id);
+  const op = accounts.find((a) => a.provider === "open_prices");
+  const opBase = (process.env.OPEN_PRICES_WRITE_URL ?? process.env.OPEN_PRICES_URL ?? "https://prices.openfoodfacts.org").replace(/^https?:\/\//, "").replace(/\/$/, "");
   const canManage = ctx.person.role === "owner" || ctx.person.role === "manager";
 
   return (
@@ -73,6 +75,33 @@ async function Content() {
           </>
         ) : (
           <p className="text-sm text-ink-3">Solo quien gestiona a esta persona puede conectarla.</p>
+        )}
+      </Card>
+
+      <Card>
+        <CardHeader title="Open Prices" subtitle="Base de datos abierta de precios de Open Food Facts. Al guardar un ticket puedes compartir sus precios; se pregunta cada vez." />
+        {op ? (
+          <div className="flex flex-wrap items-center gap-3">
+            <p className="min-w-0 flex-1 text-sm">
+              <span className="font-medium">{typeof op.meta.username === "string" ? op.meta.username : "Cuenta"}</span> <span className="text-ink-2">· {opBase}</span>{" "}
+              <Badge tone={op.status === "active" ? "ok" : "warn"}>{op.status === "active" ? "conectado" : "hay que volver a conectar"}</Badge>
+              {op.lastError ? <span className="block text-xs text-danger">{op.lastError}</span> : null}
+            </p>
+            <DisconnectAccount id={op.id} />
+          </div>
+        ) : null}
+        {!op || op.status !== "active" ? (
+          <div className="space-y-2">
+            <p className="text-sm text-ink-2">
+              Con tu cuenta de Open Food Facts (la misma de la app de Open Food Facts). La contraseña solo se usa para pedir un token; no se guarda.{" "}
+              <a href="https://world.openfoodfacts.org/cgi/user.pl" target="_blank" rel="noreferrer" className="text-herb underline">
+                Crear cuenta
+              </a>
+            </p>
+            <OpenPricesConnect />
+          </div>
+        ) : (
+          <p className="mt-2 text-xs text-ink-3">Lo que compartes es público: la foto del ticket (recortada por ti), la tienda, la fecha y los precios con código de barras.</p>
         )}
       </Card>
 

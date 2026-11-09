@@ -6,6 +6,7 @@ import { useSafeTransition } from "@/lib/use-safe-transition";
 import { Copy, Plus, RefreshCw, Send, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import { connectOpenGym, createApiToken, createWebhook, deleteWebhook, disconnectIntegration, revokeApiToken, setWebhookEnabled, syncIntegration, testWebhook } from "@/actions/settings";
+import { connectOpenPricesAction } from "@/actions/receipts";
 import { Button } from "@/components/ui/button";
 import { Field, Input, Select } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
@@ -220,5 +221,43 @@ export function IntegrationActions({ id }: { id: string }) {
         Desconectar
       </Button>
     </div>
+  );
+}
+
+export function OpenPricesConnect() {
+  const [pending, start] = useSafeTransition();
+  return (
+    <form
+      className="grid gap-2 sm:grid-cols-[1fr_1fr_auto] sm:items-end"
+      onSubmit={submitForm((fd) =>
+        start(async () => {
+          try {
+            await connectOpenPricesAction(String(fd.get("user")), String(fd.get("password")));
+            toast.success("Open Prices conectado");
+          } catch (e) {
+            toast.error(errorText(e, "No se pudo conectar"));
+          }
+        })
+      )}
+    >
+      <Field label="Usuario de Open Food Facts">
+        <Input name="user" required autoComplete="username" autoCapitalize="none" spellCheck={false} />
+      </Field>
+      <Field label="Contraseña">
+        <Input name="password" type="password" required autoComplete="current-password" />
+      </Field>
+      <Button type="submit" disabled={pending}>
+        Conectar
+      </Button>
+    </form>
+  );
+}
+
+export function DisconnectAccount({ id }: { id: string }) {
+  const [pending, start] = useSafeTransition();
+  return (
+    <Button size="sm" variant="ghost" disabled={pending} onClick={() => start(() => disconnectIntegration(id))}>
+      Desconectar
+    </Button>
   );
 }

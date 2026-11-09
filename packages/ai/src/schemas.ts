@@ -41,6 +41,34 @@ export const LabelReading = z.object({
 });
 export type LabelReading = z.infer<typeof LabelReading>;
 
+export const ReceiptReading = z.object({
+  store: z.object({
+    chain: z.string().nullable().describe("Cadena en minúsculas sin tildes: mercadona, lidl, carrefour, dia, alcampo, eroski, aldi, consum… o null"),
+    name: z.string().nullable().describe("Nombre del comercio tal como aparece"),
+    address: z.string().nullable().describe("Calle y número"),
+    city: z.string().nullable(),
+    postalCode: z.string().nullable(),
+  }),
+  date: z.string().nullable().describe("Fecha de la compra YYYY-MM-DD"),
+  time: z.string().nullable().describe("Hora HH:MM"),
+  items: z.array(
+    z.object({
+      text: z.string().describe("Texto de la línea tal como aparece (sin el importe)"),
+      name: z.string().describe("Nombre corto y claro del producto en español ('Leche semidesnatada 1 l')"),
+      quantity: z.number().describe("Unidades, o kg/l si se vende a peso"),
+      unit: z.enum(["ud", "kg", "l"]),
+      unitPrice: z.number().nullable().describe("Precio por unidad o por kg/l"),
+      total: z.number().describe("Importe de la línea en euros, ya con el descuento"),
+      discount: z.number().nullable().describe("Descuento aplicado a esta línea (positivo), o null"),
+      isFood: z.boolean().describe("false para bolsas, droguería, higiene, mascotas…"),
+    }),
+  ),
+  total: z.number().nullable(),
+  /** Where the purchase total ends on the (last) image, 0 = top, 1 = bottom. Below it go payment and loyalty details. */
+  cropBottom: z.number().nullable().describe("Fracción (0–1) de la altura de la última imagen justo debajo de la línea del TOTAL"),
+  confidence: z.number().describe("0..1"),
+});
+
 export const LabReportExtraction = z.object({
   date: z.string().nullable().describe("Fecha de la extracción YYYY-MM-DD"),
   labName: z.string().nullable(),

@@ -1,6 +1,7 @@
 /** M12 kitchen: recipes, plans + retro, pantry, shopping, stores & prices, batch cooking. */
 import { sql } from "drizzle-orm";
 import {
+  bigint,
   boolean,
   check,
   date,
@@ -234,14 +235,26 @@ export const shoppingItems = pgTable(
   (t) => [index().on(t.listId)],
 );
 
-export const stores = pgTable("stores", {
-  id: id(),
-  code: text().notNull().unique(), // mercadona | manual-<uuid>
-  name: text().notNull(),
-  provider: text(), // adapter key, null for manual stores
-  postalCode: text(),
-  ...timestamps(),
-});
+export const stores = pgTable(
+  "stores",
+  {
+    id: id(),
+    code: text().notNull().unique(), // mercadona | osm:node:<id> | manual-<uuid>
+    name: text().notNull(),
+    provider: text(), // adapter key, null for manual stores
+    postalCode: text(),
+    /** Chain key for physical branches ("mercadona", "lidl"…); learned receipt aliases are per chain. */
+    chain: text(),
+    address: text(),
+    /** OpenStreetMap element (Open Prices locations are OSM elements). */
+    osmId: bigint({ mode: "number" }),
+    osmType: text(), // NODE | WAY | RELATION
+    lat: real(),
+    lon: real(),
+    ...timestamps(),
+  },
+  (t) => [uniqueIndex("stores_osm_uq").on(t.osmType, t.osmId).where(sql`${t.osmId} is not null`)],
+);
 
 export const storeAccounts = pgTable(
   "store_accounts",
@@ -296,9 +309,92 @@ export const prices = pgTable(
     packGrams: real(),
     source: text().notNull(), // open_prices | store | manual | receipt
     observedOn: date({ mode: "string" }).notNull(),
+    receiptId: uuid().references(() => receipts.id, { onDelete: "cascade" }),
     ...timestamps(),
   },
-  (t) => [index().on(t.foodId, t.observedOn), index().on(t.barcode)],
+  (t) => [index().on(t.foodId, t.observedOn), index().on(t.barcode), index().on(t.receiptId)],
+);
+
+export interface ReceiptOpenPrices {
+  status: "pending" | "shared" | "error";
+  proofId?: number;
+  prices?: number;
+  skipped?: number;
+  sharedAt?: string;
+  error?: string;
+}
+
+/** Photographed/PDF shopping receipt: draft from the AI reading, confirmed by the user. */
+export const receipts = pgTable(
+  "receipts",
+  {
+    id: id(),
+    groupId: uuid()
+      .notNull()
+      .references(() => groups.id, { onDelete: "cascade" }),
+    userId: text().references(() => user.id, { onDelete: "set null" }),
+    storeId: uuid().references(() => stores.id, { onDelete: "set null" }),
+    purchasedOn: date({ mode: "string" }),
+    purchasedTime: text(), // "18:42"
+    total: numeric({ precision: 10, scale: 2 }),
+    currency: text().notNull().default("EUR"),
+    /** Encrypted originals in uploads/receipts/<group>/<id>/ (n.enc); mimetypes alongside. */
+    files: jsonb().$type<{ key: string; mime: string }[]>().notNull().default([]),
+    /** Cropped image the user approved for Open Prices (encrypted), if any. */
+    shareKey: text(),
+    status: text().notNull().default("draft"), // draft | confirmed
+    aiEstimateId: uuid(),
+    shoppingListId: uuid().references(() => shoppingLists.id, { onDelete: "set null" }),
+    /** AI reading of the store header (chain, address, NIF) and store candidates for the review. */
+    reading: jsonb().$type<Record<string, unknown>>().notNull().default({}),
+    openPrices: jsonb().$type<ReceiptOpenPrices | null>(),
+    ...timestamps(),
+  },
+  (t) => [index().on(t.groupId, t.purchasedOn)],
+);
+
+export const receiptItems = pgTable(
+  "receipt_items",
+  {
+    id: id(),
+    receiptId: uuid()
+      .notNull()
+      .references(() => receipts.id, { onDelete: "cascade" }),
+    line: integer().notNull(),
+    rawText: text().notNull(),
+    /** Plain product name (AI guess or the linked food's name). */
+    name: text().notNull(),
+    quantity: real().notNull().default(1),
+    unit: text().notNull().default("ud"), // ud | kg | l
+    unitPrice: numeric({ precision: 10, scale: 2 }),
+    lineTotal: numeric({ precision: 10, scale: 2 }).notNull(),
+    discount: numeric({ precision: 10, scale: 2 }),
+    foodId: uuid().references(() => foods.id, { onDelete: "set null" }),
+    /** 0..1: how sure the automatic match is (1 = learned alias). */
+    matchConfidence: real(),
+    priceId: uuid(),
+    ...timestamps(),
+  },
+  (t) => [index().on(t.receiptId), index().on(t.foodId)],
+);
+
+/** Learned receipt line → food, per household and chain ("LECHE SEMI HDO 1L" → that milk). */
+export const receiptAliases = pgTable(
+  "receipt_aliases",
+  {
+    id: id(),
+    groupId: uuid()
+      .notNull()
+      .references(() => groups.id, { onDelete: "cascade" }),
+    chain: text().notNull().default(""),
+    normText: text().notNull(),
+    foodId: uuid()
+      .notNull()
+      .references(() => foods.id, { onDelete: "cascade" }),
+    uses: integer().notNull().default(1),
+    ...timestamps(),
+  },
+  (t) => [uniqueIndex("receipt_aliases_uq").on(t.groupId, t.chain, t.normText)],
 );
 
 export const cookSessions = pgTable(

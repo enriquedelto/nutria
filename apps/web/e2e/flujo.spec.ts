@@ -1,3 +1,4 @@
+import zlib from "node:zlib";
 import { mkdirSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { expect, test, type Page } from "@playwright/test";
@@ -206,6 +207,75 @@ test("explorar: filtros en la URL, ficha con su precio y a la compra", async () 
   await expect(page.getByText(/4,80\s€\/kg/).first()).toBeVisible();
   await page.getByRole("button", { name: "A la compra" }).click();
   await expect(page.getByText("Quinoa ecológica Nutria en la lista de la compra")).toBeVisible();
+});
+
+/** Plain white RGB PNG (a real image, so the browser can decode and crop it). */
+function whitePng(w: number, h: number) {
+  const chunk = (type: string, data: Buffer) => {
+    const td = Buffer.concat([Buffer.from(type), data]);
+    const len = Buffer.alloc(4);
+    len.writeUInt32BE(data.length);
+    const crc = Buffer.alloc(4);
+    crc.writeUInt32BE(zlib.crc32(td));
+    return Buffer.concat([len, td, crc]);
+  };
+  const ihdr = Buffer.alloc(13);
+  ihdr.writeUInt32BE(w, 0);
+  ihdr.writeUInt32BE(h, 4);
+  ihdr.set([8, 2, 0, 0, 0], 8);
+  const row = Buffer.concat([Buffer.from([0]), Buffer.alloc(w * 3, 255)]);
+  const raw = Buffer.concat(Array.from({ length: h }, () => row));
+  return Buffer.concat([Buffer.from([137, 80, 78, 71, 13, 10, 26, 10]), chunk("IHDR", ihdr), chunk("IDAT", zlib.deflateSync(raw)), chunk("IEND", Buffer.alloc(0))]);
+}
+
+test("ticket: leer, revisar, guardar el precio y compartirlo en Open Prices", async () => {
+  const page = adminPage;
+  const fakes = process.env.E2E_FAKES_URL ?? "http://127.0.0.1:8132";
+  // Connect Open Prices (fake): a wrong password is refused, the right one connects.
+  await page.goto("/ajustes/integraciones");
+  await page.getByLabel("Usuario de Open Food Facts").fill("e2e");
+  await page.getByLabel("Contraseña").fill("mal");
+  await page.getByRole("button", { name: "Conectar", exact: true }).last().click();
+  await expect(page.getByText("Usuario o contraseña de Open Food Facts incorrectos")).toBeVisible();
+  await page.getByLabel("Contraseña").fill("e2e-pass");
+  await page.getByRole("button", { name: "Conectar", exact: true }).last().click();
+  await expect(page.getByText("Open Prices conectado")).toBeVisible();
+
+  // Scan (mock AI reading: quinoa 2,60 €, plátano a peso, bolsa).
+  await page.goto("/compra/tickets");
+  const png = whitePng(40, 80);
+  await page.getByLabel("Archivo del ticket").setInputFiles({ name: "ticket.png", mimeType: "image/png", buffer: png });
+  await expect(page).toHaveURL(/\/compra\/tickets\/[0-9a-f-]{36}$/);
+  await expect(page.getByRole("heading", { name: "Revisar ticket" })).toBeVisible();
+  // Store from OpenStreetMap (fake Nominatim), lines matched and the sum checked against the total.
+  await expect(page.getByRole("radio", { name: /Mercadona/ })).toBeChecked();
+  await expect(page.getByRole("link", { name: "Quinoa ecológica Nutria" })).toBeVisible();
+  await expect(page.getByText(/cuadra con el total/)).toBeVisible();
+  await page.getByRole("button", { name: "Quitar línea: Bolsa" }).click();
+  await expect(page.getByText(/faltan 0,15\s€ para el total/)).toBeVisible();
+  await page.getByLabel("Compartir en Open Prices").check();
+  await expect(page.getByAltText("Ticket que se compartirá")).toBeVisible();
+  await page.getByRole("button", { name: "Guardar ticket" }).click();
+
+  // Detail: shared in the background by the worker.
+  await expect(page.getByRole("heading", { name: "Mercadona" })).toBeVisible();
+  await expect(async () => {
+    await page.reload();
+    await expect(page.getByText(/1 precio publicado/)).toBeVisible({ timeout: 1000 });
+  }).toPass({ timeout: 30_000 });
+  const sent = (await (await fetch(`${fakes}/fake/op/last`)).json()) as { proofs: { type: string; osm: string; date: string }[]; prices: { product_code: string; price: number; proof_id: number }[] };
+  expect(sent.proofs).toHaveLength(1);
+  expect(sent.proofs[0]).toMatchObject({ type: "RECEIPT", osm: "NODE:4242424242", date: "2026-11-02" });
+  expect(sent.prices).toEqual([expect.objectContaining({ product_code: "8437000000017", price: 2.6, proof_id: 501 })]);
+
+  // The price lands in the food page, with its store; the receipts list and the prices page show it.
+  await page.getByRole("link", { name: "Quinoa ecológica Nutria" }).click();
+  await expect(page.getByText(/ticket/).first()).toBeVisible();
+  await expect(page.getByText(/2,60\s€/).first()).toBeVisible();
+  await page.goto("/compra/tickets");
+  await expect(page.getByRole("link", { name: /Mercadona.*2 líneas/ })).toBeVisible();
+  await page.goto("/compra/precios");
+  await expect(page.getByText("Gasto por mes")).toBeVisible();
 });
 
 test("diario: cambiar una entrada por otro alimento buscándolo", async () => {
@@ -557,7 +627,7 @@ test("IA en la cocina (simulada): sustituciones y foto de la nevera", async () =
 const ROUTES = [
   "/hoy", "/diario", "/buscar", "/buscar/nuevo", "/registrar", "/coach", "/coach/memoria", "/progreso", "/progreso/informe", "/informe",
   "/salud", "/salud/medicacion", "/salud/suplementos", "/salud/sintomas", "/salud/analiticas", "/salud/ayuno", "/salud/ejercicio", "/salud/sueno", "/salud/ciclo", "/salud/condiciones",
-  "/recetas", "/recetas/nueva", "/recetas/importar", "/planes", "/despensa", "/compra", "/familia", "/retos", "/mas", "/admin",
+  "/recetas", "/recetas/nueva", "/recetas/importar", "/planes", "/despensa", "/compra", "/compra/tickets", "/compra/precios", "/familia", "/retos", "/mas", "/admin",
   "/ajustes", "/ajustes/objetivos", "/ajustes/comidas", "/ajustes/pantalla", "/ajustes/notificaciones", "/ajustes/seguridad", "/ajustes/integraciones", "/ajustes/datos",
 ];
 
@@ -569,7 +639,11 @@ async function allRoutes(page: Page) {
   const person = await page.locator('a[href^="/familia/"]').first().getAttribute("href");
   await page.goto("/planes");
   const retro = await page.locator('a[href$="/repaso"]').first().getAttribute("href");
-  return [...ROUTES, ...[recipe, recipe && `${recipe}/editar`, recipe && `${recipe}/cocinar`, person, retro].filter((x): x is string => !!x)];
+  await page.goto("/compra/tickets");
+  const ticket = await page.locator('a[href^="/compra/tickets/"]').first().getAttribute("href").catch(() => null);
+  await page.goto("/compra/precios");
+  const food = await page.locator('a[href^="/alimentos/"]').first().getAttribute("href").catch(() => null);
+  return [...ROUTES, ...[recipe, recipe && `${recipe}/editar`, recipe && `${recipe}/cocinar`, person, retro, ticket, ticket && `${ticket}?editar=1`, food].filter((x): x is string => !!x)];
 }
 
 test("todas las páginas cargan sin errores de servidor", async () => {

@@ -15,7 +15,7 @@ import { closestSlot } from "@/lib/slots";
 import { requireScope } from "@/lib/session";
 import { cn } from "@/lib/utils";
 import { FoodActions } from "./food-actions";
-import { PriceChart } from "./price-chart";
+import { PriceChart } from "@/components/charts/price-chart";
 
 export const metadata = { title: "Alimento" };
 

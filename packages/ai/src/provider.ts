@@ -481,6 +481,19 @@ export function defaultMockHandlers(): Record<string, MockHandler> {
       const items = [...text.matchAll(/^- (\S+): (.+)$/gm)].map((m) => ({ id: m[1]!, nameEs: m[2]!.trim() }));
       return { items };
     },
+    receipt: () => ({
+      store: { chain: "mercadona", name: "MERCADONA, S.A.", address: "Calle Mayor 1", city: "Madrid", postalCode: "28013" },
+      date: "2026-11-02",
+      time: "18:42",
+      items: [
+        { text: "QUINOA ECO NUTRIA", name: "Quinoa ecológica Nutria", quantity: 1, unit: "ud", unitPrice: 2.6, total: 2.6, discount: null, isFood: true },
+        { text: "PLATANO", name: "Plátano", quantity: 0.85, unit: "kg", unitPrice: 1.99, total: 1.69, discount: null, isFood: true },
+        { text: "BOLSA PLASTICO", name: "Bolsa", quantity: 1, unit: "ud", unitPrice: 0.15, total: 0.15, discount: null, isFood: false },
+      ],
+      total: 4.44,
+      cropBottom: 0.7,
+      confidence: 0.9,
+    }),
     pantry_photo: () => ({ items: [{ name: "Leche", quantity: 1, unit: "ud", location: "nevera", expiresInDays: 5 }] }),
     meal_plan: () => ({ days: [], notes: "Plan simulado" }),
     weekly_report: () => ({ title: "Semana simulada", summaryMd: "Todo en orden (simulado).", highlights: [], suggestions: [] }),

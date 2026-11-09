@@ -50,6 +50,13 @@
       "when": 1794262028528,
       "tag": "0006_food_group",
       "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "7",
+      "when": 1794265293417,
+      "tag": "0007_receipts",
+      "breakpoints": true
     }
   ]
 }

@@ -14,6 +14,7 @@ export const JOBS = {
   ciqualImport: "ciqual.import",
   translateFoods: "foods.translate",
   foodGroups: "foods.groups",
+  openPricesShare: "openprices.share",
   storeCrawl: "store.crawl",
   gamification: "gamification.evaluate",
   correlations: "insights.correlations",
@@ -42,6 +43,7 @@ export interface JobPayloads {
   /** usedOnly: just the foods already in diaries, recipes or favourites (quick, after logging one). */
   "foods.translate": { batchSize?: number; usedOnly?: boolean };
   "foods.groups": Record<string, never>;
+  "openprices.share": { receiptId: string };
   /** Without `store` (the weekly cron sends {}), crawls Mercadona. */
   "store.crawl": { store?: string };
   "gamification.evaluate": { personId?: string };

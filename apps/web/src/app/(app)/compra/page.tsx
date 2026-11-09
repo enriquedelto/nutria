@@ -1,4 +1,5 @@
 import { Suspense } from "react";
+import Link from "next/link";
 import { asc, desc, eq, mealPlans, shoppingItems, storeAccounts, stores } from "@nutria/db";
 import { openShoppingList } from "@nutria/core";
 import { CATEGORY_NAMES, CATEGORY_ORDER, todayIn } from "@nutria/nutrition";
@@ -42,7 +43,16 @@ async function Content() {
 export default function CompraPage() {
   return (
     <>
-      <PageHeader title="Lista de la compra" subtitle="Compartida con tu hogar, en tiempo real" />
+      <PageHeader
+        title="Lista de la compra"
+        subtitle="Compartida con tu hogar, en tiempo real"
+        actions={
+          <span className="flex gap-3 text-sm font-medium text-herb">
+            <Link href="/compra/tickets">Tickets</Link>
+            <Link href="/compra/precios">Precios</Link>
+          </span>
+        }
+      />
       <Suspense fallback={<Skeleton className="h-96" />}>
         <Content />
       </Suspense>
