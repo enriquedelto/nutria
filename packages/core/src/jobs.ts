@@ -3,6 +3,7 @@ export const JOBS = {
   recomputeDay: "day.recompute",
   targetsRecompute: "targets.recompute",
   tdeeWeekly: "tdee.weekly",
+  bulkWeekly: "bulk.weekly",
   weeklyReport: "report.weekly",
   remindersTick: "reminders.tick",
   medicationDoses: "medication.doses",
@@ -31,6 +32,7 @@ export interface JobPayloads {
   "day.recompute": { personId: string; date: string };
   "targets.recompute": { personId: string };
   "tdee.weekly": { personId?: string };
+  "bulk.weekly": { personId?: string };
   "report.weekly": { personId?: string };
   "reminders.tick": Record<string, never>;
   "medication.doses": { date?: string };
@@ -62,6 +64,7 @@ export const SCHEDULES: { name: JobName; cron: string }[] = [
   { name: JOBS.expiryCheck, cron: "0 9 * * *" },
   { name: JOBS.opengymSyncAll, cron: "*/2 * * * *" },
   { name: JOBS.tdeeWeekly, cron: "0 6 * * 1" },
+  { name: JOBS.bulkWeekly, cron: "15 6 * * 1" },
   { name: JOBS.weeklyReport, cron: "0 9 * * 1" },
   { name: JOBS.gamification, cron: "30 23 * * *" },
   { name: JOBS.correlations, cron: "0 4 * * 0" },

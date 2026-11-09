@@ -73,7 +73,14 @@ export async function acceptTdeeEstimate(db: Database, personId: string, estimat
   const pp = await personProfile(db, personId);
   if (!e?.adaptiveTdee || !pp) return null;
   const f = computeMacroTargets(pp.profile);
-  const t = await recomputeTargets(db, personId, { overrideTdee: blendedTdee(e, e.formulaTdee ?? f.tdee, f.bmr), source: "adaptive" });
+  const blended = blendedTdee(e, e.formulaTdee ?? f.tdee, f.bmr);
+  const [cur] = await db.select({ mode: targetSets.mode }).from(targetSets).where(and(eq(targetSets.personId, personId), eq(targetSets.isDefault, true))).limit(1);
+  // In mode "adaptive" the weekly job keeps it up to date; otherwise keep it as an adjustment over
+  // the formula, so the next recompute (e.g. a weigh-in) does not drop it.
+  const t =
+    cur?.mode === "adaptive"
+      ? await recomputeTargets(db, personId, { overrideTdee: blended, source: "adaptive", kcalAdjust: 0 })
+      : await recomputeTargets(db, personId, { kcalAdjust: blended - f.tdee, source: "adaptive" });
   await db.update(tdeeEstimates).set({ acceptedAt: new Date() }).where(eq(tdeeEstimates.id, e.id));
   return t;
 }
@@ -83,7 +90,7 @@ export async function acceptTdeeEstimate(db: Database, personId: string, estimat
  * (manual targets are never overwritten unless `force`, which switches them back to calculated),
  * mode "adaptive" (keeps using the latest real-TDEE estimate) and pinned macros.
  */
-export async function recomputeTargets(db: Database, personId: string, opts: { overrideTdee?: number; source?: "formula" | "adaptive"; force?: boolean } = {}) {
+export async function recomputeTargets(db: Database, personId: string, opts: { overrideTdee?: number; source?: "formula" | "adaptive"; force?: boolean; kcalAdjust?: number } = {}) {
   const pp = await personProfile(db, personId);
   if (!pp) return null;
   const [current] = await db.select().from(targetSets).where(and(eq(targetSets.personId, personId), eq(targetSets.isDefault, true))).limit(1);
@@ -94,7 +101,10 @@ export async function recomputeTargets(db: Database, personId: string, opts: { o
     if (tdeeReal != null) opts = { ...opts, overrideTdee: tdeeReal, source: "adaptive" };
   }
   const conds = await db.select({ code: personConditions.conditionCode, config: personConditions.config }).from(personConditions).where(and(eq(personConditions.personId, personId), eq(personConditions.active, true)));
-  const macros = computeMacroTargets(pp.profile, opts.overrideTdee);
+  // Accepted adjustment (TDEE suggestion or bulk review) on top of the expenditure, kept across recomputes.
+  const kcalAdjust = Math.round(opts.kcalAdjust ?? current?.kcalAdjust ?? 0);
+  const baseTdee = opts.overrideTdee ?? (kcalAdjust ? computeMacroTargets(pp.profile).tdee : undefined);
+  const macros = computeMacroTargets(pp.profile, baseTdee == null ? undefined : baseTdee + kcalAdjust);
   let micros = computeMicroTargets(pp.profile, macros.kcal);
   let t: DayTargets = { kcal: macros.kcal, protein: macros.protein, carbs: macros.carbs, fat: macros.fat, fiber: macros.fiber, micros };
   t = applyConditions(t, conds, pp.profile.weightKg);
@@ -104,7 +114,7 @@ export async function recomputeTargets(db: Database, personId: string, opts: { o
     const pinnedVals = { ...main, ...Object.fromEntries(current.pinned.map((k) => [k, current[k as "protein" | "carbs" | "fat"]])) };
     main = rebalanceMacros(pinnedVals, t.kcal, current.pinned);
   }
-  const values = { ...main, fiber: t.fiber, micros, source: conds.length ? "condition" : (opts.source ?? "formula") };
+  const values = { ...main, fiber: t.fiber, micros, kcalAdjust, source: conds.length ? "condition" : kcalAdjust && !opts.source ? (current?.source ?? "adaptive") : (opts.source ?? "formula") };
   if (current) {
     const [u] = await db
       .update(targetSets)
@@ -117,11 +127,8 @@ export async function recomputeTargets(db: Database, personId: string, opts: { o
   return n!;
 }
 
-/**
- * Weekly adaptive TDEE: blends observed energy balance (intake vs. trend weight) with the
- * formula, stores a snapshot, and suggests new kcal (applied automatically only in mode "adaptive").
- */
-export async function weeklyAdaptiveTdee(db: Database, personId: string, now = new Date()) {
+/** Adaptive TDEE over the 28 days up to yesterday (shared by the weekly TDEE job and the bulk review). */
+export async function adaptiveSnapshot(db: Database, personId: string, now = new Date()) {
   const pp = await personProfile(db, personId);
   if (!pp) return null;
   const today = todayIn(pp.person.timezone, now);
@@ -136,6 +143,17 @@ export async function weeklyAdaptiveTdee(db: Database, personId: string, now = n
   for (const w of weights) byDate.set(w.date, { ...(byDate.get(w.date) ?? { date: w.date }), weightKg: w.kg });
   const formula = computeMacroTargets(pp.profile);
   const r = adaptiveTdee([...byDate.values()], end, { formulaTdee: formula.tdee, bmr: bmr(pp.profile) });
+  return { pp, today, end, formula, r };
+}
+
+/**
+ * Weekly adaptive TDEE: blends observed energy balance (intake vs. trend weight) with the
+ * formula, stores a snapshot, and suggests new kcal (applied automatically only in mode "adaptive").
+ */
+export async function weeklyAdaptiveTdee(db: Database, personId: string, now = new Date()) {
+  const snap = await adaptiveSnapshot(db, personId, now);
+  if (!snap) return null;
+  const { pp, today, formula, r } = snap;
   const suggested = computeMacroTargets(pp.profile, r.estimatedTdee).kcal;
   const row = {
     personId,

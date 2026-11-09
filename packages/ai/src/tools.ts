@@ -280,6 +280,23 @@ const getWeight = define({
   },
 });
 
+const getBulkReview = define({
+  name: "get_bulk_review",
+  description:
+    "Última revisión semanal del volumen (objetivo ganar peso): ritmo real frente al elegido, propuesta de kcal, series por músculo (media de 4 semanas, guía 10–20), cambio de fuerza (1RM estimado), cintura y la señal «¿músculo o grasa?».",
+  scope: "body",
+  input: z.object({}),
+  async run(_, ctx) {
+    const [r] = await ctx.db
+      .select({ title: insights.title, bodyMd: insights.bodyMd, data: insights.data, periodEnd: insights.periodEnd })
+      .from(insights)
+      .where(and(eq(insights.personId, ctx.personId), eq(insights.kind, "bulk_review")))
+      .orderBy(desc(insights.periodEnd), desc(insights.createdAt))
+      .limit(1);
+    return r ?? "Sin revisión del volumen: es para el objetivo «ganar peso» y se hace los lunes (o con «Revisar ahora» en Progreso).";
+  },
+});
+
 const getForecast = define({
   name: "get_forecast",
   description: "Previsión de peso a 30/60/90 días según la ingesta media reciente y el TDEE estimado.",
@@ -498,6 +515,7 @@ export const READ_TOOLS: AiTool[] = [
   getSupplements,
   getProfile,
   getWeight,
+  getBulkReview,
   getForecast,
   getExercise,
   getSleep,

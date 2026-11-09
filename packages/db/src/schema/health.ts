@@ -50,6 +50,8 @@ export const targetSets = pgTable(
     pinned: text().array().notNull().default(sql`'{}'::text[]`), // ["protein"]
     mode: text().notNull().default("dynamic"), // fixed | dynamic | adaptive
     source: text().notNull().default("formula"), // formula | adaptive | manual | condition
+    /** Accepted adjustment on top of the estimated expenditure (bulk review), kept across recomputes. */
+    kcalAdjust: real().notNull().default(0),
     ...timestamps(),
   },
   (t) => [index().on(t.personId)],

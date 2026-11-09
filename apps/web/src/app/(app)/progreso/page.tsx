@@ -1,6 +1,7 @@
 import { Suspense } from "react";
 import { AlertTriangle } from "lucide-react";
-import { and, asc, avg, bodyMeasurements, dailySummaries, desc, eq, goals, gte, progressPhotos, tdeeEstimates, weightLogs } from "@nutria/db";
+import { and, asc, avg, bodyMeasurements, dailySummaries, desc, eq, goals, gte, persons, progressPhotos, targetSets, tdeeEstimates, weightLogs } from "@nutria/db";
+import { latestBulkReview } from "@nutria/core";
 import { addDays, continuous, daysToGoal, forecastWeight, todayIn, trendWeights } from "@nutria/nutrition";
 import { WeightChart, type WeightPoint } from "@/components/charts/weight-chart";
 import Link from "next/link";
@@ -11,6 +12,7 @@ import { Empty, Skeleton } from "@/components/ui/empty";
 import { db } from "@/lib/db";
 import { dateLong, dateShort, kg, n0, n1 } from "@/lib/format";
 import { requireScope } from "@/lib/session";
+import { BulkCard } from "./bulk-card";
 import { AcceptTdee, GoalForm, MeasurementsForm, PhotoCompare, PhotoUpload, WeightForm, WeightList } from "./progress-forms";
 
 export const metadata = { title: "Progreso" };
@@ -22,14 +24,16 @@ async function Content() {
   const today = todayIn(ctx.person.timezone);
   const from = addDays(today, -180);
   const pid = ctx.person.id;
-  const [weights, [estimate], [goal], measures, photos, [intake]] = await Promise.all([
+  const [weights, [estimate], [goal], measures, photos, [intake], [me]] = await Promise.all([
     db().select().from(weightLogs).where(and(eq(weightLogs.personId, pid), gte(weightLogs.date, from))).orderBy(asc(weightLogs.date)),
     db().select().from(tdeeEstimates).where(eq(tdeeEstimates.personId, pid)).orderBy(desc(tdeeEstimates.date)).limit(1),
     db().select().from(goals).where(and(eq(goals.personId, pid), eq(goals.status, "active"), eq(goals.type, "weight"))).limit(1),
     db().select().from(bodyMeasurements).where(eq(bodyMeasurements.personId, pid)).orderBy(desc(bodyMeasurements.date)).limit(60),
     ctx.scopes.has("photos") ? db().select().from(progressPhotos).where(eq(progressPhotos.personId, pid)).orderBy(desc(progressPhotos.date)) : Promise.resolve([]),
     db().select({ kcal: avg(dailySummaries.kcal) }).from(dailySummaries).where(and(eq(dailySummaries.personId, pid), gte(dailySummaries.date, addDays(today, -14)), gte(dailySummaries.entries, 1))),
+    db().select({ goal: persons.goalType, adjust: targetSets.kcalAdjust }).from(persons).leftJoin(targetSets, and(eq(targetSets.personId, persons.id), eq(targetSets.isDefault, true))).where(eq(persons.id, pid)).limit(1),
   ]);
+  const bulk = me?.goal === "gain" ? await latestBulkReview(db(), pid) : null;
 
   // Daily series (one weight per day, last value wins), smoothed trend, forecast.
   const perDay = new Map<string, number>();
@@ -101,6 +105,8 @@ async function Content() {
             <p className="text-sm text-ink-2">Necesito al menos unos días de diario y pesajes.</p>
           )}
         </Card>
+
+        {me?.goal === "gain" ? <BulkCard personId={pid} review={bulk} kcalAdjust={me.adjust ?? 0} canWrite={ctx.canWrite} /> : null}
 
         <Card>
           <CardHeader title="Pesajes" />

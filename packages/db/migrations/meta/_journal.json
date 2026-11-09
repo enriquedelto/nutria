@@ -57,6 +57,13 @@
       "when": 1794265293417,
       "tag": "0007_receipts",
       "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "7",
+      "when": 1794268170070,
+      "tag": "0008_kcal_adjust",
+      "breakpoints": true
     }
   ]
 }

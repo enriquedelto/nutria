@@ -124,6 +124,20 @@ test("deporte: volumen, días de entreno, objetivos por día y creatina marcada 
   await expect(page.getByText("Supl.").first()).toBeVisible();
 });
 
+test("revisión del volumen: sin datos todavía, a mano desde Progreso", async () => {
+  const page = adminPage; // goal «gain» since the sport test
+  await page.goto("/progreso");
+  const card = page.locator("#volumen");
+  await expect(card.getByRole("heading", { name: "Revisión del volumen" })).toBeVisible();
+  await expect(card.getByText(/Aún no hay revisión/)).toBeVisible();
+  await card.getByRole("button", { name: "Revisar ahora" }).click();
+  await expect(page.getByText("Revisión actualizada")).toBeVisible();
+  await expect(card.getByText("Faltan datos")).toBeVisible();
+  await expect(card.getByText(/hacen falta unas 3–4 semanas/)).toBeVisible();
+  await expect(card.getByText("¿Músculo o grasa?")).toBeVisible();
+  await expect(card.getByText(/Sin entrenos de openGym/)).toBeVisible();
+});
+
 test("registro por IA (simulada) llega al diario", async () => {
   const page = adminPage;
   await page.goto("/registrar");

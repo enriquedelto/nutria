@@ -6,7 +6,7 @@ import { useSafeTransition } from "@/lib/use-safe-transition";
 import { useRouter } from "next/navigation";
 import { Camera, Loader2, Plus, Trash2 } from "lucide-react";
 import { toast } from "sonner";
-import { acceptTdee, deleteWeight, logMeasurements, logWeight, setGoal } from "@/actions/health";
+import { acceptTdee, applyBulkReviewAction, clearKcalAdjust, deleteWeight, logMeasurements, logWeight, reviewBulkNow, setGoal } from "@/actions/health";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent } from "@/components/ui/dialog";
 import { Field, Input, Select } from "@/components/ui/input";
@@ -75,6 +75,42 @@ export function AcceptTdee({ personId, estimateId, kcal }: { personId: string; e
       toast.success("Objetivos actualizados");
     })}>
       Usar {kcal} kcal
+    </Button>
+  );
+}
+
+export function BulkApply({ personId, insightId, delta }: { personId: string; insightId: string; delta: number }) {
+  const [pending, start] = useSafeTransition();
+  return (
+    <Button size="sm" disabled={pending} onClick={() => start(async () => {
+      await applyBulkReviewAction(personId, insightId);
+      toast.success(`Objetivo de calorías ${delta > 0 ? "subido" : "bajado"} ${Math.abs(delta)} kcal`);
+    })}>
+      Aplicar
+    </Button>
+  );
+}
+
+export function BulkClearAdjust({ personId }: { personId: string }) {
+  const [pending, start] = useSafeTransition();
+  return (
+    <Button size="sm" variant="ghost" disabled={pending} onClick={() => start(async () => {
+      await clearKcalAdjust(personId);
+      toast.success("Ajuste quitado");
+    })}>
+      Quitar ajuste
+    </Button>
+  );
+}
+
+export function BulkReviewNow({ personId }: { personId: string }) {
+  const [pending, start] = useSafeTransition();
+  return (
+    <Button size="sm" variant="outline" disabled={pending} onClick={() => start(async () => {
+      await reviewBulkNow(personId);
+      toast.success("Revisión actualizada");
+    })}>
+      {pending ? <Loader2 className="animate-spin" /> : null} Revisar ahora
     </Button>
   );
 }

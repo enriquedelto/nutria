@@ -14,3 +14,5 @@ export * from "./insights";
 export * from "./dates";
 export * from "./food-groups";
 export * from "./receipts";
+export * from "./training";
+export * from "./bulk";

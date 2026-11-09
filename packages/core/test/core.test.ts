@@ -486,3 +486,54 @@ describe("deporte y suplementos", () => {
     expect(e!.kcal).toBeCloseTo(114, 0);
   });
 });
+
+describe("revisión del volumen", () => {
+  it("dos semanas lentas proponen más kcal; al aplicarlo se mantiene tras recalcular", async () => {
+    await db.insert(user).values({ id: "gym", name: "Gym", email: "gym@example.com" });
+    await core.onUserCreated(db, { id: "gym", name: "Gym", email: "gym@example.com" }, null);
+    const [p] = await db.select().from(persons).where(eq(persons.userId, "gym"));
+    const pid = p!.id;
+    await db.update(persons).set({ sex: "male", birthDate: "1995-01-01", heightCm: 178, activityLevel: "active", goalType: "gain", weeklyRateKg: 0.25 }).where(eq(persons.id, pid));
+    const now = new Date();
+    const day = (n: number) => new Date(now.getTime() + n * 86_400_000).toISOString().slice(0, 10);
+    // 50 days up to a week from now: flat weight (no gain) and a full diary.
+    for (let i = -42; i <= 7; i++) {
+      await db.insert(weightLogs).values({ personId: pid, date: day(i), kg: 72 + (i % 2) * 0.1 });
+      await db.insert(dailySummaries).values({ personId: pid, date: day(i), kcal: 2900, protein: 140, entries: 4, complete: true });
+    }
+    // Workouts: bench (chest + triceps/shoulders as secondary) getting stronger.
+    const bench = (kg: number) => ({ exercises: [{ id: "0025", name: "Press de banca con barra", sets: [{ kg: 40, reps: 10, warmup: true }, { kg, reps: 8 }, { kg, reps: 8 }, { kg, reps: 8 }] }] });
+    for (const [i, kg] of [[-30, 60], [-23, 60], [-16, 62.5], [-9, 65], [-4, 65], [-2, 67.5]] as const)
+      await db.insert(exerciseLogs).values({ personId: pid, date: day(i), name: "Pecho", durationMin: 60, kcal: 300, details: bench(kg) });
+    const t0 = await core.recomputeTargets(db, pid);
+
+    const w1 = await core.weeklyBulkReview(db, pid, now);
+    expect(w1).toMatchObject({ verdict: "slow", kcalDelta: 0 });
+    expect(w1!.sets.find((s) => s.muscle === "pecho")!.week).toBe(6);
+    expect(w1!.sets.find((s) => s.muscle === "triceps")!.week).toBe(3);
+    expect(w1!.strengthChangePct).toBeGreaterThan(2);
+    expect(w1!.signal.kind).toBe("stalled");
+    expect(await db.select().from(notifications).where(eq(notifications.type, "bulk_review"))).toHaveLength(0);
+    // Rebuilding the same week replaces it.
+    await core.weeklyBulkReview(db, pid, now);
+    expect(await db.select().from(insights).where(and(eq(insights.personId, pid), eq(insights.kind, "bulk_review")))).toHaveLength(1);
+
+    const w2 = await core.weeklyBulkReview(db, pid, new Date(now.getTime() + 7 * 86_400_000));
+    expect(w2).toMatchObject({ verdict: "slow", kcalDelta: 150 });
+    expect(await db.select().from(notifications).where(eq(notifications.type, "bulk_review"))).toHaveLength(1);
+    const latest = await core.latestBulkReview(db, pid);
+    const t1 = await core.applyBulkReview(db, pid, latest!.id);
+    expect(t1!.kcal).toBe(t0!.kcal + 150);
+    expect(t1!.kcalAdjust).toBe(150);
+    expect(await core.applyBulkReview(db, pid, latest!.id)).toBeNull(); // only once
+    // A weigh-in recomputes the targets: the adjustment stays.
+    expect((await core.recomputeTargets(db, pid))!.kcal).toBe(t0!.kcal + 150);
+    // Manual targets move by the difference and stay manual.
+    await db.update(targetSets).set({ mode: "fixed", kcal: 3000, carbs: 350 }).where(eq(targetSets.id, t1!.id));
+    const t2 = await core.setKcalAdjust(db, pid, 0);
+    expect(t2).toMatchObject({ mode: "fixed", kcal: 2850, kcalAdjust: 0 });
+    expect(t2.carbs).toBe(313);
+    // Not for other goals.
+    expect(await core.weeklyBulkReview(db, personId, now)).toBeNull();
+  });
+});

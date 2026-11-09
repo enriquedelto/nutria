@@ -17,3 +17,4 @@ export * from "./proposals";
 export * from "./kitchen";
 export * from "./receipts";
 export * from "./openprices";
+export * from "./bulk";

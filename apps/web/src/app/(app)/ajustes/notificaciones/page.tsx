@@ -17,6 +17,7 @@ const TYPES: { type: string; label: string; hint: string; times?: string[] }[] =
   { type: "fasting", label: "Ayuno", hint: "Al completar la meta" },
   { type: "expiry", label: "Caducidades", hint: "Productos de la despensa a punto de caducar" },
   { type: "weekly_report", label: "Informe semanal", hint: "Cada lunes" },
+  { type: "bulk_review", label: "Revisión del volumen", hint: "Los lunes, si conviene cambiar las calorías (objetivo ganar)" },
   { type: "plan_ready", label: "Plan listo", hint: "Cuando la IA termina un plan" },
   { type: "retro", label: "Retrospectiva", hint: "Valorar los platos de la semana" },
   { type: "challenge", label: "Retos", hint: "Avances y resultados" },

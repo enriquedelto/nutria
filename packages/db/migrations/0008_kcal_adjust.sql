@@ -1,0 +1,1 @@
+ALTER TABLE "target_sets" ADD COLUMN "kcal_adjust" real DEFAULT 0 NOT NULL;

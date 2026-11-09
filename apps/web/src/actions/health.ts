@@ -24,12 +24,11 @@ import {
   stepLogs,
   supplementSchedules,
   symptomLogs,
-  tdeeEstimates,
   targetSets,
   weightLogs,
   type AccessScope,
 } from "@nutria/db";
-import { acceptTdeeEstimate, addSupplementPlan, latestWeight, missingProfileFields, recomputeDay, recomputeTargets, takeSupplement, untakeSupplement } from "@nutria/core";
+import { acceptTdeeEstimate, addSupplementPlan, applyBulkReview, setKcalAdjust, weeklyBulkReview, latestWeight, missingProfileFields, recomputeDay, recomputeTargets, takeSupplement, untakeSupplement } from "@nutria/core";
 import { detectSubstance, exerciseKcal, stepsKcal, SUPPLEMENT_BY_CODE } from "@nutria/nutrition";
 import { db } from "@/lib/db";
 import { emit } from "@/lib/events";
@@ -93,6 +92,35 @@ export async function acceptTdee(personId: string, estimateId: string) {
   await guard(personId, "body");
   if (!(await acceptTdeeEstimate(db(), personId, uuid.parse(estimateId)))) throw new UserError("Estimación no disponible");
   refresh();
+}
+
+/** Apply the kcal proposal of a bulk review (kept as an adjustment over the expenditure). */
+export async function applyBulkReviewAction(personId: string, insightId: string) {
+  await guard(personId, "body");
+  try {
+    await applyBulkReview(db(), personId, uuid.parse(insightId));
+  } catch (e) {
+    throw new UserError(e instanceof Error ? e.message : "No se pudo aplicar");
+  }
+  refresh();
+}
+
+/** Remove the accepted kcal adjustment (back to the estimated expenditure). */
+export async function clearKcalAdjust(personId: string) {
+  await guard(personId, "body");
+  await setKcalAdjust(db(), personId, 0).catch((e) => {
+    throw new UserError(e instanceof Error ? e.message : "No se pudo quitar el ajuste");
+  });
+  refresh();
+}
+
+/** Build this week's bulk review now (it also runs by itself on Mondays). */
+export async function reviewBulkNow(personId: string) {
+  await guard(personId, "body");
+  const r = await weeklyBulkReview(db(), personId);
+  if (!r) throw new UserError("La revisión del volumen es para el objetivo «ganar peso» y necesita tu perfil completo");
+  refresh();
+  return { verdict: r.verdict };
 }
 
 /* ---------------------------- activity ---------------------------- */

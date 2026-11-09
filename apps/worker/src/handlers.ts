@@ -43,6 +43,7 @@ import {
   toCsv,
   uploadDir,
   weeklyAdaptiveTdee,
+  weeklyBulkReview,
   type JobName,
   type JobPayloads,
   assignFoodGroups,
@@ -91,6 +92,13 @@ export const handlers: Handlers = {
     const ids = personId ? [{ id: personId }] : await personsWithWeight(db);
     let n = 0;
     for (const p of ids) if (await weeklyAdaptiveTdee(db, p.id).catch((e) => log.warn("tdee", { personId: p.id, error: String(e) }))) n++;
+    return { persons: n };
+  },
+
+  [JOBS.bulkWeekly]: async ({ personId }, { db }) => {
+    const ids = personId ? [{ id: personId }] : await personsWithWeight(db);
+    let n = 0;
+    for (const p of ids) if (await weeklyBulkReview(db, p.id).catch((e) => log.warn("volumen", { personId: p.id, error: String(e) }))) n++;
     return { persons: n };
   },
 
