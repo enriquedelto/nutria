@@ -110,7 +110,7 @@ export function CatalogItem({ personId, item, canWrite }: { personId: string; it
             </div>
           </div>
         ) : (
-          <Button type="button" size="sm" variant="outline" className="mt-2" onClick={() => setOpen(true)}>
+          <Button type="button" size="sm" variant="outline" className="mt-2" aria-label={`Añadir pauta: ${item.name}`} onClick={() => setOpen(true)}>
             <Plus /> Añadir pauta
           </Button>
         )
