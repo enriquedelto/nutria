@@ -432,7 +432,7 @@ test("openGym: emparejar con código, importar entreno con sus ejercicios y refl
   await expect(page.getByText("Código de emparejamiento no válido o caducado")).toBeVisible();
   await page.getByLabel("Código de emparejamiento").fill("k7wq2mzp");
   await page.getByRole("button", { name: "Conectar" }).click();
-  await expect(page.getByText("openGym conectado: 1 entrenos y 1 pesajes importados")).toBeVisible();
+  await expect(page.getByText("openGym conectado: 1 entreno y 1 pesaje importados")).toBeVisible();
   await expect(page.getByText(/Se sincroniza sola cada 2 min/)).toBeVisible();
   await expect(page.getByText("Ana (openGym)", { exact: false })).toBeVisible();
   await expect(page.getByText("api/hooks/opengym")).toHaveCount(0);
@@ -454,7 +454,7 @@ test("openGym: emparejar con código, importar entreno con sus ejercicios y refl
   await page.request.post(`${fakes}/fake/og/delete`);
   await page.goto("/ajustes/integraciones");
   await page.getByRole("button", { name: "Sincronizar ahora" }).click();
-  await expect(page.getByText("Sincronizado: 0 entrenos y 1 pesajes · 1 borrados")).toBeVisible();
+  await expect(page.getByText("Sincronizado: 0 entrenos y 1 pesaje · 1 borrado")).toBeVisible();
   await page.goto("/salud/ejercicio");
   await expect(page.getByText("Pierna (openGym e2e)")).toHaveCount(0);
 });
@@ -512,8 +512,8 @@ test("todas las páginas cargan sin errores de servidor", async () => {
 
 /**
  * Phone pass over every page: no horizontal overflow, no client errors, no 5xx, and every dialog
- * (Radix triggers) opens and closes cleanly. With E2E_EXPLORE_DIR it also writes a report with
- * softer findings (icon buttons without a name, images without alt, slow pages) and screenshots.
+ * (Radix triggers) opens and closes cleanly; buttons/links have a name and images an alt.
+ * With E2E_EXPLORE_DIR it also writes a report (console errors, 4xx, slow pages) and screenshots.
  */
 test("en el móvil, ninguna página desborda ni da errores", async ({ browser }) => {
   test.setTimeout(300_000);
@@ -576,8 +576,9 @@ test("en el móvil, ninguna página desborda ni da errores", async ({ browser })
     expect(res?.status(), r).toBeLessThan(500);
     if (ms > 2500) report.push({ route: r, kind: "lento", detail: `${ms} ms` });
     for (const o of await overflow()) hard.push(`${r}: desborda ${o}`);
+    // Buttons and links need an accessible name; images an alt.
+    for (const x of await soft()) hard.push(`${r}: ${x}`);
     if (dir) {
-      for (const x of await soft()) report.push({ route: r, kind: "a11y", detail: x });
       await page.screenshot({ path: join(dir, `${r.replace(/\//g, "_") || "_"}.png`), fullPage: true });
     }
     // Open and close each dialog trigger (bounded) and check the sheet fits too.

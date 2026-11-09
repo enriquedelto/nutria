@@ -10,7 +10,7 @@ import { Badge } from "@/components/ui/badge";
 import { Card, CardHeader } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/empty";
 import { db } from "@/lib/db";
-import { dateShort, n0 } from "@/lib/format";
+import { dateShort, n0, plural } from "@/lib/format";
 import { kitchenContext } from "@/lib/kitchen";
 import { getCurrentUser } from "@/lib/session";
 import { AddPerson, HouseholdPrefs, InviteMember, MemberActions, RenameGroup, RevokeInvite } from "./family-client";
@@ -102,7 +102,7 @@ async function Content() {
     <div className="grid gap-4 lg:grid-cols-2">
       <div className="space-y-4">
         <Card>
-          <CardHeader title={g?.name ?? "Hogar"} subtitle={`${members.length} ${members.length === 1 ? "cuenta" : "cuentas"} · ${groupPersons.length} personas`} action={isAdmin ? <RenameGroup name={g?.name ?? ""} /> : null} />
+          <CardHeader title={g?.name ?? "Hogar"} subtitle={`${members.length} ${members.length === 1 ? "cuenta" : "cuentas"} · ${plural(groupPersons.length, "persona", "personas")}`} action={isAdmin ? <RenameGroup name={g?.name ?? ""} /> : null} />
           <ul className="divide-y divide-line">
             {inGroup.map((a) => (
               <PersonRow key={a.person.id} a={a} />

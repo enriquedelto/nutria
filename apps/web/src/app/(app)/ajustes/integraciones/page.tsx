@@ -8,6 +8,7 @@ import { Skeleton } from "@/components/ui/empty";
 import { db } from "@/lib/db";
 import { getPersonContext } from "@/lib/session";
 import { CodeLine, IntegrationActions, NewToken, NewWebhook, OpenGymConnect, RevokeToken, WebhookActions } from "./integrations-client";
+import { plural } from "@/lib/format";
 
 export const metadata = { title: "Integraciones" };
 
@@ -52,7 +53,7 @@ async function Content() {
                 </p>
                 <p className="text-xs text-ink-3">
                   Se sincroniza sola cada 2 min · última {ago(ogHere.lastSyncAt)}
-                  {typeof ogHere.meta.workouts === "number" ? ` · ${ogHere.meta.workouts} entrenos y ${ogHere.meta.weighIns ?? 0} pesajes` : ""}
+                  {typeof ogHere.meta.workouts === "number" ? ` · ${plural(ogHere.meta.workouts, "entreno", "entrenos")} y ${plural(Number(ogHere.meta.weighIns ?? 0), "pesaje", "pesajes")}` : ""}
                 </p>
                 {ogHere.lastError ? <p className="mt-1 text-xs text-danger">{ogHere.lastError}</p> : null}
               </div>

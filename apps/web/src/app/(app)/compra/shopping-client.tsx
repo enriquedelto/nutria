@@ -10,6 +10,7 @@ import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
+import { plural } from "@/lib/format";
 
 export type Item = { id: string; name: string; quantity: number | null; unit: string | null; category: string; checked: boolean; estimatedPrice: number | null; storeProductId: string | null };
 
@@ -66,9 +67,9 @@ export function ShoppingClient({ listId, items, categories, planId, store }: { l
           if (text.trim()) add(text);
         }}
       >
-        <Input ref={input} value={text} onChange={(e) => setText(e.target.value)} placeholder="Añadir: 2 kg patatas, leche x3…" aria-label="Añadir a la lista" enterKeyHint="done" />
-        <VoiceInput onText={(t, final) => (final ? add(t) : setText(t))} />
-        <Button type="submit" size="icon" disabled={pending || !text.trim()} aria-label="Añadir">
+        <Input ref={input} value={text} onChange={(e) => setText(e.target.value)} placeholder="Añadir: 2 kg patatas, leche x3…" aria-label="Añadir a la lista" enterKeyHint="done" className="min-w-0 flex-1" />
+        <VoiceInput onText={(t, final) => (final ? add(t) : setText(t))} className="h-11 shrink-0 px-3" />
+        <Button type="submit" size="icon" className="size-11 shrink-0" disabled={pending || !text.trim()} aria-label="Añadir">
           <Plus />
         </Button>
       </form>
@@ -77,7 +78,7 @@ export function ShoppingClient({ listId, items, categories, planId, store }: { l
         {planId ? (
           <Button size="sm" variant="outline" disabled={pending} onClick={() => start(async () => {
             const r = await shoppingFromPlanAction(planId);
-            toast.success(`${r.added} productos añadidos desde el plan (ya descontada la despensa)`);
+            toast.success(`${plural(r.added, "producto añadido", "productos añadidos")} desde el plan (ya descontada la despensa)`);
           })}>
             <CalendarDays /> Desde el plan
           </Button>
@@ -92,7 +93,7 @@ export function ShoppingClient({ listId, items, categories, planId, store }: { l
           <>
             <Button size="sm" variant="outline" disabled={pending} onClick={() => start(async () => {
               const n = await autoLinkProducts(listId, store.code);
-              toast(n ? `${n} productos de ${store.name} asignados` : "Nada nuevo que asignar");
+              toast(n ? `${plural(n, "producto", "productos")} de ${store.name} ${n === 1 ? "asignado" : "asignados"}` : "Nada nuevo que asignar");
             })}>
               <Link2 /> Asignar productos
             </Button>
@@ -132,7 +133,7 @@ export function ShoppingClient({ listId, items, categories, planId, store }: { l
             <h2 className="text-xs font-semibold uppercase tracking-wide text-ink-3">En el carro ({done.length})</h2>
             <Button size="sm" disabled={pending} onClick={() => start(async () => {
               const r = await finishShopping(listId, true);
-              toast.success(`Compra terminada: ${r.bought} productos a la despensa${r.moved ? `, ${r.moved} pendientes pasan a la próxima` : ""}`);
+              toast.success(`Compra terminada: ${plural(r.bought, "producto", "productos")} a la despensa${r.moved ? `, ${r.moved} pendientes pasan a la próxima` : ""}`);
             })}>
               <Check /> Terminar compra
             </Button>

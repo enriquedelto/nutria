@@ -27,7 +27,7 @@ async function Content({ searchParams }: { searchParams: Promise<Record<string, 
   }
   return (
     <>
-      <PageHeader title="Registrar con IA" subtitle={<span className="capitalize">{dateLong(date)} · {ctx.person.name}</span>} />
+      <PageHeader title="Registrar con IA" subtitle={<span className="inline-block first-letter:uppercase">{dateLong(date)} · {ctx.person.name}</span>} />
       <RegisterClient
         aiEnabled={aiConfigured() && ctx.scopes.has("ai")}
         sharedImages={shared}

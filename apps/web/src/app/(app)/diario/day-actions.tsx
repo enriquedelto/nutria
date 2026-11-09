@@ -10,6 +10,7 @@ import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent } from "@/components/ui/dialog";
 import { Field, Input, Select, Textarea } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
+import { plural } from "@/lib/format";
 
 type TemplateItem = { foodId?: string; name: string; grams: number; servingLabel?: string };
 
@@ -19,7 +20,7 @@ export function DayActions({ personId, date, today, complete, hasEntries, meals 
   return (
     <div className="flex flex-wrap gap-2">
       {hasEntries && date !== today ? (
-        <Button variant="outline" disabled={pending} onClick={() => start(async () => void toast.success(`${await copyMealTo(personId, date, today)} alimentos copiados a hoy`))}>
+        <Button variant="outline" disabled={pending} onClick={() => start(async () => void toast.success(`${plural(await copyMealTo(personId, date, today), "alimento copiado", "alimentos copiados")} a hoy`))}>
           <Copy /> Copiar día a hoy
         </Button>
       ) : null}

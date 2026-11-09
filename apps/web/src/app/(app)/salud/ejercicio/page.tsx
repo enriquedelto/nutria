@@ -9,7 +9,7 @@ import { Badge } from "@/components/ui/badge";
 import { Card, CardHeader } from "@/components/ui/card";
 import { Empty, Skeleton } from "@/components/ui/empty";
 import { db } from "@/lib/db";
-import { dateShort, n0, relativeDay } from "@/lib/format";
+import { dateShort, n0, plural, relativeDay, sourceLabel } from "@/lib/format";
 import { trainingProgress, workoutExercises, type TrainingSet } from "@/lib/data/training";
 import { Sparkline } from "@/components/charts/sparkline";
 import { requireScope } from "@/lib/session";
@@ -69,7 +69,7 @@ async function Content() {
     <div className="grid gap-4 lg:grid-cols-[1fr_22rem]">
       <div className="space-y-4">
         <Card>
-          <CardHeader title="Gasto por ejercicio" subtitle={`Esta semana: ${week.length} sesiones · ${n0(weekMin)} min · ${n0(week.reduce((a, l) => a + l.kcal, 0))} kcal`} />
+          <CardHeader title="Gasto por ejercicio" subtitle={`Esta semana: ${plural(week.length, "sesión", "sesiones")} · ${n0(weekMin)} min · ${n0(week.reduce((a, l) => a + l.kcal, 0))} kcal`} />
           <SeriesChart data={days.map((d) => ({ date: d, value: kcalBy.get(d) ?? null }))} color="var(--persimmon)" unit="kcal" />
           <p className="mt-2 text-xs text-ink-3">La OMS recomienda al menos 150 min/semana de actividad moderada. {weekMin >= 150 ? "¡Cumplido esta semana!" : `Te faltan ${n0(150 - weekMin)} min.`}</p>
           {ctx.canWrite ? (
@@ -98,7 +98,7 @@ async function Content() {
                         {l.volumeKg ? <span className="text-ink-3"> · {n0(l.volumeKg)} kg de volumen</span> : null}
                       </span>
                       <span className="num">{n0(l.kcal)} kcal</span>
-                      {l.source !== "manual" ? <Badge>{l.source}</Badge> : ctx.canWrite ? <DeleteExercise personId={pid} id={l.id} /> : null}
+                      {l.source !== "manual" ? <Badge>{sourceLabel(l.source)}</Badge> : ctx.canWrite ? <DeleteExercise personId={pid} id={l.id} /> : null}
                     </div>
                     {exs.length ? (
                       <details className="group ml-23 mt-1">
@@ -130,7 +130,7 @@ async function Content() {
         <Card>
           <CardHeader
             title="Progreso del entreno"
-            subtitle={`Últimos 6 meses: ${progress.weekly.reduce((a, w) => a + w.sessions, 0)} sesiones · ${recentWeeks.length} de ${progress.weekly.length} semanas con entreno`}
+            subtitle={`Últimos 6 meses: ${plural(progress.weekly.reduce((a, w) => a + w.sessions, 0), "sesión", "sesiones")} · ${recentWeeks.length} de ${progress.weekly.length} semanas con entreno`}
           />
           {hasVolume ? <SeriesChart data={progress.weekly.map((w) => ({ date: w.date, value: w.volumeKg ? Math.round(w.volumeKg / 100) / 10 : null }))} color="var(--persimmon)" unit="t por semana" /> : null}
           {progress.lifts.length ? (
@@ -145,7 +145,7 @@ async function Content() {
                         <span className="num">
                           {n0(x.best.kg)} kg × {x.best.reps}
                         </span>{" "}
-                        · 1RM estimado <span className="num">{n0(x.best.e1rm)} kg</span> · {dateShort(x.best.date)}{x.best.date.slice(0, 4) !== today.slice(0, 4) ? ` ${x.best.date.slice(0, 4)}` : ""} · {x.sessions} sesiones
+                        · 1RM estimado <span className="num">{n0(x.best.e1rm)} kg</span> · {dateShort(x.best.date)}{x.best.date.slice(0, 4) !== today.slice(0, 4) ? ` ${x.best.date.slice(0, 4)}` : ""} · {plural(x.sessions, "sesión", "sesiones")}
                       </p>
                     </div>
                     <Sparkline values={x.trend} className="h-8 w-20 shrink-0" color="var(--persimmon)" />

@@ -77,7 +77,7 @@ async function Today() {
           <Flame className="size-6" />
         </span>
         <div>
-          <p className="num font-display text-2xl font-semibold">{extras.streak?.current ?? 0} días</p>
+          <p className="num font-display text-2xl font-semibold">{extras.streak?.current ?? 0} {extras.streak?.current === 1 ? "día" : "días"}</p>
           <p className="text-sm text-ink-2">registrando seguido · mejor: {extras.streak?.best ?? 0}</p>
         </div>
       </Card>
@@ -137,7 +137,7 @@ async function Today() {
     <>
       <div className="mb-5 flex flex-wrap items-end justify-between gap-3">
         <div>
-          <p className="text-sm font-medium capitalize text-ink-2">{dateLong(date)}</p>
+          <p className="text-sm font-medium text-ink-2 first-letter:uppercase">{dateLong(date)}</p>
           <h1 className="text-3xl font-semibold sm:text-4xl">
             {ctx.person.isSelf ? `Hola, ${ctx.user.name.split(" ")[0]}` : `Hoy de ${ctx.person.name}`}
           </h1>

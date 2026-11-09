@@ -38,7 +38,7 @@ export function WaterCard({ personId, date, ml, goal, canWrite }: { personId: st
     <div className="space-y-3">
       <div className="flex items-end justify-between">
         <p className="num font-display text-3xl font-semibold">
-          {(optimistic / 1000).toLocaleString("es-ES", { maximumFractionDigits: 2 })} <span className="text-base font-normal text-ink-2">/ {goal / 1000} l</span>
+          {(optimistic / 1000).toLocaleString("es-ES", { maximumFractionDigits: 2 })} <span className="text-base font-normal text-ink-2">/ {(goal / 1000).toLocaleString("es-ES", { maximumFractionDigits: 2 })} L</span>
         </p>
         <div className="flex gap-0.5" aria-hidden>
           {Array.from({ length: Math.min(12, Math.max(8, Math.ceil(goal / 250))) }).map((_, i) => (

@@ -71,8 +71,8 @@ async function Content() {
           <CardHeader title="Tuppers" subtitle="Se descuentan al registrarlos en el diario" />
           <ul className="divide-y divide-line text-sm">
             {tuppers.map((b) => (
-              <li key={b.id} className="flex items-center gap-2 py-2">
-                <span className="min-w-0 flex-1">
+              <li key={b.id} className="flex flex-wrap items-center gap-2 py-2">
+                <span className="min-w-[14rem] flex-1">
                   <b className="font-medium">{b.title}</b> <span className="num text-ink-2">· {n1(b.portionsLeft)} de {n1(b.portionsTotal)} raciones</span>
                   <span className={`block text-xs ${expiryStatus(b.expiresOn, today) === "ok" || !b.expiresOn ? "text-ink-3" : "font-semibold text-persimmon"}`}>
                     {b.location} · cocinado el {dateShort(b.cookedOn)} · {label(b.expiresOn, today)}
@@ -97,7 +97,7 @@ async function Content() {
                       <Icon className="size-5 text-herb" /> {name}
                     </span>
                   }
-                  subtitle={`${here.length} productos`}
+                  subtitle={`${here.length} ${here.length === 1 ? "producto" : "productos"}`}
                 />
                 <ul className="divide-y divide-line">
                   {here.map((i) => (

@@ -468,13 +468,14 @@ export function MedicationActions({ personId, id, active }: { personId: string; 
 
 /* ------------------------------- conditions ------------------------------- */
 
-export function ConditionToggle({ personId, code, active }: { personId: string; code: string; active: boolean }) {
+export function ConditionToggle({ personId, code, active, label }: { personId: string; code: string; active: boolean; label: string }) {
   const [pending, start] = useSafeTransition();
   return (
     <button
       type="button"
       role="switch"
       aria-checked={active}
+      aria-label={label}
       disabled={pending}
       onClick={() => start(() => setCondition(personId, code, !active))}
       className={cn("relative h-6 w-11 shrink-0 rounded-full transition-colors", active ? "bg-herb" : "bg-line")}

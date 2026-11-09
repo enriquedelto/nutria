@@ -35,7 +35,7 @@ async function Content() {
                   </p>
                   {c.description ? <p className="mt-1 text-sm text-ink-2">{c.description}</p> : null}
                 </div>
-                {ctx.canWrite ? <ConditionToggle personId={pid} code={c.code} active={!!on} /> : on ? <Badge tone="herb">activa</Badge> : null}
+                {ctx.canWrite ? <ConditionToggle personId={pid} code={c.code} active={!!on} label={c.nameEs} /> : on ? <Badge tone="herb">activa</Badge> : null}
               </div>
             </Card>
           );

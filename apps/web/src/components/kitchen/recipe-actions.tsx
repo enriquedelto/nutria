@@ -14,6 +14,7 @@ import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent } from "@/components/ui/dialog";
 import { Field, Input, Select } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
+import { plural } from "@/lib/format";
 
 type Ing = { id: string; rawText: string; grams: number | null; quantity: number | null; unit: string | null; section: string | null; optional: boolean; food: { id: string; name: string } | null };
 
@@ -24,7 +25,6 @@ export function ScaledIngredients({ ingredients, baseServings }: { ingredients: 
   const [s, setS] = useState(baseServings);
   const f = s / (baseServings || 1);
   const [checked, setChecked] = useState<Set<string>>(new Set());
-  let section: string | null = null;
   return (
     <div>
       <div className="mb-3 flex items-center gap-2">
@@ -38,8 +38,8 @@ export function ScaledIngredients({ ingredients, baseServings }: { ingredients: 
         </Button>
       </div>
       <ul className="space-y-1.5 text-sm">
-        {ingredients.map((i) => {
-          const head = i.section && i.section !== section ? ((section = i.section), i.section) : null;
+        {ingredients.map((i, idx) => {
+          const head = i.section && i.section !== ingredients[idx - 1]?.section ? i.section : null;
           const scaled = f !== 1 && (i.grams != null || i.quantity != null);
           return (
             <li key={i.id}>
@@ -114,7 +114,7 @@ export function LogRecipe({ personId, foodId, servingGrams, title, slots, defaul
               {batch ? (
                 <label className="flex items-center gap-2 text-sm">
                   <input type="checkbox" name="fromBatch" defaultChecked className="accent-[var(--herb)]" />
-                  Sale de un tupper (quedan {batch.left} raciones)
+                  Sale de un tupper (quedan {plural(batch.left, "ración", "raciones")})
                 </label>
               ) : null}
               <Button type="submit" className="w-full" disabled={pending}>
@@ -144,7 +144,7 @@ export function CookDialog({ recipeId, servings, freezable, timezone }: { recipe
               onSubmit={submitForm((fd) =>
                 start(async () => {
                   const r = await cookAction({ recipeId, servings: Number(fd.get("servings")), batchPortions: Number(fd.get("batch") || 0), location: String(fd.get("loc")) as "nevera", timezone });
-                  toast.success(`${r.used.length ? `Despensa actualizada (${r.used.length} productos)` : "Hecho"}${r.batchId ? " · tuppers guardados" : ""}`);
+                  toast.success(`${r.used.length ? `Despensa actualizada (${plural(r.used.length, "producto", "productos")})` : "Hecho"}${r.batchId ? " · tuppers guardados" : ""}`);
                   setOpen(false);
                 })
               )}

@@ -21,7 +21,7 @@ async function Content({ searchParams }: { searchParams: Promise<Record<string, 
   const slot = slots.some((s) => s.key === wanted) ? wanted : (slots[0]?.key ?? "lunch");
   return (
     <>
-      <PageHeader title="Buscar" subtitle={<span className="capitalize">{dateLong(date)} · {slots.find((s) => s.key === slot)?.label}</span>} />
+      <PageHeader title="Buscar" subtitle={<span className="inline-block first-letter:uppercase">{dateLong(date)} · {slots.find((s) => s.key === slot)?.label}</span>} />
       <SearchClient
         ctx={{
           personId: ctx.person.id,

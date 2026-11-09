@@ -33,6 +33,8 @@ async function Content({ params }: { params: PageProps<"/recetas/[id]">["params"
   const mine = ratings.filter((x) => x.personId === k.person.id).at(-1);
   const avg = ratings.filter((x) => x.stars).reduce((a, x, _, arr) => a + x.stars! / arr.length, 0);
   const micros = CORE_MICROS.filter((c) => (r.nutrientsPerServing[c] ?? 0) > 0);
+  // Ingredients that add nothing to the nutrition (no food matched or no amount in grams).
+  const missing = d.ingredients.filter((i) => !i.optional && (!i.foodId || !i.grams));
   const tz = k.person.timezone;
   const today = todayIn(tz);
 
@@ -131,6 +133,17 @@ async function Content({ params }: { params: PageProps<"/recetas/[id]">["params"
                   </li>
                 ))}
               </ul>
+            ) : null}
+            {missing.length ? (
+              <p className="mt-3 rounded-xl bg-warn/15 p-2 text-xs text-ink-2" role="note">
+                {missing.length === d.ingredients.length ? "Ningún ingrediente tiene" : `${missing.length} ${missing.length === 1 ? "ingrediente no tiene" : "ingredientes no tienen"}`} datos nutricionales
+                {missing.length < d.ingredients.length ? ` (${missing.slice(0, 3).map((i) => i.rawText).join(", ")}${missing.length > 3 ? "…" : ""})` : ""}, así que los valores se quedan cortos. Ponles cantidad («200 g de…») y un nombre reconocible.{" "}
+                {k.canWrite ? (
+                  <Link href={`/recetas/${r.id}/editar`} className="font-medium text-herb underline-offset-2 hover:underline">
+                    Editar receta
+                  </Link>
+                ) : null}
+              </p>
             ) : null}
             {r.costPerServing ? <p className="mt-3 text-sm">Coste: <b className="num">{Number(r.costPerServing).toLocaleString("es-ES", { style: "currency", currency: "EUR" })}</b> por ración</p> : null}
             {r.tags.length ? (

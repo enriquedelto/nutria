@@ -45,3 +45,9 @@ export const kg = (v: number | null | undefined) => (v == null ? "—" : `${nf1.
 export const pct = (v: number | null | undefined) => (v == null ? "—" : `${nf0.format(v)} %`);
 
 export const isDate = (s: unknown): s is string => typeof s === "string" && /^\d{4}-\d{2}-\d{2}$/.test(s);
+
+/** Display name of a data source (integrations are stored lowercase). */
+export const sourceLabel = (s: string) => ({ opengym: "openGym", ai: "IA", import: "importado", api: "API", webhook: "webhook" })[s] ?? s;
+
+/** «1 sesión», «3 sesiones». */
+export const plural = (n: number, one: string, many: string) => `${n.toLocaleString("es-ES")} ${n === 1 ? one : many}`;

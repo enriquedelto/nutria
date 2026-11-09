@@ -12,6 +12,7 @@ import { Dialog, DialogContent } from "@/components/ui/dialog";
 import { Field, Input, Select } from "@/components/ui/input";
 import { fileToJpeg } from "@/lib/image";
 import { cn } from "@/lib/utils";
+import { plural } from "@/lib/format";
 
 type Loc = "nevera" | "congelador" | "despensa";
 
@@ -128,7 +129,7 @@ export function AddPantry({ defaultLocation = "despensa" }: { defaultLocation?: 
             </ul>
             <Button className="mt-3 w-full" disabled={pending} onClick={() => start(async () => {
               await confirmPantryDraft(draft.estimateId, draft.items);
-              toast.success(`${draft.items.length} productos guardados`);
+              toast.success(`${plural(draft.items.length, "producto guardado", "productos guardados")}`);
               setDraft(null);
             })}>
               Guardar {draft.items.length}

@@ -11,7 +11,7 @@ import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent } from "@/components/ui/dialog";
 import { Field, Input, Select } from "@/components/ui/input";
 import { fileToJpeg } from "@/lib/image";
-import { dateShort, kg } from "@/lib/format";
+import { dateShort, kg, sourceLabel } from "@/lib/format";
 
 export function WeightForm({ personId, today }: { personId: string; today: string }) {
   const [pending, start] = useSafeTransition();
@@ -54,7 +54,7 @@ export function WeightList({ personId, items, canWrite }: { personId: string; it
           <span className="num flex-1 font-medium">
             {kg(w.kg)}
             {w.bodyFatPct ? <span className="ml-2 text-ink-3">{w.bodyFatPct} % grasa</span> : null}
-            {w.source !== "manual" ? <span className="ml-2 text-xs text-ink-3">({w.source})</span> : null}
+            {w.source !== "manual" ? <span className="ml-2 text-xs text-ink-3">({sourceLabel(w.source)})</span> : null}
           </span>
           {canWrite ? (
             <button type="button" aria-label="Borrar" className="rounded-full p-1 text-ink-3 hover:bg-paper-2" onClick={() => start(() => deleteWeight(personId, w.id))}>

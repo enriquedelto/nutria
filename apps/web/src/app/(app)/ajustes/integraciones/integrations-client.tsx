@@ -9,6 +9,7 @@ import { connectOpenGym, createApiToken, createWebhook, deleteWebhook, disconnec
 import { Button } from "@/components/ui/button";
 import { Field, Input, Select } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
+import { plural } from "@/lib/format";
 
 const copy = (s: string) => void navigator.clipboard.writeText(s).then(() => toast.success("Copiado"));
 
@@ -177,7 +178,7 @@ export function OpenGymConnect({ personId, defaultUrl, label = "Conectar" }: { p
         start(async () => {
           try {
             const r = await connectOpenGym(personId, String(fd.get("url")), String(fd.get("code")));
-            toast.success(r ? `openGym conectado: ${r.exercises} entrenos y ${r.weights} pesajes importados` : "openGym conectado. Importando historial…");
+            toast.success(r ? `openGym conectado: ${plural(r.exercises, "entreno", "entrenos")} y ${plural(r.weights, "pesaje", "pesajes")} importados` : "openGym conectado. Importando historial…");
           } catch (e) {
             toast.error(errorText(e, "No se pudo emparejar"));
           }
@@ -209,7 +210,7 @@ export function IntegrationActions({ id }: { id: string }) {
           start(async () => {
             const r = await syncIntegration(id);
             if (!r) return;
-            toast.success(r.fetched ? `Sincronizado: ${r.exercises} entrenos y ${r.weights} pesajes${r.removed ? ` · ${r.removed} borrados` : ""}` : "Sin cambios desde la última vez");
+            toast.success(r.fetched ? `Sincronizado: ${plural(r.exercises, "entreno", "entrenos")} y ${plural(r.weights, "pesaje", "pesajes")}${r.removed ? ` · ${plural(r.removed, "borrado", "borrados")}` : ""}` : "Sin cambios desde la última vez");
           })
         }
       >
