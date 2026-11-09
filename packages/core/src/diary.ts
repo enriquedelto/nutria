@@ -95,10 +95,47 @@ export async function addEntries(db: Database, input: AddEntriesInput) {
   return rows;
 }
 
-/** Update grams / locked values of an entry, re-scaling from its stored snapshot. */
-export async function updateEntry(db: Database, personId: string, id: string, patch: { grams?: number; mealSlot?: string; date?: string; lockedValues?: NutrientMap; note?: string | null }) {
+/**
+ * Update grams / locked values of an entry, re-scaling from its stored snapshot.
+ * With `foodId` the entry is swapped to another food (same grams unless given): name, brand and
+ * nutrients come from the new food and earlier corrections are dropped.
+ */
+export async function updateEntry(db: Database, personId: string, id: string, patch: { grams?: number; mealSlot?: string; date?: string; lockedValues?: NutrientMap; note?: string | null; foodId?: string }) {
   const [e] = await db.select().from(diaryEntries).where(and(eq(diaryEntries.id, id), eq(diaryEntries.personId, personId))).limit(1);
   if (!e) return null;
+  if (patch.foodId && patch.foodId !== e.foodId) {
+    const [f] = await db.select().from(foods).where(eq(foods.id, patch.foodId)).limit(1);
+    if (!f) throw new Error("Alimento no encontrado");
+    const grams = patch.grams ?? (e.grams > 0 ? e.grams : 100);
+    const nutrients = scaleNutrients({ ...f.nutrients, ...(f.kcal != null ? { energy_kcal: f.kcal } : {}) }, grams);
+    const [u] = await db
+      .update(diaryEntries)
+      .set({
+        foodId: f.id,
+        recipeId: null,
+        batchId: null,
+        name: f.nameEs ?? f.name,
+        brand: f.brand,
+        grams,
+        servingLabel: null,
+        servingQty: null,
+        nutrients,
+        ...macroColumns(nutrients),
+        lockedValues: {},
+        nova: f.nova,
+        nutriscore: f.nutriscore,
+        quick: false,
+        mealSlot: patch.mealSlot ?? e.mealSlot,
+        date: patch.date ?? e.date,
+        note: patch.note === undefined ? e.note : patch.note,
+      })
+      .where(eq(diaryEntries.id, id))
+      .returning();
+    await db.update(foods).set({ popularity: sql`${foods.popularity} + 1` }).where(eq(foods.id, f.id));
+    await recomputeDay(db, personId, e.date);
+    if (patch.date && patch.date !== e.date) await recomputeDay(db, personId, patch.date);
+    return u!;
+  }
   let nutrients = e.nutrients;
   const grams = patch.grams ?? e.grams;
   if (!e.quick && (patch.grams != null || patch.lockedValues)) {

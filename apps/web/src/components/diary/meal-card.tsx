@@ -3,12 +3,13 @@ import { submitForm } from "@/lib/forms";
 import { useState } from "react";
 import { useSafeTransition } from "@/lib/use-safe-transition";
 import Link from "next/link";
-import { Copy, MoreHorizontal, Plus, Sparkles, Trash2 } from "lucide-react";
+import { ArrowLeftRight, Copy, MoreHorizontal, Plus, Sparkles, Trash2 } from "lucide-react";
 import { DropdownMenu } from "radix-ui";
 import { toast } from "sonner";
 import { copyMealTo, editEntry, removeEntries } from "@/actions/diary";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent } from "@/components/ui/dialog";
+import { FoodPicker } from "@/components/food/food-picker";
 import { Field, Input, Select } from "@/components/ui/input";
 import { n0 } from "@/lib/format";
 
@@ -141,11 +142,47 @@ export function MealCard({
 function EditEntryDialog({ personId, entry, slots, onClose }: { personId: string; entry: MealEntry; slots: { key: string; label: string }[]; onClose: () => void }) {
   const [pending, start] = useSafeTransition();
   const [grams, setGrams] = useState(entry.grams);
+  const [swapping, setSwapping] = useState(false);
+  const [picked, setPicked] = useState<string | null>(null);
   const ratio = entry.grams > 0 ? grams / entry.grams : 1;
   return (
     <Dialog open onOpenChange={(o) => !o && onClose()}>
       <DialogContent title={entry.name} description={entry.brand ?? undefined}>
+        <div className="mb-4">
+          {swapping ? (
+            <div className="space-y-2">
+              <div className="flex items-center justify-between">
+                <p className="text-sm font-medium">Cambiar por otro alimento{entry.quick ? "" : ` (se mantienen ${n0(grams)} g)`}</p>
+                <Button type="button" size="sm" variant="ghost" onClick={() => setSwapping(false)}>
+                  Cancelar
+                </Button>
+              </div>
+              <FoodPicker
+                personId={personId}
+                initialQuery={entry.name}
+                busyId={picked}
+                onPick={(f) => {
+                  setPicked(f.id);
+                  start(async () => {
+                    try {
+                      await editEntry(personId, entry.id, { foodId: f.id, grams: entry.quick ? undefined : grams > 0 ? grams : undefined });
+                      toast.success(`Cambiado por ${f.name}`);
+                      onClose();
+                    } finally {
+                      setPicked(null);
+                    }
+                  });
+                }}
+              />
+            </div>
+          ) : (
+            <Button type="button" variant="outline" className="w-full" onClick={() => setSwapping(true)}>
+              <ArrowLeftRight /> Cambiar por otro alimento
+            </Button>
+          )}
+        </div>
         <form
+          hidden={swapping}
           className="space-y-4"
           onSubmit={submitForm((fd) =>
             start(async () => {

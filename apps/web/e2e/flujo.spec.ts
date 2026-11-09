@@ -131,6 +131,46 @@ test("coste de receta con precios de Open Prices", async () => {
   await expect(page.getByText(/Coste:\s*1,20\s€\s*por ración/)).toBeVisible();
 });
 
+test("diario: cambiar una entrada por otro alimento buscándolo", async () => {
+  const page = adminPage;
+  await page.goto("/diario");
+  await page.getByRole("button", { name: /Tortilla de patatas/ }).first().click();
+  await page.getByRole("button", { name: "Cambiar por otro alimento" }).click();
+  const search = page.getByRole("searchbox", { name: "Buscar otro alimento" });
+  await expect(search).toHaveValue("Tortilla de patatas");
+  await search.fill("quinoa ecológica");
+  await page.getByRole("button", { name: /Quinoa ecológica Nutria/ }).click();
+  await expect(page.getByText("Cambiado por Quinoa ecológica Nutria")).toBeVisible();
+  await expect(page.getByRole("button", { name: /Quinoa ecológica Nutria/ }).first()).toBeVisible();
+});
+
+test("registro por IA: buscar otro alimento antes de confirmar", async () => {
+  const page = adminPage;
+  await page.goto("/registrar");
+  await page.getByPlaceholder(/lentejas con chorizo/).fill("Tortilla");
+  await page.getByRole("button", { name: "Analizar" }).click();
+  await page.getByRole("button", { name: /^Buscar otro alimento para/ }).first().click();
+  await page.getByRole("searchbox", { name: "Buscar otro alimento" }).fill("quinoa ecológica");
+  await page.getByRole("button", { name: /Quinoa ecológica Nutria/ }).click();
+  await expect(page.getByText(/Base de datos: Quinoa ecológica Nutria/)).toBeVisible();
+  await page.getByRole("button", { name: "Volver" }).click();
+});
+
+test("coach: la respuesta aparece mientras se genera, sin romper la página", async () => {
+  const page = adminPage;
+  const errors: string[] = [];
+  page.on("pageerror", (e) => errors.push(e.message));
+  await page.goto("/coach");
+  await page.getByRole("button", { name: "¿Por qué no bajo de peso?" }).click();
+  await expect(page.getByText(/\(simulado\) He recibido: ¿Por qué no bajo de peso\?/)).toBeVisible();
+  await expect(page.getByText("Algo ha fallado")).toHaveCount(0);
+  await expect(page).toHaveURL(/\/coach\?c=/);
+  await page.getByRole("textbox", { name: "Mensaje" }).fill("Y otra pregunta");
+  await page.getByRole("button", { name: "Enviar" }).click();
+  await expect(page.getByText(/He recibido: Y otra pregunta/)).toBeVisible();
+  expect(errors).toEqual([]);
+});
+
 test("plan semanal: añadir la receta y mandarla a la compra", async () => {
   const page = adminPage;
   await page.goto("/planes");

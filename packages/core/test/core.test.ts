@@ -149,6 +149,20 @@ describe("diario", () => {
     const u2 = await core.updateEntry(db, personId, e!.id, { grams: 300 });
     expect(u2!.protein).toBeCloseTo(15);
   });
+  it("cambiar una entrada por otro alimento mantiene los gramos y descarta correcciones", async () => {
+    const [e] = await db.select().from(diaryEntries).where(eq(diaryEntries.clientId, "c1"));
+    const [soja] = await db.insert(foods).values({ source: "custom", name: "Bebida de soja sin azúcar", brand: "Marca", kcal: 33, protein: 3.3, carbs: 0.2, fat: 1.9, nutrients: { energy_kcal: 33, protein: 3.3, carbs: 0.2, fat: 1.9, calcium: 120 }, nova: 3 }).returning();
+    const u = await core.updateEntry(db, personId, e!.id, { foodId: soja!.id });
+    expect(u).toMatchObject({ foodId: soja!.id, name: "Bebida de soja sin azúcar", brand: "Marca", grams: 300, lockedValues: {}, nova: 3 });
+    expect(u!.kcal).toBeCloseTo(99);
+    expect(u!.protein).toBeCloseTo(9.9);
+    expect(u!.nutrients.calcium).toBeCloseTo(360);
+    const [s] = await db.select().from(dailySummaries).where(and(eq(dailySummaries.personId, personId), eq(dailySummaries.date, "2026-11-02")));
+    expect(s?.kcal).toBeCloseTo(99);
+    // Back to rice with explicit grams.
+    const back = await core.updateEntry(db, personId, e!.id, { foodId, grams: 100 });
+    expect(back!.kcal).toBeCloseTo(130);
+  });
   it("confirmar propuesta de IA y deshacer", async () => {
     const [est] = await db.insert(aiEstimates).values({ userId: uid, personId, kind: "meal" }).returning();
     await core.addEntries(db, { personId, userId: uid, date: "2026-11-03", mealSlot: "dinner", origin: "ai_text", estimateId: est!.id, items: [{ name: "Tortilla", grams: 150, per100: { energy_kcal: 190, protein: 6.5 } }] });

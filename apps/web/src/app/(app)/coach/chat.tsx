@@ -46,7 +46,10 @@ export function Chat({ personId, conversationId: initialId, initial, personName,
   const bottom = useRef<HTMLDivElement>(null);
   const files = useRef<HTMLInputElement>(null);
 
-  useEffect(() => bottom.current?.scrollIntoView({ behavior: "smooth", block: "end" }), [messages, tool]);
+  // Braces matter: recent Chrome returns a Promise from scrollIntoView, and React would call it as the cleanup.
+  useEffect(() => {
+    bottom.current?.scrollIntoView({ behavior: "smooth", block: "end" });
+  }, [messages, tool]);
 
   const send = async (text: string) => {
     if (!text.trim() || streaming) return;
@@ -128,7 +131,13 @@ export function Chat({ personId, conversationId: initialId, initial, personName,
           <div key={m.id} className={cn("flex", m.role === "user" ? "justify-end" : "justify-start")}>
             <div className={cn("max-w-[88%] rounded-3xl px-4 py-3", m.role === "user" ? "rounded-br-md bg-herb text-herb-ink" : "rounded-bl-md border border-line bg-card")}>
               {m.role === "assistant" ? (
-                m.content ? <Markdown text={m.content} /> : <Loader2 className="size-4 animate-spin text-ink-3" />
+                m.content ? (
+                  <Markdown text={m.content} />
+                ) : (
+                  <span className="flex items-center gap-2 text-sm text-ink-3" role="status">
+                    <Loader2 className="size-4 animate-spin" /> {tool ? `${TOOL_LABELS[tool] ?? tool}…` : "Pensando…"}
+                  </span>
+                )
               ) : (
                 <p className="whitespace-pre-wrap">{m.content}</p>
               )}
@@ -160,7 +169,7 @@ export function Chat({ personId, conversationId: initialId, initial, personName,
             </div>
           </div>
         ))}
-        {tool ? (
+        {tool && messages.at(-1)?.content ? (
           <p className="flex items-center gap-2 text-sm text-ink-3">
             <Wrench className="size-4" /> {TOOL_LABELS[tool] ?? tool}…
           </p>

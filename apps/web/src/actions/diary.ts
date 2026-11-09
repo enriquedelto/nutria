@@ -2,7 +2,7 @@
 import { UserError } from "@/lib/errors";
 import { refresh } from "next/cache";
 import { z } from "zod";
-import { and, dailySummaries, eq, foodFavorites, mealTemplates, waterLogs, type MealTemplateItem } from "@nutria/db";
+import { and, dailySummaries, eq, foodFavorites, foods, isNull, mealTemplates, or, persons, waterLogs, type MealTemplateItem } from "@nutria/db";
 import { copyMeal, deleteEntries, recomputeDay, undoAiAction, updateEntry } from "@nutria/core";
 import { db } from "@/lib/db";
 import { addDiaryItems, type AddPayload } from "@/lib/diary-service";
@@ -23,9 +23,16 @@ export async function addItems(payload: AddPayload) {
   return { ids: rows.map((r) => r.id), actionId: rows.actionId };
 }
 
-export async function editEntry(personId: string, id: string, patch: { grams?: number; mealSlot?: string; date?: string; lockedValues?: Record<string, number>; note?: string | null }) {
+export async function editEntry(personId: string, id: string, patch: { grams?: number; mealSlot?: string; date?: string; lockedValues?: Record<string, number>; note?: string | null; foodId?: string }) {
   const u = await user();
   await assertAccess(u.id, personId, "diary", true);
+  if (patch.foodId) {
+    // Only foods visible to the person's household (public catalogue or their own custom foods).
+    const [p] = await db().select({ groupId: persons.groupId }).from(persons).where(eq(persons.id, personId)).limit(1);
+    const groupId = p?.groupId ?? null;
+    const [f] = await db().select({ id: foods.id }).from(foods).where(and(eq(foods.id, z.string().uuid().parse(patch.foodId)), groupId ? or(isNull(foods.groupId), eq(foods.groupId, groupId)) : isNull(foods.groupId))).limit(1);
+    if (!f) throw new UserError("Ese alimento no está disponible");
+  }
   await updateEntry(db(), personId, id, patch);
   refresh();
 }

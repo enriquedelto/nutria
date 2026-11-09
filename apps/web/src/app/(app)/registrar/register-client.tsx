@@ -4,11 +4,12 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { useSafeTransition } from "@/lib/use-safe-transition";
 import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
-import { Camera, HelpCircle, ImagePlus, Loader2, ScanText, Sparkles, Trash2, X } from "lucide-react";
+import { Camera, HelpCircle, ImagePlus, Loader2, ScanText, Search, Sparkles, Trash2, X } from "lucide-react";
 import { toast } from "sonner";
 import { scaleNutrients, type NutrientMap } from "@nutria/nutrition";
 import { learnPortions } from "@/actions/ai";
 import { WhatIf, type DayContext } from "@/components/food/add-food-dialog";
+import { FoodPicker } from "@/components/food/food-picker";
 import { VoiceInput } from "@/components/voice-input";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -57,6 +58,7 @@ export function RegisterClient({ ctx, aiEnabled, sharedImages }: { ctx: DayConte
   const [est, setEst] = useState<Estimate | null>(null);
   const [rows, setRows] = useState<Row[]>([]);
   const [busy, setBusy] = useState(false);
+  const [picking, setPicking] = useState<string | null>(null);
   const [saving, start] = useSafeTransition();
   const fileRef = useRef<HTMLInputElement>(null);
   const camRef = useRef<HTMLInputElement>(null);
@@ -112,15 +114,26 @@ export function RegisterClient({ ctx, aiEnabled, sharedImages }: { ctx: DayConte
     }
   };
 
-  const switchFood = async (key: string, foodId: string | null) => {
+  const switchFood = async (key: string, foodId: string | null, rename = false) => {
     if (!foodId) return setRows((rs) => rs.map((r) => (r.key === key ? { ...r, foodId: null, matchName: null } : r)));
     const res = await fetch(`/api/foods/${foodId}?personId=${ctx.personId}`);
     if (!res.ok) return toast.error("No se pudo cargar el alimento");
     const d = await res.json();
     const f = d.food;
+    const name = f.nameEs ?? f.name;
     setRows((rs) =>
       rs.map((r) =>
-        r.key === key ? { ...r, foodId, matchName: [f.nameEs ?? f.name, f.brand].filter(Boolean).join(" · "), per100: { ...f.nutrients, energy_kcal: f.kcal ?? 0, protein: f.protein ?? 0, carbs: f.carbs ?? 0, fat: f.fat ?? 0, fiber: f.fiber ?? 0 } } : r,
+        r.key === key
+          ? {
+              ...r,
+              ...(rename ? { name } : {}),
+              foodId,
+              matchName: [name, f.brand].filter(Boolean).join(" · "),
+              // Keep the picked food in the dropdown so it can be chosen again after switching away.
+              candidates: r.candidates.some((c) => c.foodId === foodId) ? r.candidates : [{ foodId, name, brand: f.brand, kcal: f.kcal }, ...r.candidates],
+              per100: { ...f.nutrients, energy_kcal: f.kcal ?? 0, protein: f.protein ?? 0, carbs: f.carbs ?? 0, fat: f.fat ?? 0, fiber: f.fiber ?? 0 },
+            }
+          : r,
       ),
     );
   };
@@ -261,7 +274,7 @@ export function RegisterClient({ ctx, aiEnabled, sharedImages }: { ctx: DayConte
                       <Trash2 className="size-4" />
                     </button>
                   </div>
-                  <div className="mt-2 grid grid-cols-[6rem_1fr] gap-2">
+                  <div className="mt-2 grid grid-cols-[6rem_1fr_auto] gap-2">
                     <Input type="number" inputMode="decimal" min={0} value={r.grams} aria-label="Gramos" onChange={(e) => setRows((rs) => rs.map((x) => (x.key === r.key ? { ...x, grams: Number(e.target.value) } : x)))} />
                     <Select value={r.foodId ?? ""} onChange={(e) => void switchFood(r.key, e.target.value || null)} aria-label="Alimento de la base de datos">
                       <option value="">Usar estimación de la IA</option>
@@ -272,7 +285,22 @@ export function RegisterClient({ ctx, aiEnabled, sharedImages }: { ctx: DayConte
                         </option>
                       ))}
                     </Select>
+                    <Button type="button" variant={picking === r.key ? "soft" : "outline"} size="icon" className="size-11" aria-label={`Buscar otro alimento para ${r.name}`} onClick={() => setPicking((k) => (k === r.key ? null : r.key))}>
+                      <Search />
+                    </Button>
                   </div>
+                  {picking === r.key ? (
+                    <div className="mt-2">
+                      <FoodPicker
+                        personId={ctx.personId}
+                        initialQuery={r.name}
+                        onPick={(f) => {
+                          setPicking(null);
+                          void switchFood(r.key, f.id, true);
+                        }}
+                      />
+                    </div>
+                  ) : null}
                   <p className="num mt-2 text-xs text-ink-2">
                     {r.servingLabel ? `${r.servingLabel} · ` : ""}
                     {n0(m.energy_kcal)} kcal · P {n0(m.protein)} · H {n0(m.carbs)} · G {n0(m.fat)}
