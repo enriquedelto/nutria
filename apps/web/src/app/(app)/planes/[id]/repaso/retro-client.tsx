@@ -64,8 +64,8 @@ export function RetroClient(props: {
               <li key={i.id} className="flex flex-wrap items-center gap-2 py-2.5">
                 <div className="min-w-0 flex-1">
                   <p className="font-medium">{i.title}</p>
-                  <p className="text-xs text-ink-3 capitalize">
-                    {day.format(new Date(`${i.date}T12:00:00Z`))} {!i.cooked ? <Badge tone="warn">sin marcar como hecho</Badge> : null}
+                  <p className="text-xs text-ink-3">
+                    <span className="inline-block first-letter:uppercase">{day.format(new Date(`${i.date}T12:00:00Z`))}</span> {!i.cooked ? <Badge tone="warn">sin marcar como hecho</Badge> : null}
                   </p>
                 </div>
                 <div className="flex items-center gap-1">

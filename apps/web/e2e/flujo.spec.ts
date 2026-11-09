@@ -540,7 +540,9 @@ test("diario en el móvil: cambiar gramos y comida, borrar con confirmación; ag
   await expect(page.getByText("0,25 / 2 L")).toBeVisible();
 
   await page.goto("/compra");
-  const box = page.getByRole("checkbox").first();
+  // Ticked items move to the "done" list, so follow the item by its name.
+  const name = (await page.getByRole("checkbox").first().getAttribute("aria-label"))!;
+  const box = page.getByRole("checkbox", { name, exact: true });
   await box.click();
   await expect(box).toHaveAttribute("aria-checked", "true");
   await box.click();
