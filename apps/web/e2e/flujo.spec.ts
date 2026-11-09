@@ -114,8 +114,11 @@ test("deporte: volumen, días de entreno, objetivos por día y creatina marcada 
 
   await page.goto("/hoy");
   await expect(page.getByText(/Día de (entreno|descanso)/)).toBeVisible();
+  // The button turns «tomada» optimistically: wait for the server action before reloading.
+  const saved = page.waitForResponse((r) => r.request().method() === "POST" && new URL(r.url()).pathname === "/hoy");
   await page.getByRole("button", { name: "Marcar Creatina monohidrato como tomada" }).click();
   await expect(page.getByRole("button", { name: "Creatina monohidrato: tomada" })).toBeVisible();
+  await saved;
   await page.reload();
   await expect(page.getByRole("button", { name: "Creatina monohidrato: tomada" })).toBeVisible();
   await expect(page.getByText("Supl.").first()).toBeVisible();
@@ -243,8 +246,9 @@ test("ticket: leer, revisar, guardar el precio y compartirlo en Open Prices", as
 
   // Scan (mock AI reading: quinoa 2,60 €, plátano a peso, bolsa).
   await page.goto("/compra/tickets");
-  const png = whitePng(40, 80);
-  await page.getByLabel("Archivo del ticket").setInputFiles({ name: "ticket.png", mimeType: "image/png", buffer: png });
+  const chooser = page.waitForEvent("filechooser");
+  await page.getByRole("button", { name: "Subir foto o PDF" }).click();
+  await (await chooser).setFiles({ name: "ticket.png", mimeType: "image/png", buffer: whitePng(40, 80) });
   await expect(page).toHaveURL(/\/compra\/tickets\/[0-9a-f-]{36}$/);
   await expect(page.getByRole("heading", { name: "Revisar ticket" })).toBeVisible();
   // Store from OpenStreetMap (fake Nominatim), lines matched and the sum checked against the total.
@@ -261,7 +265,7 @@ test("ticket: leer, revisar, guardar el precio y compartirlo en Open Prices", as
   await expect(page.getByRole("heading", { name: "Mercadona" })).toBeVisible();
   await expect(async () => {
     await page.reload();
-    await expect(page.getByText(/1 precio publicado/)).toBeVisible({ timeout: 1000 });
+    await expect(page.getByRole("main")).toContainText("1 precio publicado", { timeout: 2000 });
   }).toPass({ timeout: 30_000 });
   const sent = (await (await fetch(`${fakes}/fake/op/last`)).json()) as { proofs: { type: string; osm: string; date: string }[]; prices: { product_code: string; price: number; proof_id: number }[] };
   expect(sent.proofs).toHaveLength(1);
@@ -573,10 +577,10 @@ test("openGym: emparejar con código, importar entreno con sus ejercicios y refl
   await expect(page.getByText("Emparejar la app móvil")).toBeVisible();
   await page.getByLabel("Dirección de openGym").fill("http://fakes:8080");
   await page.getByLabel("Código de emparejamiento").fill("ZZZZ2222");
-  await page.getByRole("button", { name: "Conectar" }).click();
+  await page.getByRole("button", { name: "Conectar", exact: true }).click();
   await expect(page.getByText("Código de emparejamiento no válido o caducado")).toBeVisible();
   await page.getByLabel("Código de emparejamiento").fill("k7wq2mzp");
-  await page.getByRole("button", { name: "Conectar" }).click();
+  await page.getByRole("button", { name: "Conectar", exact: true }).click();
   await expect(page.getByText("openGym conectado: 1 entreno y 1 pesaje importados")).toBeVisible();
   await expect(page.getByText(/Se sincroniza sola cada 2 min/)).toBeVisible();
   await expect(page.getByText("Ana (openGym)", { exact: false })).toBeVisible();
@@ -639,10 +643,12 @@ async function allRoutes(page: Page) {
   const person = await page.locator('a[href^="/familia/"]').first().getAttribute("href");
   await page.goto("/planes");
   const retro = await page.locator('a[href$="/repaso"]').first().getAttribute("href");
+  // evaluateAll does not wait: these links only exist once a ticket has been saved.
+  const firstHref = (sel: string) => page.locator(sel).evaluateAll((els) => els[0]?.getAttribute("href") ?? null);
   await page.goto("/compra/tickets");
-  const ticket = await page.locator('a[href^="/compra/tickets/"]').first().getAttribute("href").catch(() => null);
-  await page.goto("/compra/precios");
-  const food = await page.locator('a[href^="/alimentos/"]').first().getAttribute("href").catch(() => null);
+  const ticket = await firstHref('a[href^="/compra/tickets/"]');
+  if (ticket) await page.goto(ticket);
+  const food = ticket ? await firstHref('main a[href^="/alimentos/"]') : null;
   return [...ROUTES, ...[recipe, recipe && `${recipe}/editar`, recipe && `${recipe}/cocinar`, person, retro, ticket, ticket && `${ticket}?editar=1`, food].filter((x): x is string => !!x)];
 }
 
