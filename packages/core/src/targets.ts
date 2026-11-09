@@ -10,10 +10,12 @@ import {
   computeMicroTargets,
   isoDow,
   rebalanceMacros,
+  sportProfile,
   todayIn,
   type DayTargets,
   type PersonProfile,
 } from "@nutria/nutrition";
+import { dayKindFor, getSportProfile, personToday, sportDayVariants, type DayKind } from "./sport";
 
 export async function latestWeight(db: Database, personId: string) {
   const [w] = await db.select({ kg: weightLogs.kg, bodyFatPct: weightLogs.bodyFatPct, date: weightLogs.date }).from(weightLogs).where(eq(weightLogs.personId, personId)).orderBy(desc(weightLogs.date), desc(weightLogs.measuredAt)).limit(1);
@@ -140,20 +142,30 @@ export async function weeklyAdaptiveTdee(db: Database, personId: string, now = n
 
 /**
  * Target set that applies on a date: a non-default set whose rule matches (weekday list or
- * training day = any exercise logged), otherwise the default set.
+ * training day), otherwise the default set — split into training/rest variants when the sport
+ * profile has carb cycling on. Training day = workout logged, or a planned day (today onwards).
  */
-export async function targetsForDate(db: Database, personId: string, date: string) {
+export async function targetsForDate(db: Database, personId: string, date: string): Promise<(typeof targetSets.$inferSelect & { dayKind: DayKind | null }) | null> {
   const sets = await db.select().from(targetSets).where(eq(targetSets.personId, personId)).orderBy(desc(targetSets.isDefault));
   if (!sets.length) return null;
   const dow = isoDow(date);
-  let training: boolean | null = null;
+  const sport = await getSportProfile(db, personId);
+  const sp = sport.active ? sport.profile : sportProfile({});
+  let kind: DayKind | null = null;
+  const kindOf = async () => {
+    if (kind) return kind;
+    const logged = (await db.select({ id: exerciseLogs.id }).from(exerciseLogs).where(and(eq(exerciseLogs.personId, personId), eq(exerciseLogs.date, date))).limit(1)).length > 0;
+    kind = dayKindFor(date, await personToday(db, personId), logged, sp);
+    return kind;
+  };
   for (const s of sets.filter((x) => !x.isDefault)) {
     if (s.rule.days?.length && !s.rule.days.includes(dow)) continue;
-    if (s.rule.trainingDay !== undefined) {
-      training ??= (await db.select({ id: exerciseLogs.id }).from(exerciseLogs).where(and(eq(exerciseLogs.personId, personId), eq(exerciseLogs.date, date))).limit(1)).length > 0;
-      if (s.rule.trainingDay !== training) continue;
-    }
-    if (s.rule.days?.length || s.rule.trainingDay !== undefined) return s;
+    if (s.rule.trainingDay !== undefined && s.rule.trainingDay !== ((await kindOf()) === "training")) continue;
+    if (s.rule.days?.length || s.rule.trainingDay !== undefined) return { ...s, dayKind: s.rule.trainingDay !== undefined ? await kindOf() : null };
   }
-  return sets.find((s) => s.isDefault) ?? sets[0]!;
+  const def = sets.find((s) => s.isDefault) ?? sets[0]!;
+  const variants = sport.active ? sportDayVariants(def, sp) : null;
+  if (!variants) return { ...def, dayKind: null };
+  const k = await kindOf();
+  return { ...variants[k], dayKind: k };
 }

@@ -24,6 +24,7 @@ import {
 } from "@nutria/db";
 import { addDays, expiryStatus, isoDow, todayIn } from "@nutria/nutrition";
 import { notify } from "./notify";
+import { supplementTakenOn } from "./supplements";
 
 /** Users that should receive reminders for a person (owners/managers). */
 async function caretakers(db: Database, personId: string): Promise<string[]> {
@@ -88,7 +89,7 @@ export async function remindersTick(db: Database, now = new Date(), windowMin = 
 
   // Supplements at their times.
   const sups = await db
-    .select({ id: supplementSchedules.id, personId: supplementSchedules.personId, times: supplementSchedules.times, daysOfWeek: supplementSchedules.daysOfWeek, name: sql<string>`coalesce(${foods.nameEs}, ${foods.name})`, timezone: persons.timezone })
+    .select({ id: supplementSchedules.id, personId: supplementSchedules.personId, foodId: supplementSchedules.foodId, times: supplementSchedules.times, daysOfWeek: supplementSchedules.daysOfWeek, name: sql<string>`coalesce(${foods.nameEs}, ${foods.name})`, timezone: persons.timezone })
     .from(supplementSchedules)
     .innerJoin(foods, eq(foods.id, supplementSchedules.foodId))
     .innerJoin(persons, eq(persons.id, supplementSchedules.personId))
@@ -98,7 +99,10 @@ export async function remindersTick(db: Database, now = new Date(), windowMin = 
     if (!s.daysOfWeek.includes(isoDow(today))) continue;
     for (const t of s.times) {
       const at = zonedTime(today, t, s.timezone);
-      if (at > since && at <= now) for (const userId of await caretakers(db, s.personId)) {
+      if (at <= since || at > now) continue;
+      // Already logged today (from Hoy or the diary): no reminder.
+      if (await supplementTakenOn(db, s.personId, s.foodId, today)) continue;
+      for (const userId of await caretakers(db, s.personId)) {
         await notify(db, { userId, type: "supplement", title: `Suplemento: ${s.name}`, url: "/hoy", tag: `sup-${s.id}`, timezone: s.timezone });
         sent++;
       }

@@ -78,6 +78,48 @@ test("objetivos: «Recalcular» calcula con el perfil, también si estaban fijad
   await expect(page.getByText("calculado", { exact: true })).toBeVisible();
 });
 
+test("deporte: volumen, días de entreno, objetivos por día y creatina marcada en Hoy", async () => {
+  const page = adminPage;
+  await page.goto("/ajustes");
+  await page.getByLabel("Objetivo", { exact: true }).selectOption("gain");
+  await page.getByRole("button", { name: /Volumen limpio/ }).click();
+  await expect(page.getByText("Ritmo: 0,16 kg/semana (0,26 % de tu peso)", { exact: false })).toBeVisible();
+  await page.getByRole("button", { name: "Guardar perfil" }).click();
+  await expect(page.getByText("Perfil guardado. Objetivos recalculados.")).toBeVisible();
+
+  await page.getByLabel(/Entreno de fuerza o hipertrofia/).check();
+  await page.getByRole("button", { name: /Competitivo/ }).click();
+  await expect(page.getByText("Proteína: 2,0 g/kg ≈ 125 g al día")).toBeVisible();
+  for (const d of ["lunes", "miércoles", "viernes"]) await page.getByRole("button", { name: d, exact: true }).click();
+  await expect(page.getByLabel(/Más hidratos los días de entreno/)).toBeChecked();
+  await page.getByLabel(/Agua según tu peso y tu entreno/).uncheck();
+  await page.getByRole("button", { name: "Guardar deporte" }).click();
+  await expect(page.getByText("Perfil deportivo guardado. Objetivos recalculados.")).toBeVisible();
+
+  await page.goto("/ajustes/objetivos");
+  await expect(page.getByText("Día de entreno (3/sem)")).toBeVisible();
+  await expect(page.getByText("Día de descanso (4/sem)")).toBeVisible();
+  await expect(page.getByText("2 g/kg × 62,5 kg = 125 g", { exact: false })).toBeVisible();
+  await expect(page.getByText("para ganar 0,16 kg/semana", { exact: false })).toBeVisible();
+
+  await page.goto("/salud/suplementos");
+  const creatine = page.locator("div.rounded-xl").filter({ hasText: "Creatina monohidrato" }).first();
+  await expect(creatine.getByText("Evidencia A")).toBeVisible();
+  await creatine.getByRole("button", { name: "Añadir pauta" }).click();
+  await creatine.getByRole("button", { name: "Guardar pauta" }).click();
+  await expect(page.getByText("Creatina monohidrato añadida a tus pautas")).toBeVisible();
+  await expect(creatine.getByText("Ya está en tus pautas")).toBeVisible();
+  await expect(page.getByText("BCAA / aminoácidos ramificados:")).toBeVisible();
+
+  await page.goto("/hoy");
+  await expect(page.getByText(/Día de (entreno|descanso)/)).toBeVisible();
+  await page.getByRole("button", { name: "Marcar Creatina monohidrato como tomada" }).click();
+  await expect(page.getByRole("button", { name: "Creatina monohidrato: tomada" })).toBeVisible();
+  await page.reload();
+  await expect(page.getByRole("button", { name: "Creatina monohidrato: tomada" })).toBeVisible();
+  await expect(page.getByText("Supl.").first()).toBeVisible();
+});
+
 test("registro por IA (simulada) llega al diario", async () => {
   const page = adminPage;
   await page.goto("/registrar");
@@ -481,7 +523,7 @@ test("IA en la cocina (simulada): sustituciones y foto de la nevera", async () =
 
 const ROUTES = [
   "/hoy", "/diario", "/buscar", "/buscar/nuevo", "/registrar", "/coach", "/coach/memoria", "/progreso", "/informe",
-  "/salud", "/salud/medicacion", "/salud/sintomas", "/salud/analiticas", "/salud/ayuno", "/salud/ejercicio", "/salud/sueno", "/salud/ciclo", "/salud/condiciones",
+  "/salud", "/salud/medicacion", "/salud/suplementos", "/salud/sintomas", "/salud/analiticas", "/salud/ayuno", "/salud/ejercicio", "/salud/sueno", "/salud/ciclo", "/salud/condiciones",
   "/recetas", "/recetas/nueva", "/recetas/importar", "/planes", "/despensa", "/compra", "/familia", "/retos", "/mas", "/admin",
   "/ajustes", "/ajustes/objetivos", "/ajustes/comidas", "/ajustes/pantalla", "/ajustes/notificaciones", "/ajustes/seguridad", "/ajustes/integraciones", "/ajustes/datos",
 ];

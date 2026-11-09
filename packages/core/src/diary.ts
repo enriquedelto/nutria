@@ -28,7 +28,7 @@ export const DiaryItemInput = z.object({
 });
 export type DiaryItemInput = z.infer<typeof DiaryItemInput>;
 
-export const DIARY_ORIGINS = ["manual", "scan", "ai_text", "ai_photo", "ai_voice", "label", "plan", "import", "quick", "mcp", "batch", "recipe"] as const;
+export const DIARY_ORIGINS = ["manual", "scan", "ai_text", "ai_photo", "ai_voice", "label", "plan", "import", "quick", "mcp", "batch", "recipe", "supplement"] as const;
 export type DiaryOrigin = (typeof DIARY_ORIGINS)[number];
 
 export interface AddEntriesInput {

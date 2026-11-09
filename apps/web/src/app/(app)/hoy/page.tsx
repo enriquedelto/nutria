@@ -1,6 +1,6 @@
 import { Suspense } from "react";
 import Link from "next/link";
-import { Flame, Pill, Scale, Timer, Dumbbell, Footprints } from "lucide-react";
+import { Flame, Pill, Scale, Timer, Dumbbell, Footprints, FlaskConical } from "lucide-react";
 import { fastingStatus, todayIn } from "@nutria/nutrition";
 import { Card, CardHeader } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/empty";
@@ -10,6 +10,7 @@ import { MealCard } from "@/components/diary/meal-card";
 import { WaterCard } from "@/components/diary/water-card";
 import { Sparkline } from "@/components/charts/sparkline";
 import { DoseButton } from "@/components/health/dose-button";
+import { SupplementButton } from "@/components/health/supplement-button";
 import { HOME_CARDS } from "@/lib/home-cards";
 import { getDay, getHomeExtras } from "@/lib/data/day";
 import { getPersonContext } from "@/lib/session";
@@ -101,6 +102,27 @@ async function Today() {
                   <span className="block text-xs text-ink-3">{time(m.scheduledAt, ctx.person.timezone)}{m.withFood ? " · con comida" : ""}</span>
                 </span>
                 <DoseButton personId={ctx.person.id} doseId={m.id} status={m.status} disabled={!ctx.canWrite} />
+              </li>
+            ))}
+          </ul>
+        </Card>
+      ) : null,
+    suplementos:
+      extras.supplements.length > 0 ? (
+        <Card key="suplementos">
+          <CardHeader title="Suplementos" action={<Link href="/salud/suplementos" className="text-sm text-herb">Gestionar</Link>} />
+          <ul className="space-y-2">
+            {extras.supplements.map((s) => (
+              <li key={s.id} className="flex items-center gap-3">
+                <FlaskConical className="size-4 text-ink-3" />
+                <span className="min-w-0 flex-1 text-sm">
+                  <span className="font-medium">{s.name}</span> <span className="text-ink-3">· {s.doseLabel}</span>
+                  <span className="block text-xs text-ink-3">
+                    {s.times.length ? s.times.join(", ") : "sin hora"}
+                    {s.streak > 1 ? ` · ${s.streak} días seguidos` : ""}
+                  </span>
+                </span>
+                <SupplementButton personId={ctx.person.id} scheduleId={s.id} date={date} taken={s.taken} name={s.name} disabled={!ctx.canWrite} />
               </li>
             ))}
           </ul>

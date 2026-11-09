@@ -4,6 +4,7 @@
  */
 import type { MicroTarget } from "./targets";
 import type { NutrientMap } from "./totals";
+import { proteinPerMeal, sportMacros, sportProfile, sportProteinPerKg } from "./sport";
 
 export interface DayTargets {
   kcal: number;
@@ -167,12 +168,23 @@ const athlete: ConditionModule = {
   code: "athlete",
   nameEs: "Deportista",
   adjustTargets(t, ctx) {
-    const gPerKg = Number(ctx.config.proteinPerKg ?? 1.8);
-    const protein = Math.round(gPerKg * ctx.weightKg);
-    const carbs = Math.max(0, Math.round((t.kcal - protein * 4 - t.fat * 9) / 4));
-    return { ...t, protein, carbs };
+    return sportMacros(t, ctx.weightKg, sportProfile(ctx.config));
   },
-  aiContext: (ctx) => `Deportista: proteína ${ctx.config.proteinPerKg ?? 1.8} g/kg, hidratos alrededor del entreno.`,
+  dayAlerts(totals, t, ctx) {
+    const sp = sportProfile(ctx.config);
+    if (sp.focus === "general" || t.carbs >= 4 * ctx.weightKg) return [];
+    return [{ condition: "athlete", level: "info", message: `Tu objetivo de hidratos (${Math.round(t.carbs)} g = ${(t.carbs / ctx.weightKg).toFixed(1)} g/kg) queda por debajo de 4 g/kg, lo mínimo recomendado para entrenar fuerza o hipertrofia.` }];
+  },
+  aiContext: (ctx) => {
+    const sp = sportProfile(ctx.config);
+    const DOW = ["", "L", "M", "X", "J", "V", "S", "D"];
+    const focus = { hypertrophy: "hipertrofia", strength: "fuerza", general: "general" }[sp.focus];
+    return [
+      `Deportista (${focus}, nivel ${sp.level === "competitive" ? "competitivo" : "recreativo"}): proteína ${sportProteinPerKg(sp).toLocaleString("es-ES")} g/kg repartida en ~4 tomas de ~${proteinPerMeal(ctx.weightKg)} g; grasa ≥ 0,8 g/kg; hidratos 4–7 g/kg, sobre todo alrededor del entreno.`,
+      sp.trainingDays?.length ? `Días de entreno previstos: ${sp.trainingDays.map((d) => DOW[d]).join(" ")}${sp.cycleCarbs ? " (más hidratos esos días, menos en descanso)" : ""}.` : "",
+      "Suplementos: solo la creatina (3–5 g/día) tiene evidencia fuerte; cafeína opcional antes de entrenar; proteína en polvo solo si no llega con comida. BCAA, glutamina y «potenciadores» no aportan.",
+    ].filter(Boolean).join(" ");
+  },
 };
 
 const ckd: ConditionModule = {

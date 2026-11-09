@@ -29,7 +29,7 @@ export type MealEntry = {
   mealSlot: string;
 };
 
-const ORIGIN_ICON: Record<string, string> = { ai_text: "IA", ai_photo: "IA", ai_voice: "IA", label: "Etiqueta", scan: "Escaneo", plan: "Plan", import: "Import." };
+const ORIGIN_ICON: Record<string, string> = { ai_text: "IA", ai_photo: "IA", ai_voice: "IA", label: "Etiqueta", scan: "Escaneo", plan: "Plan", import: "Import.", supplement: "Supl." };
 
 export function MealCard({
   personId,

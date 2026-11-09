@@ -8,6 +8,7 @@ import { updateProfile } from "@/actions/settings";
 import { Button } from "@/components/ui/button";
 import { Field, Input, Select, Textarea } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
+import { gainRatePresets, ratePctOfWeight, surplusForRate } from "@nutria/nutrition";
 
 export type ProfileValues = {
   displayName: string;
@@ -44,6 +45,36 @@ const DIETS = [
   ["keto", "Keto"],
   ["low_carb", "Baja en hidratos"],
 ] as const;
+
+/** Bulking pace: presets as % of body weight per week plus a fine slider. */
+function GainRate({ rate, weightKg, onChange }: { rate: number; weightKg: number | null; onChange: (r: number) => void }) {
+  const pct = weightKg ? ratePctOfWeight(rate, weightKg) : null;
+  const fmt = (x: number, d = 2) => x.toLocaleString("es-ES", { maximumFractionDigits: d });
+  return (
+    <div className="space-y-2 sm:col-span-2">
+      {weightKg ? (
+        <div className="grid gap-2 sm:grid-cols-2">
+          {gainRatePresets(weightKg).map((p) => (
+            <button key={p.key} type="button" aria-pressed={Math.abs(rate - p.kgPerWeek) < 0.005} onClick={() => onChange(p.kgPerWeek)} className={cn("rounded-xl border p-2.5 text-left text-sm", Math.abs(rate - p.kgPerWeek) < 0.005 ? "border-herb bg-herb-soft" : "border-line hover:bg-paper-2")}>
+              <span className="font-semibold">
+                {p.label} · {fmt(p.kgPerWeek)} kg/sem
+              </span>
+              <span className="mt-0.5 block text-xs text-ink-3">
+                {fmt(p.pctPerWeek)} % de tu peso por semana · +{p.surplusKcal} kcal/día{p.key === "lean" ? " · menos grasa ganada" : " · más rápido, algo más de grasa"}
+              </span>
+            </button>
+          ))}
+        </div>
+      ) : null}
+      <Field
+        label={`Ritmo: ${fmt(rate)} kg/semana${pct != null ? ` (${fmt(pct)} % de tu peso)` : ""} · +${surplusForRate(rate)} kcal/día`}
+        hint={pct != null && pct > 0.5 ? "Por encima del 0,5 % semanal casi todo lo extra que ganas es grasa, no músculo." : "Entre el 0,25 y el 0,5 % de tu peso por semana es lo recomendado para ganar músculo."}
+      >
+        <input type="range" min={0.05} max={0.75} step={0.01} value={rate} onChange={(e) => onChange(Number(e.target.value))} className="w-full accent-[var(--herb)]" aria-label="Ritmo de ganancia" />
+      </Field>
+    </div>
+  );
+}
 
 export function ProfileForm({ personId, initial, allergens, timezones, isChild }: { personId: string; initial: ProfileValues; allergens: { code: string; name: string }[]; timezones: string[]; isChild: boolean }) {
   const [v, setV] = useState(initial);
@@ -140,10 +171,12 @@ export function ProfileForm({ personId, initial, allergens, timezones, isChild }
                 <option value="gain">Ganar músculo/peso</option>
               </Select>
             </Field>
-            {v.goalType !== "maintain" ? (
-              <Field label={`Ritmo: ${Math.abs(v.weeklyRateKg || (v.goalType === "lose" ? 0.5 : 0.25)).toLocaleString("es-ES")} kg/semana`} hint={v.goalType === "lose" ? "0,25–0,75 kg/semana es sostenible para la mayoría" : "0,1–0,3 kg/semana minimiza la grasa ganada"}>
-                <input type="range" min={0.1} max={v.goalType === "lose" ? 1 : 0.5} step={0.05} value={Math.abs(v.weeklyRateKg || (v.goalType === "lose" ? 0.5 : 0.25))} onChange={(e) => set("weeklyRateKg", Number(e.target.value) * (v.goalType === "lose" ? -1 : 1))} className="w-full accent-[var(--herb)]" />
+            {v.goalType === "lose" ? (
+              <Field label={`Ritmo: ${Math.abs(v.weeklyRateKg || 0.5).toLocaleString("es-ES")} kg/semana`} hint="0,25–0,75 kg/semana es sostenible para la mayoría">
+                <input type="range" min={0.1} max={1} step={0.05} value={Math.abs(v.weeklyRateKg || 0.5)} onChange={(e) => set("weeklyRateKg", -Number(e.target.value))} className="w-full accent-[var(--herb)]" />
               </Field>
+            ) : v.goalType === "gain" ? (
+              <GainRate rate={Math.abs(v.weeklyRateKg || 0.25)} weightKg={v.weightKg} onChange={(r) => set("weeklyRateKg", r)} />
             ) : null}
           </div>
         ) : null}

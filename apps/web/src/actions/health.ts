@@ -21,14 +21,15 @@ import {
   personConditions,
   sleepLogs,
   stepLogs,
+  supplementSchedules,
   symptomLogs,
   tdeeEstimates,
   targetSets,
   weightLogs,
   type AccessScope,
 } from "@nutria/db";
-import { latestWeight, missingProfileFields, recomputeDay, recomputeTargets } from "@nutria/core";
-import { detectSubstance, exerciseKcal, stepsKcal } from "@nutria/nutrition";
+import { addSupplementPlan, latestWeight, missingProfileFields, recomputeDay, recomputeTargets, takeSupplement, untakeSupplement } from "@nutria/core";
+import { detectSubstance, exerciseKcal, stepsKcal, SUPPLEMENT_BY_CODE } from "@nutria/nutrition";
 import { db } from "@/lib/db";
 import { emit } from "@/lib/events";
 import { enqueue } from "@/lib/jobs";
@@ -249,13 +250,61 @@ export async function markDose(personId: string, doseId: string, status: "taken"
 
 /* ---------------------------- conditions ---------------------------- */
 
-export async function setCondition(personId: string, code: string, active: boolean, config: Record<string, unknown> = {}) {
+/** Toggle a condition; its config (e.g. the sport profile) is kept unless a new one is given. */
+export async function setCondition(personId: string, code: string, active: boolean, config?: Record<string, unknown>) {
   await guard(personId, "health");
   await db()
     .insert(personConditions)
-    .values({ personId, conditionCode: code, active, config, since: new Date().toISOString().slice(0, 10) })
-    .onConflictDoUpdate({ target: [personConditions.personId, personConditions.conditionCode], set: { active, config } });
+    .values({ personId, conditionCode: code, active, config: config ?? {}, since: new Date().toISOString().slice(0, 10) })
+    .onConflictDoUpdate({ target: [personConditions.personId, personConditions.conditionCode], set: { active, ...(config ? { config } : {}) } });
   await recomputeTargets(db(), personId).catch(() => undefined);
+  refresh();
+}
+
+/* ---------------------------- supplements ---------------------------- */
+
+const hhmmZ = z.string().regex(/^\d{2}:\d{2}$/);
+const SupplementPlan = z.object({
+  code: z.string().max(30).optional(),
+  foodId: uuid.optional(),
+  dose: z.number().positive().max(10_000),
+  doseUnit: z.string().trim().min(1).max(20),
+  gramsPerDose: z.number().positive().max(500),
+  times: z.array(hhmmZ).max(6),
+  daysOfWeek: z.array(z.number().int().min(1).max(7)).min(1).max(7),
+});
+
+export async function saveSupplementPlan(personId: string, input: z.input<typeof SupplementPlan>, id?: string) {
+  const u = await guard(personId, "diary");
+  const v = SupplementPlan.parse(input);
+  if (!id && !v.foodId && !(v.code && SUPPLEMENT_BY_CODE[v.code])) throw new UserError("Elige un suplemento");
+  const days = [...new Set(v.daysOfWeek)].sort();
+  if (id) {
+    await db()
+      .update(supplementSchedules)
+      .set({ dose: v.dose, doseUnit: v.doseUnit, gramsPerDose: v.gramsPerDose, times: v.times, daysOfWeek: days, updatedAt: new Date() })
+      .where(and(eq(supplementSchedules.id, uuid.parse(id)), eq(supplementSchedules.personId, personId)));
+  } else await addSupplementPlan(db(), personId, u.id, { ...v, daysOfWeek: days });
+  refresh();
+}
+
+export async function setSupplementActive(personId: string, id: string, active: boolean) {
+  await guard(personId, "diary");
+  await db().update(supplementSchedules).set({ active }).where(and(eq(supplementSchedules.id, uuid.parse(id)), eq(supplementSchedules.personId, personId)));
+  refresh();
+}
+
+export async function deleteSupplementPlan(personId: string, id: string) {
+  await guard(personId, "diary");
+  await db().delete(supplementSchedules).where(and(eq(supplementSchedules.id, uuid.parse(id)), eq(supplementSchedules.personId, personId)));
+  refresh();
+}
+
+/** Mark today's dose of a plan as taken (diary entry) or undo it. */
+export async function markSupplement(personId: string, scheduleId: string, date: string, taken: boolean) {
+  const u = await guard(personId, "diary");
+  if (taken) await takeSupplement(db(), personId, u.id, uuid.parse(scheduleId), day.parse(date));
+  else await untakeSupplement(db(), personId, uuid.parse(scheduleId), day.parse(date));
   refresh();
 }
 

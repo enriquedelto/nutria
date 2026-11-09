@@ -1,6 +1,6 @@
 /** Builds the per-person context injected into AI requests (respecting access scopes). */
 import { aiMemories, and, desc, eq, groups, personConditions, persons, portionMemory, targetSets, weightLogs, type Database } from "@nutria/db";
-import { ageFromBirthDate, conditionsAiContext, formatDateEs, todayIn } from "@nutria/nutrition";
+import { ageFromBirthDate, conditionsAiContext, formatDateEs, isoDow, sportProfile, todayIn } from "@nutria/nutrition";
 
 export interface PersonContext {
   personId: string;
@@ -58,6 +58,11 @@ export async function buildPersonContext(db: Database, personId: string, scopes:
     const conds = await db.select({ code: personConditions.conditionCode, config: personConditions.config }).from(personConditions).where(and(eq(personConditions.personId, personId), eq(personConditions.active, true)));
     const ctx = conditionsAiContext(conds, weightKg ?? 70);
     if (ctx.length) lines.push(`Condiciones:\n- ${ctx.join("\n- ")}`);
+    const athlete = conds.find((c) => c.code === "athlete");
+    if (athlete) {
+      const sp = sportProfile(athlete.config);
+      if (sp.trainingDays?.length) lines.push(`Hoy es día de ${sp.trainingDays.includes(isoDow(today)) ? "entreno (previsto)" : "descanso salvo que registre un entreno"}${sp.cycleCarbs ? "; los hidratos objetivo cambian según el día (consulta get_targets)" : ""}.`);
+    }
   }
 
   if (scopes.has("ai")) {

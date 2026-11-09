@@ -7,6 +7,7 @@ export * from "./tdee-adaptive";
 export * from "./quality";
 export * from "./activity";
 export * from "./conditions";
+export * from "./sport";
 export * from "./interactions";
 export * from "./kitchen";
 export * from "./insights";

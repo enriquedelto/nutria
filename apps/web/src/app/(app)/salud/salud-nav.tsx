@@ -3,6 +3,7 @@ import { SubNav } from "@/components/sub-nav";
 const ITEMS = [
   ["/salud", "Resumen"],
   ["/salud/medicacion", "Medicación"],
+  ["/salud/suplementos", "Suplementos"],
   ["/salud/sintomas", "Síntomas"],
   ["/salud/analiticas", "Analíticas"],
   ["/salud/ayuno", "Ayuno"],

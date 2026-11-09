@@ -32,6 +32,7 @@ import {
   sleepLogs,
   sql,
   stepLogs,
+  supplementSchedules,
   symptomLogs,
   targetSets,
   tdeeEstimates,
@@ -44,7 +45,13 @@ import {
   CYCLE_PHASE_NOTES,
   cyclePhase,
   forecastWeight,
+  isoDow,
+  NOT_NEEDED,
   NUTRIENT_BY_CODE,
+  sportProfile,
+  sportProteinPerKg,
+  SUPPLEMENTS,
+  trainingDaySplit,
   round,
   sumNutrients,
   todayIn,
@@ -160,14 +167,66 @@ const getDiary = define({
   },
 });
 
+async function athleteProfile(ctx: ToolContext) {
+  const [c] = await ctx.db.select({ active: personConditions.active, config: personConditions.config }).from(personConditions).where(and(eq(personConditions.personId, ctx.personId), eq(personConditions.conditionCode, "athlete"))).limit(1);
+  return c?.active ? sportProfile(c.config) : null;
+}
+
 const getTargets = define({
   name: "get_targets",
-  description: "Objetivos diarios vigentes (kcal, macros, micros mínimos y límites) y macros fijados.",
+  description: "Objetivos diarios vigentes (kcal, macros, micros mínimos y límites) y macros fijados. Con perfil deportivo y reparto por días, incluye el objetivo de la fecha (día de entreno o descanso).",
+  scope: "diary",
+  input: z.object({ date: dateStr.optional() }),
+  async run(i, ctx) {
+    const sets = await ctx.db.select().from(targetSets).where(eq(targetSets.personId, ctx.personId)).orderBy(desc(targetSets.isDefault));
+    const out = sets.map((t) => ({ name: t.name, isDefault: t.isDefault, kcal: t.kcal, protein: t.protein, carbs: t.carbs, fat: t.fat, fiber: t.fiber, pinned: t.pinned, mode: t.mode, rule: t.rule, micros: t.micros }));
+    const sp = await athleteProfile(ctx);
+    const base = sets.find((s) => s.isDefault);
+    if (!sp || !base) return { sets: out };
+    const date = i.date ?? today(ctx);
+    const logged = (await ctx.db.select({ id: exerciseLogs.id }).from(exerciseLogs).where(and(eq(exerciseLogs.personId, ctx.personId), eq(exerciseLogs.date, date))).limit(1)).length > 0;
+    const dayKind = logged || (date >= today(ctx) && sp.trainingDays?.includes(isoDow(date))) ? "training" : "rest";
+    const split = sp.cycleCarbs && sp.trainingDays?.length ? trainingDaySplit(base, sp.trainingDays.length) : null;
+    const t = split ? split[dayKind] : base;
+    return {
+      sets: out,
+      sport: { focus: sp.focus, level: sp.level, proteinPerKg: sportProteinPerKg(sp), trainingDays: sp.trainingDays ?? [], carbCycling: !!split },
+      forDate: { date, dayKind, kcal: Math.round(t.kcal), protein: Math.round(t.protein), carbs: Math.round(t.carbs), fat: Math.round(t.fat) },
+    };
+  },
+});
+
+const getSupplements = define({
+  name: "get_supplements",
+  description: "Pautas de suplementos de la persona (dosis, horas, días), si hoy ya están tomadas, cuántos días de los últimos 14 las tomó, y el catálogo con evidencia y lo que no hace falta.",
   scope: "diary",
   input: z.object({}),
   async run(_i, ctx) {
-    const sets = await ctx.db.select().from(targetSets).where(eq(targetSets.personId, ctx.personId)).orderBy(desc(targetSets.isDefault));
-    return sets.map((t) => ({ name: t.name, isDefault: t.isDefault, kcal: t.kcal, protein: t.protein, carbs: t.carbs, fat: t.fat, fiber: t.fiber, pinned: t.pinned, mode: t.mode, rule: t.rule, micros: t.micros }));
+    const d = today(ctx);
+    const rows = await ctx.db
+      .select({ s: supplementSchedules, name: sql<string>`coalesce(${foods.nameEs}, ${foods.name})` })
+      .from(supplementSchedules)
+      .innerJoin(foods, eq(foods.id, supplementSchedules.foodId))
+      .where(eq(supplementSchedules.personId, ctx.personId));
+    const ids = rows.map((r) => r.s.foodId);
+    const taken = ids.length
+      ? await ctx.db.select({ foodId: diaryEntries.foodId, date: diaryEntries.date }).from(diaryEntries).where(and(eq(diaryEntries.personId, ctx.personId), inArray(diaryEntries.foodId, ids), gte(diaryEntries.date, addDays(d, -13))))
+      : [];
+    const [w] = await ctx.db.select({ kg: weightLogs.kg }).from(weightLogs).where(eq(weightLogs.personId, ctx.personId)).orderBy(desc(weightLogs.date)).limit(1);
+    return {
+      plans: rows.map(({ s, name }) => ({
+        name,
+        dose: `${s.dose} ${s.doseUnit}`,
+        times: s.times.map((t) => t.slice(0, 5)),
+        daysOfWeek: s.daysOfWeek,
+        active: s.active,
+        takenToday: taken.some((t) => t.foodId === s.foodId && t.date === d),
+        daysTakenLast14: new Set(taken.filter((t) => t.foodId === s.foodId).map((t) => t.date)).size,
+      })),
+      catalog: SUPPLEMENTS.map((x) => ({ name: x.name, evidence: x.evidence, purpose: x.purpose, dose: x.dose(w?.kg ?? 70).label, timing: x.timing })),
+      notNeeded: NOT_NEEDED,
+      manageAt: "/salud/suplementos",
+    };
   },
 });
 
@@ -436,6 +495,7 @@ export const READ_TOOLS: AiTool[] = [
   nutrientRanking,
   getDiary,
   getTargets,
+  getSupplements,
   getProfile,
   getWeight,
   getForecast,

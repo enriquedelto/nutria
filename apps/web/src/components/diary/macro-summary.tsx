@@ -2,7 +2,7 @@ import { Bar, Ring } from "@/components/ui/progress";
 import { energy, n0, nutrient, nutrientName, type EnergyUnit } from "@/lib/format";
 import type { NutrientMap } from "@nutria/nutrition";
 
-type Target = { kcal: number; protein: number; carbs: number; fat: number; fiber: number | null } | null;
+type Target = { kcal: number; protein: number; carbs: number; fat: number; fiber: number | null; dayKind?: "training" | "rest" | null } | null;
 
 const MACROS = [
   { code: "protein", label: "Proteína", color: "var(--protein)" },
@@ -13,7 +13,9 @@ const MACROS = [
 
 export function MacroSummary({ totals, target, exerciseKcal = 0, unit = "kcal" }: { totals: NutrientMap; target: Target; exerciseKcal?: number; unit?: EnergyUnit }) {
   const kcal = totals.energy_kcal ?? 0;
-  const goal = target ? target.kcal + Math.round(exerciseKcal * 0.5) : null; // eat back half of exercise
+  // Eat back half of exercise, unless the target already depends on the day (training/rest split).
+  const eatBack = target?.dayKind ? 0 : Math.round(exerciseKcal * 0.5);
+  const goal = target ? target.kcal + eatBack : null;
   const left = goal != null ? goal - kcal : null;
   return (
     <div className="grid items-center gap-5 sm:grid-cols-[auto_1fr]">
@@ -31,6 +33,12 @@ export function MacroSummary({ totals, target, exerciseKcal = 0, unit = "kcal" }
         </Ring>
       </div>
       <div className="space-y-3">
+        {target?.dayKind ? (
+          <p className="text-xs font-medium text-ink-2">
+            <span className={`mr-1.5 inline-block size-2 rounded-full ${target.dayKind === "training" ? "bg-persimmon" : "bg-ink-3"}`} aria-hidden />
+            {target.dayKind === "training" ? "Día de entreno: más hidratos" : "Día de descanso: menos hidratos"}
+          </p>
+        ) : null}
         {MACROS.map((m) => {
           const v = totals[m.code] ?? 0;
           const t = target ? (target[m.code] ?? null) : null;
@@ -49,7 +57,7 @@ export function MacroSummary({ totals, target, exerciseKcal = 0, unit = "kcal" }
             </div>
           );
         })}
-        {exerciseKcal > 0 ? <p className="text-xs text-ink-3">Incluye +{n0(exerciseKcal * 0.5)} kcal por ejercicio (la mitad de lo quemado).</p> : null}
+        {eatBack > 0 ? <p className="text-xs text-ink-3">Incluye +{n0(eatBack)} kcal por ejercicio (la mitad de lo quemado).</p> : null}
       </div>
     </div>
   );

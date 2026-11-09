@@ -23,6 +23,7 @@ import {
 } from "@nutria/db";
 import { addDays, streak, todayIn } from "@nutria/nutrition";
 import { rowsOf } from "./util";
+import { baseWaterGoal } from "./sport";
 
 const VEG_CATEGORY = /en:(fruits|vegetables|fresh-vegetables|fresh-fruits|legumes)/;
 
@@ -40,7 +41,7 @@ async function dayFlags(db: Database, personId: string, from: string, to: string
     group by d.date`);
   const vegRows = rowsOf<{ date: string; grams: number }>(veg);
   const vegByDate = new Map(vegRows.map((r) => [r.date, r.grams]));
-  const waterGoal = p?.settings.waterGoalMl ?? 2000;
+  const waterGoal = await baseWaterGoal(db, personId, p?.settings.waterGoalMl ?? 2000);
   return {
     logging: days.filter((d) => d.entries >= 2).map((d) => d.date),
     water: days.filter((d) => d.waterMl >= waterGoal).map((d) => d.date),

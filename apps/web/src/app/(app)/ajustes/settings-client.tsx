@@ -48,7 +48,7 @@ export function ThemePicker() {
 
 type Display = { homeCards: string[]; trackedMicros: string[]; units: "metric" | "imperial"; energyUnit: "kcal" | "kj"; waterGoalMl: number };
 
-export function DisplaySettings({ personId, initial, cards, micros, canEdit }: { personId: string; initial: Display; cards: { code: string; name: string }[]; micros: { code: string; name: string }[]; canEdit: boolean }) {
+export function DisplaySettings({ personId, initial, cards, micros, canEdit, waterAuto = false }: { personId: string; initial: Display; cards: { code: string; name: string }[]; micros: { code: string; name: string }[]; canEdit: boolean; waterAuto?: boolean }) {
   const [v, setV] = useState(initial);
   const [pending, start] = useSafeTransition();
   const move = (i: number, d: -1 | 1) =>
@@ -127,7 +127,7 @@ export function DisplaySettings({ personId, initial, cards, micros, canEdit }: {
             <option value="kj">kJ</option>
           </Select>
         </Field>
-        <Field label="Meta de agua (ml)">
+        <Field label="Meta de agua (ml)" hint={waterAuto ? "Ahora se calcula sola según tu peso y tu entreno (Perfil › Deporte). Esta meta se usa si lo desactivas." : undefined}>
           <Input type="number" min={500} max={8000} step={50} value={v.waterGoalMl} onChange={(e) => setV((x) => ({ ...x, waterGoalMl: Number(e.target.value) }))} />
         </Field>
       </fieldset>

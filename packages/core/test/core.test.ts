@@ -205,6 +205,7 @@ describe("openGym", () => {
           { id: "w2", d: "2026-11-02", start: 7_200_000, end: 9_000_000, name: "Extra", vol: 1000, entries: [] },
         ],
         bodyweight: [{ d: "2026-11-02", w: 84.2, t: 1 }],
+        week: { "1": ["r1"], "3": ["r2"], "6": [] },
       } as Record<string, unknown> & { workouts: unknown[]; bodyweight: { d: string; w: number; t: number }[] },
       fetch: (async (url: string, init?: RequestInit) => {
         const path = String(url).replace("http://og", "");
@@ -243,7 +244,7 @@ describe("openGym", () => {
     expect(s?.exerciseKcal).toBeGreaterThan(100);
     const { integrationAccounts } = await import("@nutria/db");
     const [a] = await db.select().from(integrationAccounts).where(eq(integrationAccounts.id, acc.id));
-    expect(a!.meta).toMatchObject({ rev: 4, workouts: 2, weighIns: 1, name: "Ana" });
+    expect(a!.meta).toMatchObject({ rev: 4, workouts: 2, weighIns: 1, name: "Ana", plannedDays: [1, 3] });
   });
 
   it("si la revisión no cambia no descarga el documento", async () => {
@@ -421,5 +422,67 @@ describe("datos", () => {
     expect(await core.deliverWebhook(db, w!.id, "weight.logged", { kg: 80 }, fake)).toBe(200);
     expect(sig).toBe(`sha256=${hmacSha256("s3cret", body)}`);
     expect((await core.webhooksFor(db, uid, "weight.logged")).length).toBe(1);
+  });
+});
+
+describe("deporte y suplementos", () => {
+  it("perfil deportivo: entreno/descanso con la misma media y agua automática", async () => {
+    await core.saveSportProfile(db, personId, true, { level: "competitive", trainingDays: [1, 3, 5], trainingDaysSource: "manual", cycleCarbs: true, waterAuto: true });
+    const base = await core.recomputeTargets(db, personId, { force: true });
+    const kg = (await core.latestWeight(db, personId))!.kg;
+    expect(base!.protein).toBe(Math.round(2 * kg));
+    const mon = await core.targetsForDate(db, personId, "2030-01-07");
+    const tue = await core.targetsForDate(db, personId, "2030-01-08");
+    expect(mon!.dayKind).toBe("training");
+    expect(tue!.dayKind).toBe("rest");
+    expect(mon!.kcal).toBeGreaterThan(base!.kcal);
+    expect(tue!.kcal).toBeLessThan(base!.kcal);
+    expect(Math.abs(3 * mon!.kcal + 4 * tue!.kcal - 7 * base!.kcal)).toBeLessThanOrEqual(3);
+    expect(mon!.protein).toBe(base!.protein);
+    // In the past a planned day without a workout was a rest day; a logged workout makes it a training day.
+    await db.insert(exerciseLogs).values({ personId, date: "2020-01-07", name: "Pierna", durationMin: 50, kcal: 300, source: "manual" });
+    expect((await core.targetsForDate(db, personId, "2020-01-06"))!.dayKind).toBe("rest");
+    expect((await core.targetsForDate(db, personId, "2020-01-07"))!.dayKind).toBe("training");
+    expect(await core.waterGoalFor(db, personId, "2020-01-07")).toMatchObject({ auto: true, ml: Math.round((35 * kg + 500) / 250) * 250, dayKind: "training" });
+    expect(await core.waterGoalFor(db, personId, "2020-01-06")).toMatchObject({ auto: true, ml: Math.round((35 * kg) / 250) * 250, dayKind: "rest" });
+    // Without carb cycling every day uses the base target.
+    await core.saveSportProfile(db, personId, true, { cycleCarbs: false });
+    expect((await core.targetsForDate(db, personId, "2030-01-07"))!.kcal).toBe(base!.kcal);
+  });
+
+  it("días previstos de openGym salvo que se hayan puesto a mano", async () => {
+    expect(core.plannedDaysFromWeek({ "0": ["a"], "1": ["b"], "3": [], "5": ["c"] })).toEqual([1, 5, 7]);
+    expect(await core.applyPlannedDays(db, personId, [1, 2, 3, 4, 5])).toBe(false);
+    await core.saveSportProfile(db, personId, true, { trainingDaysSource: "opengym" });
+    expect(await core.applyPlannedDays(db, personId, [1, 2, 3, 4, 5])).toBe(true);
+    expect((await core.getSportProfile(db, personId)).profile).toMatchObject({ trainingDays: [1, 2, 3, 4, 5], trainingDaysSource: "opengym", level: "competitive" });
+  });
+
+  it("pauta de creatina: tomar, racha, deshacer y recordatorio", async () => {
+    const plan = await core.addSupplementPlan(db, personId, uid, { code: "creatine", dose: 5, doseUnit: "g", gramsPerDose: 5, times: ["09:00"], daysOfWeek: [1, 2, 3, 4, 5, 6, 7] });
+    expect((await core.supplementFood(db, personId, uid, "creatine")).id).toBe(plan.foodId);
+    await core.takeSupplement(db, personId, uid, plan.id, "2026-12-01");
+    await core.takeSupplement(db, personId, uid, plan.id, "2026-12-01");
+    await core.takeSupplement(db, personId, uid, plan.id, "2026-12-02");
+    const day1 = await db.select().from(diaryEntries).where(and(eq(diaryEntries.personId, personId), eq(diaryEntries.date, "2026-12-01"), eq(diaryEntries.origin, "supplement")));
+    expect(day1).toHaveLength(1);
+    expect(day1[0]).toMatchObject({ grams: 5, kcal: 0, servingLabel: "5 g" });
+    let [st] = await core.supplementsForDate(db, personId, "2026-12-02");
+    expect(st).toMatchObject({ code: "creatine", taken: true, streak: 2, doseLabel: "5 g" });
+    await core.untakeSupplement(db, personId, plan.id, "2026-12-02");
+    [st] = await core.supplementsForDate(db, personId, "2026-12-02");
+    expect(st).toMatchObject({ taken: false, streak: 1 });
+    // Reminder only when the dose is not logged yet.
+    await core.remindersTick(db, core.zonedTime("2026-12-01", "09:02", "Europe/Madrid"));
+    expect(await db.select().from(notifications).where(eq(notifications.type, "supplement"))).toHaveLength(0);
+    await core.remindersTick(db, core.zonedTime("2026-12-03", "09:02", "Europe/Madrid"));
+    expect(await db.select().from(notifications).where(eq(notifications.type, "supplement"))).toHaveLength(1);
+  });
+
+  it("la whey suma proteína al diario", async () => {
+    const plan = await core.addSupplementPlan(db, personId, uid, { code: "whey", dose: 30, doseUnit: "g", gramsPerDose: 30, times: [], daysOfWeek: [1, 2, 3, 4, 5, 6, 7] });
+    const e = await core.takeSupplement(db, personId, uid, plan.id, "2026-12-05");
+    expect(e!.protein).toBeCloseTo(23.4, 1);
+    expect(e!.kcal).toBeCloseTo(114, 0);
   });
 });

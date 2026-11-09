@@ -1,5 +1,6 @@
 import { Suspense } from "react";
 import { eq, persons } from "@nutria/db";
+import { getSportProfile } from "@nutria/core";
 import { CORE_MICROS, NUTRIENTS } from "@nutria/nutrition";
 import { PageHeader } from "@/components/page-header";
 import { Card, CardHeader } from "@/components/ui/card";
@@ -15,12 +16,14 @@ async function Content() {
   const ctx = await getPersonContext();
   const [p] = await db().select({ settings: persons.settings }).from(persons).where(eq(persons.id, ctx.person.id)).limit(1);
   const s = p?.settings ?? {};
+  const sport = await getSportProfile(db(), ctx.person.id);
   const micros = NUTRIENTS.filter((n) => n.category === "vitamin" || n.category === "mineral" || ["sodium", "sugars", "saturated_fat", "caffeine", "alcohol", "omega3"].includes(n.code));
   return (
     <Card>
       <DisplaySettings
         personId={ctx.person.id}
         canEdit={ctx.person.role === "owner" || ctx.person.role === "manager"}
+        waterAuto={sport.active && !!sport.profile.waterAuto}
         cards={HOME_CARDS.map((c) => ({ code: c, name: HOME_CARD_NAMES[c] }))}
         micros={micros.map((n) => ({ code: n.code, name: n.nameEs }))}
         initial={{

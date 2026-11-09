@@ -342,3 +342,57 @@ describe("insights", () => {
     expect(weekStart("2026-11-08")).toBe("2026-11-02");
   });
 });
+
+describe("perfil deportivo", () => {
+  const base = { kcal: 2731, protein: 133, carbs: 345, fat: 91, fiber: 38, micros: {} };
+  it("proteína por nivel y suelo de grasa", async () => {
+    const { sportMacros, sportProfile, sportFatFloor } = await import("../src/sport");
+    const comp = sportMacros(base, 74, sportProfile({ level: "competitive" }));
+    expect(comp.protein).toBe(148);
+    expect(comp.fat).toBe(91);
+    expect(comp.protein * 4 + comp.carbs * 4 + comp.fat * 9).toBeGreaterThan(2720);
+    expect(sportMacros(base, 74, sportProfile({})).protein).toBe(133);
+    // legacy config and clamping
+    expect(sportMacros(base, 74, sportProfile({ proteinPerKg: 3 })).protein).toBe(163);
+    expect(sportFatFloor(2000, 74)).toBe(59);
+    expect(sportMacros({ ...base, fat: 40 }, 74, sportProfile({})).fat).toBe(76);
+  });
+  it("la condición athlete usa el perfil y avisa de pocos hidratos", () => {
+    const t = applyConditions(base, [{ code: "athlete", config: { level: "competitive" } }], 74);
+    expect(t.protein).toBe(148);
+    const low = applyConditions({ ...base, kcal: 2000, carbs: 200 }, [{ code: "athlete", config: { level: "competitive" } }], 74);
+    expect(low.carbs).toBeLessThan(4 * 74);
+  });
+  it("ritmos de volumen y reparto entreno/descanso con la misma media", async () => {
+    const { gainRatePresets, trainingDaySplit, surplusForRate } = await import("../src/sport");
+    const [lean, bulk] = gainRatePresets(74);
+    expect(lean).toMatchObject({ kgPerWeek: 0.19, pctPerWeek: 0.25 });
+    expect(bulk!.kgPerWeek).toBe(0.37);
+    expect(surplusForRate(0.19)).toBe(209);
+    const s = trainingDaySplit(base, 5)!;
+    expect(s.training.kcal - base.kcal).toBe(78);
+    expect(base.kcal - s.rest.kcal).toBe(195);
+    expect(Math.abs(5 * s.training.kcal + 2 * s.rest.kcal - 7 * base.kcal)).toBeLessThanOrEqual(2);
+    expect(s.training.protein).toBe(base.protein);
+    expect(s.rest.fat).toBe(base.fat);
+    expect(trainingDaySplit(base, 0)).toBeNull();
+    expect(trainingDaySplit(base, 7)).toBeNull();
+  });
+  it("agua según peso y entreno", async () => {
+    const { waterTargetMl } = await import("../src/sport");
+    expect(waterTargetMl({ weightKg: 74 })).toBe(2500);
+    expect(waterTargetMl({ weightKg: 74, trainingMin: 60 })).toBe(3250);
+  });
+  it("suplementos: dosis por peso y precauciones", async () => {
+    const { SUPPLEMENT_BY_CODE } = await import("../src/sport");
+    const cr = SUPPLEMENT_BY_CODE.creatine!;
+    expect(cr.dose(74).amount).toBe(3.5);
+    expect(cr.dose(50).amount).toBe(3);
+    expect(cr.dose(120).amount).toBe(5);
+    expect(cr.cautions({ conditions: ["ckd"], pregnant: false, lowLabs: [] })[0]).toMatch(/renal/);
+    const caf = SUPPLEMENT_BY_CODE.caffeine!;
+    expect(caf.dose(74)).toMatchObject({ amount: 220, grams: 0.22 });
+    expect(caf.dose(150).amount).toBe(400);
+    expect(caf.cautions({ conditions: ["hypertension"], pregnant: true, lowLabs: [] }).length).toBe(3);
+  });
+});

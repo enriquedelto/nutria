@@ -17,7 +17,7 @@ import {
   weightLogs,
 } from "@nutria/db";
 import { todayIn } from "@nutria/nutrition";
-import { audit, latestWeight, missingProfileFields, notify, pairOpenGym, recomputeTargets, syncOpenGym, WEBHOOK_EVENTS } from "@nutria/core";
+import { audit, latestWeight, missingProfileFields, notify, pairOpenGym, recomputeTargets, saveSportProfile, syncOpenGym, WEBHOOK_EVENTS } from "@nutria/core";
 import { encrypt, newToken } from "@nutria/integrations";
 import { db } from "@/lib/db";
 import { enqueue } from "@/lib/jobs";
@@ -79,6 +79,26 @@ export async function updateProfile(personId: string, input: z.input<typeof Prof
   await recomputeTargets(db(), personId).catch(() => undefined);
   refresh();
   return { missing: await missingProfileFields(db(), personId) };
+}
+
+const Sport = z.object({
+  active: z.boolean(),
+  focus: z.enum(["hypertrophy", "strength", "general"]),
+  level: z.enum(["recreational", "competitive"]),
+  proteinPerKg: z.number().min(1.6).max(2.2),
+  trainingDays: z.array(z.number().int().min(1).max(7)).max(7),
+  trainingDaysSource: z.enum(["manual", "opengym"]),
+  cycleCarbs: z.boolean(),
+  waterAuto: z.boolean(),
+});
+
+/** Sport profile = config of the "athlete" condition; recalculates the targets. */
+export async function saveSport(personId: string, input: z.input<typeof Sport>) {
+  await manage(personId);
+  const { active, ...v } = Sport.parse(input);
+  await saveSportProfile(db(), personId, active, { ...v, trainingDays: [...new Set(v.trainingDays)].sort(), proteinPerKg: Math.round(v.proteinPerKg * 10) / 10 });
+  await recomputeTargets(db(), personId).catch(() => undefined);
+  refresh();
 }
 
 const Settings = z.object({

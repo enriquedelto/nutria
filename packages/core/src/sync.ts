@@ -19,6 +19,7 @@ import {
 import { macroColumns, normalizeCiqual, normalizeOff, todayIn, type CiqualRow, type FoodInput } from "@nutria/nutrition";
 import { recomputeDay } from "./summaries";
 import { latestWeight } from "./targets";
+import { applyPlannedDays, plannedDaysFromWeek } from "./sport";
 import { notify } from "./notify";
 
 /* ---------------------------------- foods --------------------------------- */
@@ -317,6 +318,8 @@ export async function syncOpenGym(db: Database, accountId: string, f?: typeof fe
     }
     for (const d of dates) await recomputeDay(db, personId, d);
     meta.rev = rev;
+    meta.plannedDays = plannedDaysFromWeek(state?.week);
+    await applyPlannedDays(db, personId, meta.plannedDays as number[]);
     meta.workouts = mapped.exercises.length;
     meta.weighIns = mapped.weights.length;
     await db.update(integrationAccounts).set({ ...set, meta, lastSyncAt: new Date(), lastError: null, status: "active" }).where(eq(integrationAccounts.id, acc.id));

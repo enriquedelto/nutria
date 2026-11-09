@@ -2,6 +2,8 @@ export * from "./jobs";
 export * from "./util";
 export * from "./summaries";
 export * from "./targets";
+export * from "./sport";
+export * from "./supplements";
 export * from "./diary";
 export * from "./notify";
 export * from "./sync";

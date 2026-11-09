@@ -1,6 +1,9 @@
 import { Suspense } from "react";
 import { Lock, Pencil } from "lucide-react";
-import { asc, desc, eq, targetSets } from "@nutria/db";
+import Link from "next/link";
+import { asc, desc, eq, persons, targetSets } from "@nutria/db";
+import { averageSessionMin, getSportProfile, latestWeight, personToday, sportDayVariants } from "@nutria/core";
+import { proteinPerMeal, ratePctOfWeight, sportFatFloor, sportProteinPerKg, surplusForRate, waterTargetMl } from "@nutria/nutrition";
 import { PageHeader } from "@/components/page-header";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -86,6 +89,7 @@ async function Content() {
           </ul>
           <p className="mt-3 text-xs text-ink-3">«Calculado» se actualiza al cambiar tu perfil o peso. «Adaptativo» usa tu gasto real cuando aceptas la propuesta semanal en Progreso. Los días especiales tienen prioridad sobre el conjunto diario.</p>
         </Card>
+        <SportCard personId={pid} base={base} />
       </div>
       <Card>
         <CardHeader title="Micronutrientes" subtitle="Ingestas de referencia de la EFSA para tu perfil" />
@@ -106,6 +110,67 @@ async function Content() {
         )}
       </Card>
     </div>
+  );
+}
+
+const l1 = (x: number) => x.toLocaleString("es-ES", { maximumFractionDigits: 1 });
+const l2 = (x: number) => x.toLocaleString("es-ES", { maximumFractionDigits: 2 });
+
+/** Training vs. rest targets and where each number comes from (only with the sport profile on). */
+async function SportCard({ personId, base }: { personId: string; base: typeof targetSets.$inferSelect }) {
+  const [sport, w, [p], today] = await Promise.all([getSportProfile(db(), personId), latestWeight(db(), personId), db().select({ rate: persons.weeklyRateKg, goal: persons.goalType }).from(persons).where(eq(persons.id, personId)).limit(1), personToday(db(), personId)]);
+  if (!sport.active || !w) return null;
+  const sp = sport.profile;
+  const kg = w.kg;
+  const minutes = await averageSessionMin(db(), personId, today);
+  const v = sportDayVariants(base, sp);
+  const cols = v
+    ? [
+        { title: `Día de entreno (${sp.trainingDays!.length}/sem)`, t: v.training, water: waterTargetMl({ weightKg: kg, trainingMin: minutes }) },
+        { title: `Día de descanso (${7 - sp.trainingDays!.length}/sem)`, t: v.rest, water: waterTargetMl({ weightKg: kg }) },
+      ]
+    : [{ title: "Cada día", t: base, water: waterTargetMl({ weightKg: kg, trainingMin: sp.trainingDays?.length ? (minutes * sp.trainingDays.length) / 7 : 0 }) }];
+  const rate = p?.goal === "gain" ? Math.abs(p.rate ?? 0) : 0;
+  return (
+    <Card>
+      <CardHeader title="Deporte" subtitle={`${{ hypertrophy: "Hipertrofia", strength: "Fuerza", general: "Forma física" }[sp.focus]} · nivel ${sp.level === "competitive" ? "competitivo" : "recreativo"}`} action={<Link href="/ajustes" className="text-sm text-herb">Cambiar</Link>} />
+      <div className={`grid gap-3 ${cols.length > 1 ? "sm:grid-cols-2" : ""}`}>
+        {cols.map((c) => (
+          <div key={c.title} className="rounded-xl bg-paper-2 p-3">
+            <p className="text-sm font-medium text-ink-2">{c.title}</p>
+            <p className="num font-display text-2xl font-semibold">{n0(c.t.kcal)} kcal</p>
+            <p className="num text-sm text-ink-2">
+              P {n0(c.t.protein)} g · H {n0(c.t.carbs)} g · G {n0(c.t.fat)} g
+            </p>
+            <p className="num text-sm text-ink-2">
+              Agua {sport.profile.waterAuto ? `${l1(c.water / 1000)} L` : "objetivo fijo"}
+            </p>
+          </div>
+        ))}
+      </div>
+      {v ? <p className="mt-2 text-xs text-ink-3">Media de la semana: {n0(base.kcal)} kcal (la misma que el objetivo diario). Solo cambian los hidratos.</p> : null}
+      <ul className="mt-3 space-y-1 text-sm text-ink-2">
+        <li>
+          <span className="font-medium text-ink">Proteína:</span> {l1(sportProteinPerKg(sp))} g/kg × {l1(kg)} kg = {n0(sportProteinPerKg(sp) * kg)} g, unos {proteinPerMeal(kg)} g en cada una de 4 comidas.
+        </li>
+        <li>
+          <span className="font-medium text-ink">Grasa:</span> mínimo {sportFatFloor(base.kcal, kg)} g (0,8 g/kg y al menos el 25 % de las kcal).
+        </li>
+        <li>
+          <span className="font-medium text-ink">Hidratos:</span> el resto, {l1(base.carbs / kg)} g/kg{base.carbs / kg < 4 && sp.focus !== "general" ? " — por debajo de los 4 g/kg recomendados para entrenar" : " (recomendado 4–7 g/kg)"}.
+        </li>
+        {rate > 0 ? (
+          <li>
+            <span className="font-medium text-ink">Superávit:</span> +{surplusForRate(rate)} kcal/día para ganar {l2(rate)} kg/semana ({l2(ratePctOfWeight(rate, kg))} % de tu peso; lo recomendado es 0,25–0,5 %).
+          </li>
+        ) : null}
+        {sp.waterAuto ? (
+          <li>
+            <span className="font-medium text-ink">Agua:</span> 35 ml/kg + unos 0,6 L por hora de entreno (tu sesión media: {minutes} min).
+          </li>
+        ) : null}
+      </ul>
+    </Card>
   );
 }
 
