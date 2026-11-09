@@ -53,3 +53,27 @@ describe("groupOf", () => {
     expect(new Set(FOOD_GROUPS.map((g) => g.key)).size).toBe(FOOD_GROUPS.length);
   });
 });
+
+describe("groupOf por nombre (sin categorías)", () => {
+  it.each([
+    ["Contramuslo deshuesado", "carne"],
+    ["Burger meat extra", "carne"],
+    ["Jamon de bellota", "embutidos"],
+    ["Llonganissa extra de pagès", "embutidos"],
+    ["Berberechos al natural", "pescado"],
+    ["Mozarella", "quesos"],
+    ["Iogurt natural", "lacteos"],
+    ["Palmeritas", "dulces"],
+    ["Gofio de millo", "cereales"],
+    ["Aceitunas rellenas", "verduras"],
+    ["Piña en almíbar", "frutas"],
+    ["Cacao soluble", "bebidas"],
+  ])("%s → %s", (name, group) => {
+    expect(groupOf({ name })).toBe(group);
+  });
+  it("aceitunas y cacao por etiqueta", () => {
+    expect(groupOf({ name: "x", categories: ["en:plant-based-foods", "en:pickles", "en:olives"] })).toBe("verduras");
+    expect(groupOf({ name: "x", categories: ["en:cocoa-and-its-products", "en:cocoa-powders"] })).toBe("bebidas");
+    expect(groupOf({ name: "x", categories: ["en:cocoa-and-its-products", "en:chocolates"] })).toBe("dulces");
+  });
+});

@@ -59,15 +59,15 @@ const OFF_RULES: [string, string[]][] = [
   ["legumbres", ["en:legumes", "en:pulses", "en:legumes-and-their-products", "en:chickpeas", "en:lentils", "en:beans", "en:hummus"]],
   ["frutos_secos", ["en:nuts", "en:seeds", "en:nuts-and-their-products", "en:peanuts", "en:almonds", "en:walnuts", "en:nut-butters", "en:peanut-butters"]],
   ["grasas", ["en:fats", "en:vegetable-oils", "en:olive-oils", "en:butters", "en:margarines", "en:animal-fats"]],
-  ["salsas", ["en:condiments", "en:sauces", "en:spices", "en:salts", "en:vinegars", "en:mayonnaises", "en:ketchup", "en:mustards", "en:broths", "en:stocks"]],
-  ["dulces", ["en:sweet-snacks", "en:biscuits-and-cakes", "en:biscuits", "en:cakes", "en:pastries", "en:viennoiseries", "en:confectioneries", "en:chocolates", "en:candies", "en:desserts", "en:ice-creams", "en:sweet-spreads", "en:jams", "en:honeys", "en:sugars"]],
+  ["salsas", ["en:condiments", "en:sauces", "en:spices", "en:salts", "en:vinegars", "en:mayonnaises", "en:ketchup", "en:mustards", "en:broths", "en:stocks", "en:food-additives"]],
+  ["dulces", ["en:sweet-snacks", "en:biscuits-and-cakes", "en:biscuits", "en:cakes", "en:pastries", "en:viennoiseries", "en:confectioneries", "en:chocolates", "en:candies", "en:desserts", "en:ice-creams", "en:sweet-spreads", "en:jams", "en:honeys", "en:sugars", "en:sweeteners", "en:sugar-substitutes", "en:syrups"]],
   ["snacks", ["en:salty-snacks", "en:chips-and-fries", "en:crisps", "en:appetizers", "en:crackers", "en:popcorn"]],
-  ["bebidas", ["en:beverages", "en:waters", "en:sodas", "en:coffees", "en:teas", "en:juices", "en:fruit-juices", "en:plant-based-beverages"]],
+  ["bebidas", ["en:beverages", "en:waters", "en:sodas", "en:coffees", "en:teas", "en:juices", "en:fruit-juices", "en:plant-based-beverages", "en:beverage-preparations", "en:cocoa-and-its-products"]],
   ["pasta_arroz", ["en:pastas", "en:rices", "en:noodles", "en:couscous", "en:semolinas"]],
   ["patatas", ["en:potatoes", "en:potato-products", "en:sweet-potatoes"]],
   ["cereales", ["en:breads", "en:breakfast-cereals", "en:flours", "en:cereals-and-their-products", "en:cereal-grains", "en:oat-flakes", "en:rusks", "en:tortillas"]],
   ["frutas", ["en:fruits", "en:fresh-fruits", "en:dried-fruits", "en:fruits-based-foods", "en:compotes"]],
-  ["verduras", ["en:vegetables", "en:fresh-vegetables", "en:vegetables-based-foods", "en:canned-vegetables", "en:frozen-vegetables", "en:mushrooms", "en:salads"]],
+  ["verduras", ["en:vegetables", "en:fresh-vegetables", "en:vegetables-based-foods", "en:canned-vegetables", "en:frozen-vegetables", "en:mushrooms", "en:salads", "en:pickles", "en:olives"]],
   ["cereales", ["en:cereals-and-potatoes"]],
 ];
 
@@ -76,7 +76,7 @@ const NUT = /(amande|noix|noisette|pistache|cajou|graine|sésame|cacahuète|arac
 const LEGUME = /(lentille|pois chiche|haricot (sec|blanc|rouge|noir)|fève|flageolet|soja, graine|lupin|lenteja|garbanzo|alubia|judía (blanca|pinta)|haba)/;
 const POTATO = /(pomme de terre|patate|topinambour|manioc|igname|patata|boniato|yuca)/;
 const EGG = /(œuf|oeuf|huevo)/;
-const FISH = /(poisson|saumon|thon|cabillaud|merlu|sardine|maquereau|truite|sole|colin|lieu|bar |dorade|anchois|hareng|crevette|moule|huître|calmar|seiche|poulpe|crabe|homard|langoustine|coquille|surimi|pescado|salmón|atún|merluza|bacalao|gamba|mejillón|calamar|pulpo|sardina)/;
+const FISH = /(poisson|saumon|thon|cabillaud|merlu|sardine|maquereau|truite|(?:^| )(?:sole|colin|lieu|bar)[ ,]|dorade|anchois|hareng|crevette|moule|huître|calmar|seiche|poulpe|crabe|homard|langoustine|coquille|surimi|pescado|salmón|atún|merluza|bacalao|gamba|mejillón|calamar|pulpo|sardina)/;
 const COLD_CUT = /(jambon|saucisse|saucisson|chorizo|pâté|rillettes|lardon|bacon|salami|mortadelle|boudin|andouille|jamón|salchicha|salchichón|fuet|lomo embuchado|mortadela|morcilla|fiambre)/;
 const CHEESE = /(fromage|camembert|emmental|comté|mozzarella|parmesan|feta|roquefort|chèvre|brie|gouda|edam|cheddar|ricotta|mascarpone|raclette|reblochon|queso)/;
 const PASTA_RICE = /(pâtes|riz|spaghetti|nouille|semoule|couscous|vermicelle|lasagne|macaroni|tagliatelle|arroz|pasta|fideo|macarrón|espagueti|cuscús)/;
@@ -145,23 +145,27 @@ const NAME_RULES: [RegExp, string][] = [
   [/(tofu|tempeh|seitán|bebida de (soja|avena|almendra|arroz)|heura)/i, "vegetal_proteina"],
   [/(pizza|lasaña|croqueta|empanada|tortilla de patata|paella|sopa|crema de|ensaladilla|sándwich|sandwich|burrito)/i, "platos"],
   [CHEESE, "quesos"],
+  [/(mozarella|formatge|requeson|burrata)/i, "quesos"],
   [COLD_CUT, "embutidos"],
+  [/(jamon|longaniza|llonganissa|sobrasada|lacon|cecina|butifarra|botifarra|chopped|pechuga de pavo|salchichon)/i, "embutidos"],
   [EGG, "huevos"],
   [FISH, "pescado"],
-  [/(pollo|ternera|cerdo|pavo|cordero|conejo|carne|filete|hamburguesa|chicken|beef|pork)/i, "carne"],
-  [/(leche|yogur|kéfir|skyr|nata|cuajada|milk|yogurt)/i, "lacteos"],
+  [/(berberecho|dorada|anchoa|almeja|boqueron|lubina|caballa|bonito|melva|mejillon|langostino|navaja|zamburi|rape|rodaballo|emperador|sepia|atun|salmon)/i, "pescado"],
+  [/(pollo|ternera|cerdo|pavo|cordero|conejo|conill|carne|filete|hamburguesa|hamburgesa|burger|contramuslo|muslo|pechuga|solomillo|costilla|chuleta|entrecot|albondiga|carrillada|secreto|presa iberica|buey|chicken|beef|pork)/i, "carne"],
+  [/(leche|llet|yogur|iogurt|yoghurt|kefir|kéfir|skyr|nata|cuajada|natillas|milk|yogurt)/i, "lacteos"],
   [LEGUME, "legumbres"],
-  [/(galleta|chocolate|bizcocho|magdalena|croissant|donut|caramelo|golosina|helado|mermelada|miel|cookie|cake)/i, "dulces"],
-  [/(patatas fritas|chips|nachos|palomitas|cortezas|crackers)/i, "snacks"],
+  [/(galleta|chocolate|bizcocho|magdalena|croissant|donut|caramelo|golosina|helado|mermelada|miel|cookie|cake|palmera|palmerita|farton|rosco|nevado|bombon|polvoron|mantecado|ensaimada|churro|turron|mazapan|tarta|flan|brownie|gofre|edulcorante|sirope)/i, "dulces"],
+  [/(patatas fritas|chips|nachos|palomitas|crispetes|cortezas|crackers|gusanitos|panchitos)/i, "snacks"],
   [NUT, "frutos_secos"],
   [/(aceite|mantequilla|margarina|manteca|oil|butter)/i, "grasas"],
   [/(salsa|ketchup|mayonesa|mostaza|vinagre|especia|pimienta|orégano|caldo|sauce)/i, "salsas"],
   [PASTA_RICE, "pasta_arroz"],
   [POTATO, "patatas"],
-  [/(pan |pan$|cereales|avena|harina|tostada|muesli|granola|bread|cereal)/i, "cereales"],
+  [/(pan |pan$|cereales|avena|harina|tostada|muesli|granola|gofio|tortitas|picos|regañá|bread|cereal)/i, "cereales"],
   [FRUIT, "frutas"],
-  [/(lechuga|tomate|zanahoria|cebolla|pimiento|brócoli|espinaca|calabac|berenjena|pepino|judía verde|champiñón|verdura|vegetable)/i, "verduras"],
-  [/(agua|refresco|zumo|café|té |infusión|bebida|juice|soda|water)/i, "bebidas"],
+  [/(piña|pina en|platano|melocoton|sandia|aguacate|arandano|frambuesa|higo|ciruela|mango|papaya|granada)/i, "frutas"],
+  [/(lechuga|tomate|zanahoria|cebolla|pimiento|brócoli|brocoli|espinaca|calabac|berenjena|pepino|judía verde|judias verdes|champiñón|champinon|seta|verdura|aceituna|oliva|guisante|alcachofa|esparrago|maiz|coliflor|acelga|puerro|ajo|pepinillo|encurtido|vegetable)/i, "verduras"],
+  [/(agua|refresco|zumo|suc |café|cafe|té |infusión|infusion|bebida|cacao soluble|mate|horchata|juice|soda|water)/i, "bebidas"],
 ];
 
 export interface GroupableFood {
@@ -176,7 +180,9 @@ export function groupOf(f: GroupableFood): string | null {
   if (f.kind === "supplement") return "suplementos";
   if (f.kind === "alcohol") return "alcohol";
   const cats = f.categories ?? [];
-  const names = `${f.nameEs ?? ""} ${f.name}`.toLowerCase();
+  const raw = `${f.nameEs ?? ""} ${f.name}`.toLowerCase();
+  // Keyword rules match with and without accents ("jamon", "jamón").
+  const names = `${raw} ${raw.normalize("NFD").replace(/[\u0300-\u036f]/g, "")}`;
   const ciqual = cats.find((c) => c.startsWith("ciqual:"));
   if (ciqual) return ciqualGroup(ciqual.slice(7), `${f.name} ${f.nameEs ?? ""}`);
   const store = cats.find((c) => c.includes("›"));
