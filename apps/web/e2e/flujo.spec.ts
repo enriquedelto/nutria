@@ -187,7 +187,8 @@ test("coach en el móvil: abrir y borrar conversaciones anteriores", async ({ br
   await expect(sheet.getByRole("link", { name: /Ideas de desayuno con avena/ })).toBeVisible();
   await sheet.getByRole("link", { name: /¿Por qué no bajo de peso\?/ }).click();
   await expect(sheet).toBeHidden();
-  await expect(page.getByText("Y otra pregunta", { exact: true })).toBeVisible();
+  await expect(page.getByText("Y otra pregunta", { exact: true }).first()).toBeVisible();
+  await expect(page.getByText("Ideas de desayuno con avena")).toBeHidden(); // only in the (hidden) desktop list
 
   await page.getByRole("button", { name: /Conversaciones \(\d+\)/ }).click();
   await sheet.getByRole("button", { name: "Borrar conversación «Ideas de desayuno con avena»" }).click();
