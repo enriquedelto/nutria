@@ -2,10 +2,10 @@
 import { createInterface } from "node:readline";
 import { Readable } from "node:stream";
 import { createGunzip } from "node:zlib";
-import { and, eq, exerciseLogs, foods, foodServings, inArray, integrationAccounts, isNull, prices, sql, stores, weightLogs, type Database } from "@nutria/db";
+import { and, eq, exerciseLogs, foods, foodServings, inArray, integrationAccounts, isNull, notInArray, prices, sql, stores, weightLogs, type Database } from "@nutria/db";
 import {
   decrypt,
-  encrypt, newToken,
+  encrypt,
   keepForMirror,
   mapOpenGymState,
   OffClient,
@@ -19,6 +19,7 @@ import {
 import { macroColumns, normalizeCiqual, normalizeOff, todayIn, type CiqualRow, type FoodInput } from "@nutria/nutrition";
 import { recomputeDay } from "./summaries";
 import { latestWeight } from "./targets";
+import { notify } from "./notify";
 
 /* ---------------------------------- foods --------------------------------- */
 
@@ -214,60 +215,136 @@ export async function importCiqualRows(db: Database, rows: CiqualRow[], batch = 
 export interface OpenGymSyncResult {
   exercises: number;
   weights: number;
+  removed: number;
   rev: number;
+  /** False when the revision had not changed and the document was not fetched. */
+  fetched: boolean;
 }
 
-/** Pull openGym state and upsert workouts/weigh-ins idempotently (by externalId). */
-export async function syncOpenGym(db: Database, accountId: string, f?: typeof fetch): Promise<OpenGymSyncResult> {
+const WEEK = 7 * 86_400_000;
+
+/**
+ * Pull openGym (read-only) into exercise_logs / weight_logs:
+ * - polls the cheap revision first and only downloads the state when it changed;
+ * - reconciles against the whole state: new and edited workouts/weigh-ins are upserted, the ones no
+ *   longer in openGym are removed (it is the source of truth for rows with source=opengym);
+ * - renews the pairing token weekly through /api/me (openGym tokens last 90 days);
+ * - on an expired token marks the account "reauth" and tells the user once.
+ */
+export async function syncOpenGym(db: Database, accountId: string, f?: typeof fetch, opts: { force?: boolean } = {}): Promise<OpenGymSyncResult> {
   const [acc] = await db.select().from(integrationAccounts).where(eq(integrationAccounts.id, accountId)).limit(1);
   if (!acc || acc.provider !== "opengym" || !acc.personId || !acc.baseUrl || !acc.credentialsEnc) throw new Error("Cuenta de openGym no válida");
   const personId = acc.personId;
   const client = new OpenGymClient(acc.baseUrl, decrypt(acc.credentialsEnc), f);
+  const meta: Record<string, unknown> = { ...acc.meta };
+  const set: Partial<typeof integrationAccounts.$inferInsert> = {};
   try {
-    const lastRev = Number(acc.meta.rev ?? -1);
-    const { state, rev } = await client.data();
-    if (!state || rev === lastRev) {
-      await db.update(integrationAccounts).set({ lastSyncAt: new Date(), lastError: null, status: "active" }).where(eq(integrationAccounts.id, acc.id));
-      return { exercises: 0, weights: 0, rev };
+    if (Date.now() - Number(meta.meCheckedAt ?? 0) > WEEK) {
+      const me = await client.me();
+      if (me.renewedToken) set.credentialsEnc = encrypt(me.renewedToken);
+      meta.meCheckedAt = Date.now();
+      if (me.name) meta.name = me.name;
     }
+    const lastRev = Number(meta.rev ?? -1);
+    const currentRev = await client.rev();
+    if (currentRev === lastRev && !opts.force) {
+      await db.update(integrationAccounts).set({ ...set, meta, lastSyncAt: new Date(), lastError: null, status: "active" }).where(eq(integrationAccounts.id, acc.id));
+      return { exercises: 0, weights: 0, removed: 0, rev: currentRev, fetched: false };
+    }
+    const { state, rev } = await client.data();
     const w = await latestWeight(db, personId);
-    const mapped = mapOpenGymState(state, w?.kg ?? 75);
+    const mapped = mapOpenGymState(state ?? {}, w?.kg ?? 75);
     const dates = new Set<string>();
+
+    const exIds = mapped.exercises.map((e) => e.externalId);
+    const goneEx = await db
+      .delete(exerciseLogs)
+      .where(and(eq(exerciseLogs.personId, personId), eq(exerciseLogs.source, "opengym"), exIds.length ? notInArray(exerciseLogs.externalId, exIds) : undefined))
+      .returning({ date: exerciseLogs.date });
+    goneEx.forEach((r) => dates.add(r.date));
     if (mapped.exercises.length) {
       const rows = await db
         .insert(exerciseLogs)
-        .values(mapped.exercises.map((e) => ({ personId, date: e.date, startedAt: e.startedAt, name: e.name, durationMin: e.durationMin, kcal: e.kcal, volumeKg: e.volumeKg, sets: e.sets, source: "opengym", externalId: e.externalId, activityCode: "strength_moderate" })))
+        .values(
+          mapped.exercises.map((e) => ({
+            personId,
+            date: e.date,
+            startedAt: e.startedAt,
+            name: e.name,
+            durationMin: e.durationMin,
+            kcal: e.kcal,
+            volumeKg: e.volumeKg,
+            sets: e.sets,
+            details: { ...e.details },
+            source: "opengym",
+            externalId: e.externalId,
+            activityCode: "strength_moderate",
+          })),
+        )
         .onConflictDoUpdate({
           target: [exerciseLogs.personId, exerciseLogs.source, exerciseLogs.externalId],
           targetWhere: sql`${exerciseLogs.externalId} is not null`,
-          set: { name: sql`excluded.name`, durationMin: sql`excluded.duration_min`, kcal: sql`excluded.kcal`, volumeKg: sql`excluded.volume_kg`, sets: sql`excluded.sets`, updatedAt: new Date() },
+          set: {
+            date: sql`excluded.date`,
+            startedAt: sql`excluded.started_at`,
+            name: sql`excluded.name`,
+            durationMin: sql`excluded.duration_min`,
+            kcal: sql`excluded.kcal`,
+            volumeKg: sql`excluded.volume_kg`,
+            sets: sql`excluded.sets`,
+            details: sql`excluded.details`,
+            updatedAt: new Date(),
+          },
         })
         .returning({ date: exerciseLogs.date });
       rows.forEach((r) => dates.add(r.date));
     }
+
+    const wIds = mapped.weights.map((x) => x.externalId);
+    const goneW = await db
+      .delete(weightLogs)
+      .where(and(eq(weightLogs.personId, personId), eq(weightLogs.source, "opengym"), wIds.length ? notInArray(weightLogs.externalId, wIds) : undefined))
+      .returning({ id: weightLogs.id });
     if (mapped.weights.length) {
       await db
         .insert(weightLogs)
         .values(mapped.weights.map((x) => ({ personId, date: x.date, measuredAt: x.measuredAt, kg: x.kg, source: "opengym", externalId: x.externalId })))
-        .onConflictDoNothing();
+        .onConflictDoUpdate({
+          target: [weightLogs.personId, weightLogs.source, weightLogs.externalId],
+          targetWhere: sql`${weightLogs.externalId} is not null`,
+          set: { kg: sql`excluded.kg`, measuredAt: sql`excluded.measured_at` },
+        });
     }
     for (const d of dates) await recomputeDay(db, personId, d);
-    await db.update(integrationAccounts).set({ lastSyncAt: new Date(), lastError: null, status: "active", meta: { ...acc.meta, rev } }).where(eq(integrationAccounts.id, acc.id));
-    return { exercises: mapped.exercises.length, weights: mapped.weights.length, rev };
+    meta.rev = rev;
+    meta.workouts = mapped.exercises.length;
+    meta.weighIns = mapped.weights.length;
+    await db.update(integrationAccounts).set({ ...set, meta, lastSyncAt: new Date(), lastError: null, status: "active" }).where(eq(integrationAccounts.id, acc.id));
+    return { exercises: mapped.exercises.length, weights: mapped.weights.length, removed: goneEx.length + goneW.length, rev, fetched: true };
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e);
-    await db.update(integrationAccounts).set({ lastError: msg, status: /caducado|401/.test(msg) ? "reauth" : "error" }).where(eq(integrationAccounts.id, acc.id));
+    const reauth = /caducado|401/.test(msg);
+    await db.update(integrationAccounts).set({ ...set, meta, lastError: msg, status: reauth ? "reauth" : "error" }).where(eq(integrationAccounts.id, acc.id));
+    if (reauth && acc.status !== "reauth" && acc.userId)
+      await notify(db, {
+        userId: acc.userId,
+        type: "integration",
+        title: "Vuelve a emparejar openGym",
+        body: "El acceso a openGym ha caducado. Genera un código nuevo en openGym y emparéjalo en Ajustes → Integraciones.",
+        url: "/ajustes/integraciones",
+        tag: `opengym:${acc.id}`,
+      }).catch(() => undefined);
     throw e;
   }
 }
 
-/** Pair with an openGym instance (one-time code) and store the encrypted token. */
+/** Pair with an openGym instance (one-time code from Settings → "Pair the mobile app") and store the encrypted token. */
 export async function pairOpenGym(db: Database, input: { userId: string; personId: string; baseUrl: string; code: string }, f?: typeof fetch) {
   const client = new OpenGymClient(input.baseUrl, undefined, f);
-  const token = await client.redeem(input.code);
+  const token = await client.redeem(input.code.trim().toUpperCase());
   const [acc] = await db
     .insert(integrationAccounts)
-    .values({ userId: input.userId, personId: input.personId, provider: "opengym", baseUrl: input.baseUrl.replace(/\/$/, ""), credentialsEnc: encrypt(token), webhookSecretEnc: encrypt(newToken("whs").token), status: "active" })
+    .values({ userId: input.userId, personId: input.personId, provider: "opengym", baseUrl: input.baseUrl.replace(/\/$/, ""), credentialsEnc: encrypt(token), status: "active", meta: {} })
     .returning();
   return acc!;
 }

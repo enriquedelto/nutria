@@ -9,8 +9,8 @@ import { aiConfigured } from "@/lib/ai";
 import { db } from "@/lib/db";
 import { dateShort } from "@/lib/format";
 import { getPersonContext } from "@/lib/session";
-import { cn } from "@/lib/utils";
 import { Chat, type ChatMessage, type ChatProposal } from "./chat";
+import { ConversationList, ConversationsSheet, type ConversationItem } from "./conversations";
 
 export const metadata = { title: "Coach" };
 
@@ -27,6 +27,7 @@ async function Content({ searchParams }: { searchParams: Promise<Record<string, 
     .orderBy(desc(aiConversations.updatedAt))
     .limit(30);
   const current = sp.c && convs.some((c) => c.id === sp.c) ? sp.c : null;
+  const items: ConversationItem[] = convs.map((c) => ({ id: c.id, title: c.title, date: dateShort(c.updatedAt.toISOString().slice(0, 10)) }));
   const msgs = current ? await db().select().from(aiMessages).where(eq(aiMessages.conversationId, current)).orderBy(asc(aiMessages.createdAt)) : [];
   const initial: ChatMessage[] = msgs
     .filter((m) => m.role === "user" || m.role === "assistant")
@@ -47,27 +48,21 @@ async function Content({ searchParams }: { searchParams: Promise<Record<string, 
         <Link href="/coach/memoria" className="flex items-center gap-2 rounded-xl px-3 py-2 text-sm text-ink-2 hover:bg-paper-2">
           <Brain className="size-4" /> Lo que recuerda
         </Link>
-        <ul className="space-y-0.5">
-          {convs.map((c) => (
-            <li key={c.id}>
-              <Link href={`/coach?c=${c.id}`} className={cn("block rounded-xl px-3 py-2 text-sm hover:bg-paper-2", c.id === current && "bg-paper-2 font-medium")}>
-                <span className="block truncate">{c.title ?? "Conversación"}</span>
-                <span className="text-xs text-ink-3">{dateShort(c.updatedAt.toISOString().slice(0, 10))}</span>
-              </Link>
-            </li>
-          ))}
-        </ul>
+        <ConversationList convs={items} current={current} />
       </aside>
       <div>
-        <div className="mb-3 flex items-center justify-between lg:hidden">
-          <Link href="/coach/memoria" className="flex items-center gap-1 text-sm text-ink-2">
-            <Brain className="size-4" /> Memoria
-          </Link>
-          {current ? (
-            <Link href="/coach" className="text-sm text-herb">
-              Nueva conversación
+        <div className="mb-3 flex items-center justify-between gap-2 lg:hidden">
+          <ConversationsSheet convs={items} current={current} />
+          <div className="flex items-center gap-3">
+            <Link href="/coach/memoria" className="flex items-center gap-1 text-sm text-ink-2">
+              <Brain className="size-4" /> Memoria
             </Link>
-          ) : null}
+            {current ? (
+              <Link href="/coach" className="flex items-center gap-1 text-sm text-herb" aria-label="Nueva conversación">
+                <MessageSquarePlus className="size-4" /> Nueva
+              </Link>
+            ) : null}
+          </div>
         </div>
         <Chat key={current ?? "new"} personId={ctx.person.id} conversationId={current} initial={initial} personName={ctx.person.isSelf ? ctx.user.name : ctx.person.name} prompt={!current && sp.q ? sp.q.slice(0, 500) : undefined} />
       </div>

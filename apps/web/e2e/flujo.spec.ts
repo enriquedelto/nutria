@@ -172,6 +172,32 @@ test("coach: la respuesta aparece mientras se genera, sin romper la página", as
   expect(errors).toEqual([]);
 });
 
+test("coach en el móvil: abrir y borrar conversaciones anteriores", async ({ browser }) => {
+  const ctx = await browser.newContext({ storageState: await adminPage.context().storageState(), viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true });
+  const page = await ctx.newPage();
+  await page.goto("/coach");
+  await page.getByRole("textbox", { name: "Mensaje" }).fill("Ideas de desayuno con avena");
+  await page.getByRole("button", { name: "Enviar" }).click();
+  await expect(page.getByText(/\(simulado\) He recibido/)).toHaveCount(1);
+  await expect(page).toHaveURL(/\/coach\?c=/);
+
+  // The first conversation (from the previous test) is reachable from the phone.
+  await page.getByRole("button", { name: /Conversaciones \(\d+\)/ }).click();
+  const sheet = page.getByRole("dialog", { name: "Conversaciones" });
+  await expect(sheet.getByRole("link", { name: /Ideas de desayuno con avena/ })).toBeVisible();
+  await sheet.getByRole("link", { name: /¿Por qué no bajo de peso\?/ }).click();
+  await expect(sheet).toBeHidden();
+  await expect(page.getByText("Y otra pregunta", { exact: true })).toBeVisible();
+
+  await page.getByRole("button", { name: /Conversaciones \(\d+\)/ }).click();
+  await sheet.getByRole("button", { name: "Borrar conversación «Ideas de desayuno con avena»" }).click();
+  await sheet.getByRole("button", { name: "Borrar", exact: true }).click();
+  await expect(page.getByText("Conversación borrada")).toBeVisible();
+  await expect(sheet.getByRole("link", { name: /Ideas de desayuno con avena/ })).toHaveCount(0);
+  await expect(sheet.getByRole("link", { name: /¿Por qué no bajo de peso\?/ })).toBeVisible();
+  await ctx.close();
+});
+
 test("plan semanal: añadir la receta y mandarla a la compra", async () => {
   const page = adminPage;
   await page.goto("/planes");
@@ -390,24 +416,44 @@ test("webhooks: salida firmada (Home Assistant) y peso de entrada con token", as
   expect(pesos.filter((p) => p.kg === 63.4)).toHaveLength(1);
 });
 
-test("openGym: emparejar con código e importar entreno y pesaje", async () => {
+test("openGym: emparejar con código, importar entreno con sus ejercicios y reflejar borrados", async () => {
   const page = adminPage;
+  // The fake openGym is published on the NUC as 127.0.0.1:8132 (tunnelled like the app).
+  const fakes = process.env.E2E_FAKES_URL ?? "http://127.0.0.1:8132";
+  await page.request.post(`${fakes}/fake/og/reset`);
   await page.goto("/ajustes/integraciones");
+  await expect(page.getByText("Emparejar la app móvil")).toBeVisible();
   await page.getByLabel("Dirección de openGym").fill("http://fakes:8080");
-  await page.getByLabel("Código de emparejamiento").fill("000000");
+  await page.getByLabel("Código de emparejamiento").fill("ZZZZ2222");
   await page.getByRole("button", { name: "Conectar" }).click();
   await expect(page.getByText("Código de emparejamiento no válido o caducado")).toBeVisible();
-  await page.getByLabel("Código de emparejamiento").fill("123456");
+  await page.getByLabel("Código de emparejamiento").fill("k7wq2mzp");
   await page.getByRole("button", { name: "Conectar" }).click();
-  await expect(page.getByText(/openGym conectado/)).toBeVisible();
-  await expect(async () => {
-    await page.goto("/salud/ejercicio");
-    await expect(page.getByText("Pierna (openGym e2e)")).toBeVisible({ timeout: 2000 });
-  }).toPass({ timeout: 60_000 });
+  await expect(page.getByText("openGym conectado: 1 entrenos y 1 pesajes importados")).toBeVisible();
+  await expect(page.getByText(/Se sincroniza sola cada 2 min/)).toBeVisible();
+  await expect(page.getByText("Ana (openGym)", { exact: false })).toBeVisible();
+  await expect(page.getByText("api/hooks/opengym")).toHaveCount(0);
+
+  await page.goto("/salud/ejercicio");
+  await expect(page.getByText("Pierna (openGym e2e)")).toBeVisible();
+  await page.getByText("2 ejercicios · 1 récord").click();
+  await expect(page.getByText("Sentadilla con barra alta")).toBeVisible();
+  await expect(page.getByText("3×8 · 60 kg")).toBeVisible();
+  await expect(page.getByText("Zancada en mi banco")).toBeVisible();
+  await expect(page.getByText("12×10 kg, 10×12 kg")).toBeVisible();
+
   await page.goto("/ajustes/datos");
   const href = await page.getByRole("link", { name: "Todo (JSON)" }).getAttribute("href");
   const pesos = ((await (await page.request.get(href!)).json()) as { data: { pesos: { kg: number; source: string }[] } }).data.pesos;
   expect(pesos.some((p) => p.kg === 61.8 && p.source === "opengym")).toBe(true);
+
+  // Deleted in openGym → gone from Nutria on the next sync.
+  await page.request.post(`${fakes}/fake/og/delete`);
+  await page.goto("/ajustes/integraciones");
+  await page.getByRole("button", { name: "Sincronizar ahora" }).click();
+  await expect(page.getByText("Sincronizado: 0 entrenos y 1 pesajes · 1 borrados")).toBeVisible();
+  await page.goto("/salud/ejercicio");
+  await expect(page.getByText("Pierna (openGym e2e)")).toHaveCount(0);
 });
 
 test("IA en la cocina (simulada): sustituciones y foto de la nevera", async () => {

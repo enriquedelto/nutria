@@ -246,14 +246,24 @@ const getForecast = define({
 
 const getExercise = define({
   name: "get_exercise",
-  description: "Ejercicio (manual u openGym) y pasos de los últimos días.",
+  description: "Ejercicio (manual u openGym) y pasos de los últimos días. Los entrenos de openGym traen los ejercicios con sus series (repeticiones×kg) y los récords del día.",
   scope: "body",
   input: z.object({ days: days(60, 14) }),
   async run({ days: n }, ctx) {
     const from = addDays(today(ctx), -n);
-    const ex = await ctx.db.select({ date: exerciseLogs.date, name: exerciseLogs.name, durationMin: exerciseLogs.durationMin, kcal: exerciseLogs.kcal, volumeKg: exerciseLogs.volumeKg, source: exerciseLogs.source }).from(exerciseLogs).where(and(eq(exerciseLogs.personId, ctx.personId), gte(exerciseLogs.date, from))).orderBy(desc(exerciseLogs.date));
+    const rows = await ctx.db.select({ date: exerciseLogs.date, name: exerciseLogs.name, durationMin: exerciseLogs.durationMin, kcal: exerciseLogs.kcal, volumeKg: exerciseLogs.volumeKg, source: exerciseLogs.source, details: exerciseLogs.details }).from(exerciseLogs).where(and(eq(exerciseLogs.personId, ctx.personId), gte(exerciseLogs.date, from))).orderBy(desc(exerciseLogs.date));
+    type Ex = { name?: string; sets?: { kg: number | null; reps: number | null }[] };
+    const exercise = rows.map(({ details, ...r }) => {
+      const exs = Array.isArray(details.exercises) ? (details.exercises as Ex[]) : [];
+      const prs = Array.isArray(details.prs) ? (details.prs as string[]) : [];
+      return {
+        ...r,
+        ...(exs.length ? { exercises: exs.map((e) => ({ name: e.name, sets: (e.sets ?? []).map((s) => `${s.reps ?? "?"}${s.kg ? `×${s.kg}kg` : ""}`).join(", ") })) } : {}),
+        ...(prs.length ? { prs } : {}),
+      };
+    });
     const steps = await ctx.db.select({ date: stepLogs.date, steps: stepLogs.steps }).from(stepLogs).where(and(eq(stepLogs.personId, ctx.personId), gte(stepLogs.date, from))).orderBy(desc(stepLogs.date));
-    return { exercise: ex, steps };
+    return { exercise, steps };
   },
 });
 

@@ -115,10 +115,10 @@ export const handlers: Handlers = {
   [JOBS.medicationDoses]: async (_d, { db }) => ({ created: await generateMedicationDoses(db) }),
   [JOBS.expiryCheck]: async (_d, { db }) => ({ sent: await expiryCheck(db) }),
 
-  [JOBS.opengymSync]: async ({ accountId }, { db }) => syncOpenGym(db, accountId),
+  [JOBS.opengymSync]: async ({ accountId, force }, { db }) => syncOpenGym(db, accountId, undefined, { force }),
   [JOBS.opengymSyncAll]: async (_d, { db, boss }) => {
     const accs = await db.select({ id: integrationAccounts.id }).from(integrationAccounts).where(and(eq(integrationAccounts.provider, "opengym"), eq(integrationAccounts.status, "active")));
-    for (const a of accs) await boss.send(JOBS.opengymSync, { accountId: a.id }, { singletonKey: a.id, singletonSeconds: 600 } as never);
+    for (const a of accs) await boss.send(JOBS.opengymSync, { accountId: a.id }, { singletonKey: a.id, singletonSeconds: 90 } as never);
     return { queued: accs.length };
   },
 

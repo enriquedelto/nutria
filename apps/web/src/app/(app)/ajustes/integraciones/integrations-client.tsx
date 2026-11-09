@@ -168,7 +168,7 @@ export function WebhookActions({ id, enabled }: { id: string; enabled: boolean }
 
 /* --------------------------------- openGym -------------------------------- */
 
-export function OpenGymConnect({ personId, defaultUrl }: { personId: string; defaultUrl: string }) {
+export function OpenGymConnect({ personId, defaultUrl, label = "Conectar" }: { personId: string; defaultUrl: string; label?: string }) {
   const [pending, start] = useSafeTransition();
   return (
     <form
@@ -176,8 +176,8 @@ export function OpenGymConnect({ personId, defaultUrl }: { personId: string; def
       onSubmit={submitForm((fd) =>
         start(async () => {
           try {
-            await connectOpenGym(personId, String(fd.get("url")), String(fd.get("code")));
-            toast.success("openGym conectado. Importando historial…");
+            const r = await connectOpenGym(personId, String(fd.get("url")), String(fd.get("code")));
+            toast.success(r ? `openGym conectado: ${r.exercises} entrenos y ${r.weights} pesajes importados` : "openGym conectado. Importando historial…");
           } catch (e) {
             toast.error(errorText(e, "No se pudo emparejar"));
           }
@@ -188,10 +188,10 @@ export function OpenGymConnect({ personId, defaultUrl }: { personId: string; def
         <Input name="url" type="url" required defaultValue={defaultUrl} />
       </Field>
       <Field label="Código de emparejamiento">
-        <Input name="code" required className="num uppercase tracking-widest" autoComplete="off" />
+        <Input name="code" required minLength={6} maxLength={12} pattern="[A-Za-z0-9]{6,12}" placeholder="K7WQ2MZP" className="num uppercase tracking-widest" autoComplete="off" autoCapitalize="characters" spellCheck={false} />
       </Field>
       <Button type="submit" disabled={pending}>
-        Conectar
+        {label}
       </Button>
     </form>
   );
@@ -201,11 +201,19 @@ export function IntegrationActions({ id }: { id: string }) {
   const [pending, start] = useSafeTransition();
   return (
     <div className="flex gap-1">
-      <Button size="sm" variant="outline" disabled={pending} onClick={() => start(async () => {
-        await syncIntegration(id);
-        toast("Sincronizando…");
-      })}>
-        <RefreshCw /> Sincronizar
+      <Button
+        size="sm"
+        variant="outline"
+        disabled={pending}
+        onClick={() =>
+          start(async () => {
+            const r = await syncIntegration(id);
+            if (!r) return;
+            toast.success(r.fetched ? `Sincronizado: ${r.exercises} entrenos y ${r.weights} pesajes${r.removed ? ` · ${r.removed} borrados` : ""}` : "Sin cambios desde la última vez");
+          })
+        }
+      >
+        <RefreshCw className={pending ? "animate-spin" : undefined} /> Sincronizar ahora
       </Button>
       <Button size="sm" variant="ghost" disabled={pending} onClick={() => start(() => disconnectIntegration(id))}>
         Desconectar

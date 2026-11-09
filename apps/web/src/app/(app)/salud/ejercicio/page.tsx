@@ -14,6 +14,26 @@ import { requireScope } from "@/lib/session";
 
 export const metadata = { title: "Ejercicio y pasos" };
 
+type WorkoutSet = { kg: number | null; reps: number | null };
+type WorkoutExercise = { id: string; name: string; sets: WorkoutSet[] };
+
+const kgText = (kg: number) => `${Number(kg.toFixed(1)).toLocaleString("es-ES")} kg`;
+
+/** «3×8 · 60 kg» when every set is the same, otherwise «8×60 kg, 8×60 kg, 6×65 kg». */
+function setsText(sets: WorkoutSet[]) {
+  if (!sets.length) return "";
+  const same = sets.every((s) => s.kg === sets[0]!.kg && s.reps === sets[0]!.reps);
+  if (same) {
+    const s = sets[0]!;
+    return `${sets.length}×${s.reps ?? "?"}${s.kg ? ` · ${kgText(s.kg)}` : ""}`;
+  }
+  return sets.map((s) => `${s.reps ?? "?"}${s.kg ? `×${kgText(s.kg)}` : ""}`).join(", ");
+}
+
+function workoutExercises(details: Record<string, unknown>): WorkoutExercise[] {
+  return Array.isArray(details.exercises) ? (details.exercises as WorkoutExercise[]).filter((e) => e && typeof e.name === "string" && Array.isArray(e.sets)) : [];
+}
+
 async function Content() {
   const ctx = await requireScope("body");
   const pid = ctx.person.id;
@@ -48,17 +68,40 @@ async function Content() {
           <CardHeader title="Sesiones" action={<Link href="/ajustes/integraciones" className="text-sm text-herb hover:underline">Conectar openGym</Link>} />
           {logs.length ? (
             <ul className="divide-y divide-line text-sm">
-              {logs.map((l) => (
-                <li key={l.id} className="flex items-center gap-3 py-2">
-                  <span className="w-20 text-ink-3">{relativeDay(l.date, today)}</span>
-                  <span className="flex-1">
-                    {l.name} <span className="text-ink-3">· {n0(l.durationMin)} min</span>
-                    {l.volumeKg ? <span className="text-ink-3"> · {n0(l.volumeKg)} kg de volumen</span> : null}
-                  </span>
-                  <span className="num">{n0(l.kcal)} kcal</span>
-                  {l.source !== "manual" ? <Badge>{l.source}</Badge> : ctx.canWrite ? <DeleteExercise personId={pid} id={l.id} /> : null}
-                </li>
-              ))}
+              {logs.map((l) => {
+                const exs = workoutExercises(l.details);
+                const prs = Array.isArray(l.details.prs) ? (l.details.prs as string[]) : [];
+                return (
+                  <li key={l.id} className="py-2">
+                    <div className="flex items-center gap-3">
+                      <span className="w-20 text-ink-3">{relativeDay(l.date, today)}</span>
+                      <span className="flex-1">
+                        {l.name} <span className="text-ink-3">· {n0(l.durationMin)} min</span>
+                        {l.volumeKg ? <span className="text-ink-3"> · {n0(l.volumeKg)} kg de volumen</span> : null}
+                      </span>
+                      <span className="num">{n0(l.kcal)} kcal</span>
+                      {l.source !== "manual" ? <Badge>{l.source}</Badge> : ctx.canWrite ? <DeleteExercise personId={pid} id={l.id} /> : null}
+                    </div>
+                    {exs.length ? (
+                      <details className="group ml-23 mt-1">
+                        <summary className="cursor-pointer text-xs text-herb hover:underline">
+                          {exs.length} {exs.length === 1 ? "ejercicio" : "ejercicios"}
+                          {prs.length ? ` · ${prs.length} ${prs.length === 1 ? "récord" : "récords"}` : ""}
+                        </summary>
+                        <ul className="mt-1 space-y-0.5 text-xs text-ink-2">
+                          {exs.map((e, i) => (
+                            <li key={`${e.id}-${i}`}>
+                              <span className="text-ink">{e.name}</span>
+                              {e.sets.length ? <span className="num"> · {setsText(e.sets)}</span> : null}
+                              {prs.includes(e.name) ? <span className="text-persimmon"> · récord</span> : null}
+                            </li>
+                          ))}
+                        </ul>
+                      </details>
+                    ) : null}
+                  </li>
+                );
+              })}
             </ul>
           ) : (
             <Empty title="Sin ejercicio en las últimas 4 semanas" />

@@ -122,6 +122,43 @@ describe("openGym", () => {
     expect(exercises[0]).toMatchObject({ externalId: "w1", durationMin: 60, sets: 2, volumeKg: 10000 });
     expect(exercises[0]!.kcal).toBeGreaterThan(100);
     expect(weights[0]!.kg).toBeCloseTo(80, 0);
+    expect(weights[0]!.externalId).toBe("bw:2026-11-01");
+  });
+  it("detalla ejercicios y series con nombres del catálogo y propios, y un pesaje por día", () => {
+    const { exercises, weights } = mapOpenGymState(
+      {
+        unit: "lb",
+        customEx: [{ id: "c-1", name: "Remo en mi polea" }],
+        workouts: [
+          {
+            id: "w2",
+            d: "2026-11-03",
+            entries: [
+              { id: "1436", sets: [{ w: 135, r: 8 }, { w: 135, r: 8, done: false }] },
+              { id: "c-1", sets: [{ r: 12 }] },
+              { id: "no-existe", sets: [] },
+            ],
+            prs: ["1436"],
+          },
+        ],
+        bodyweight: [
+          { d: "2026-11-03", w: 180, t: 1000 },
+          { d: "2026-11-03", w: 178, t: 2000 },
+        ],
+      },
+      80,
+    );
+    expect(exercises[0]!.details).toEqual({
+      exercises: [
+        { id: "1436", name: "Sentadilla con barra alta", sets: [{ kg: 61.2, reps: 8 }] },
+        { id: "c-1", name: "Remo en mi polea", sets: [{ kg: null, reps: 12 }] },
+        { id: "no-existe", name: "Ejercicio", sets: [] },
+      ],
+      prs: ["Sentadilla con barra alta"],
+    });
+    expect(exercises[0]!.durationMin).toBe(45);
+    expect(weights).toHaveLength(1);
+    expect(weights[0]!.kg).toBeCloseTo(80.74, 1);
   });
 });
 

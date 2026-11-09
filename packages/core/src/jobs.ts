@@ -33,7 +33,7 @@ export interface JobPayloads {
   "reminders.tick": Record<string, never>;
   "medication.doses": { date?: string };
   "pantry.expiry": Record<string, never>;
-  "opengym.sync": { accountId: string };
+  "opengym.sync": { accountId: string; force?: boolean };
   "opengym.sync-all": Record<string, never>;
   "off.mirror": { url?: string; countries?: string[] };
   "off.refresh-product": { barcode: string };
@@ -55,7 +55,7 @@ export const SCHEDULES: { name: JobName; cron: string }[] = [
   { name: JOBS.remindersTick, cron: "*/5 * * * *" },
   { name: JOBS.medicationDoses, cron: "5 0 * * *" },
   { name: JOBS.expiryCheck, cron: "0 9 * * *" },
-  { name: JOBS.opengymSyncAll, cron: "*/15 * * * *" },
+  { name: JOBS.opengymSyncAll, cron: "*/2 * * * *" },
   { name: JOBS.tdeeWeekly, cron: "0 6 * * 1" },
   { name: JOBS.weeklyReport, cron: "0 9 * * 1" },
   { name: JOBS.gamification, cron: "30 23 * * *" },

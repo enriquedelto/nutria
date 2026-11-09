@@ -17,7 +17,7 @@ import {
   weightLogs,
 } from "@nutria/db";
 import { todayIn } from "@nutria/nutrition";
-import { audit, latestWeight, missingProfileFields, notify, pairOpenGym, recomputeTargets, WEBHOOK_EVENTS } from "@nutria/core";
+import { audit, latestWeight, missingProfileFields, notify, pairOpenGym, recomputeTargets, syncOpenGym, WEBHOOK_EVENTS } from "@nutria/core";
 import { encrypt, newToken } from "@nutria/integrations";
 import { db } from "@/lib/db";
 import { enqueue } from "@/lib/jobs";
@@ -216,7 +216,12 @@ export async function testWebhook(id: string) {
 export async function connectOpenGym(personId: string, baseUrl: string, code: string) {
   const u = await manage(personId);
   const url = z.string().url().max(300).parse(baseUrl.trim());
-  const c = z.string().trim().min(4).max(100).parse(code);
+  const c = z
+    .string()
+    .trim()
+    .toUpperCase()
+    .regex(/^[A-Z0-9]{6,12}$/, "El código son 8 letras y números (openGym → Ajustes → Emparejar la app móvil)")
+    .parse(code);
   const existing = await db().select({ id: integrationAccounts.id }).from(integrationAccounts).where(and(eq(integrationAccounts.userId, u.id), eq(integrationAccounts.provider, "opengym"), eq(integrationAccounts.personId, personId)));
   if (existing.length) await db().delete(integrationAccounts).where(eq(integrationAccounts.id, existing[0]!.id));
   const acc = await pairOpenGym(db(), { userId: u.id, personId, baseUrl: url, code: c }).catch((e: unknown) => {
@@ -224,15 +229,26 @@ export async function connectOpenGym(personId: string, baseUrl: string, code: st
     const m = e instanceof Error ? e.message : "";
     throw new UserError(/código|openGym/i.test(m) ? m : "No se pudo conectar con openGym en esa dirección");
   });
-  await enqueue("opengym.sync", { accountId: acc.id });
+  // First import right away so the user sees the result; if it is slow or fails, the worker retries.
+  const r = await syncOpenGym(db(), acc.id, undefined, { force: true }).catch(async () => {
+    await enqueue("opengym.sync", { accountId: acc.id, force: true });
+    return null;
+  });
   refresh();
+  return r ? { exercises: r.exercises, weights: r.weights } : null;
 }
 
 export async function syncIntegration(id: string) {
   const u = await me();
   const [a] = await db().select().from(integrationAccounts).where(and(eq(integrationAccounts.id, uuid.parse(id)), eq(integrationAccounts.userId, u.id))).limit(1);
   if (!a) throw new UserError("No encontrado");
-  if (a.provider === "opengym") await enqueue("opengym.sync", { accountId: a.id });
+  if (a.provider !== "opengym") return null;
+  // Run it here (not queued) so the button answers with what changed.
+  const r = await syncOpenGym(db(), a.id, undefined, { force: true }).catch((e: unknown) => {
+    throw new UserError(e instanceof Error && /openGym|caducado/.test(e.message) ? e.message : "No se pudo conectar con openGym");
+  });
+  refresh();
+  return r;
 }
 
 export async function disconnectIntegration(id: string) {

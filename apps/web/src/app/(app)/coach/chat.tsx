@@ -31,11 +31,13 @@ function Reveal({ text }: { text: string }) {
 function useElapsed(running: boolean) {
   const [s, setS] = useState(0);
   useEffect(() => {
-    setS(0);
     if (!running) return;
     const t0 = Date.now();
     const id = setInterval(() => setS(Math.floor((Date.now() - t0) / 1000)), 1000);
-    return () => clearInterval(id);
+    return () => {
+      clearInterval(id);
+      setS(0);
+    };
   }, [running]);
   return s;
 }

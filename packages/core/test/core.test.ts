@@ -183,24 +183,114 @@ describe("diario", () => {
 });
 
 describe("openGym", () => {
-  it("sincroniza entrenos y pesajes sin duplicar", async () => {
-    const [p] = await db.select().from(persons).where(eq(persons.id, personId));
+  /** Fake openGym server: mutable state, request log, configurable token behaviour. */
+  function fakeOpenGym() {
+    const o = {
+      rev: 3,
+      token: "tok",
+      renew: null as string | null,
+      calls: [] as string[],
+      state: {
+        unit: "kg",
+        workouts: [
+          { id: "w1", d: "2026-11-02", start: 0, end: 3_600_000, name: "Torso", vol: 8000, entries: [{ id: "1436", sets: [{ w: 80, r: 8 }] }] },
+          { id: "w2", d: "2026-11-02", start: 7_200_000, end: 9_000_000, name: "Extra", vol: 1000, entries: [] },
+        ],
+        bodyweight: [{ d: "2026-11-02", w: 84.2, t: 1 }],
+      } as Record<string, unknown> & { workouts: unknown[]; bodyweight: { d: string; w: number; t: number }[] },
+      fetch: (async (url: string, init?: RequestInit) => {
+        const path = String(url).replace("http://og", "");
+        o.calls.push(path);
+        if ((init?.headers as Record<string, string>).Authorization !== `Bearer ${o.token}`) return new Response("{}", { status: 401 });
+        if (path === "/api/me") return Response.json({ user: { name: "Ana" }, ...(o.renew ? { token: o.renew } : {}) });
+        if (path === "/api/data/rev") return Response.json({ rev: o.rev, wid: "x" });
+        if (path === "/api/data") return Response.json({ rev: o.rev, state: o.state });
+        return new Response("{}", { status: 404 });
+      }) as unknown as typeof fetch,
+    };
+    return o;
+  }
+  async function ogAccount(meta: Record<string, unknown> = {}) {
     const { integrationAccounts } = await import("@nutria/db");
-    const [acc] = await db.insert(integrationAccounts).values({ userId: uid, personId: p!.id, provider: "opengym", baseUrl: "http://og", credentialsEnc: encrypt("tok") }).returning();
-    let rev = 3;
-    const fake = (async (url: string, init?: RequestInit) => {
-      expect(String(url)).toBe("http://og/api/data");
-      expect((init?.headers as Record<string, string>).Authorization).toBe("Bearer tok");
-      return new Response(JSON.stringify({ rev, state: { unit: "kg", workouts: [{ id: "w1", d: "2026-11-02", start: 0, end: 3_600_000, name: "Torso", vol: 8000, entries: [{ id: "bench", sets: [{ w: 80, r: 8 }] }] }], bodyweight: [{ d: "2026-11-02", w: 84.2, t: 1 }] } }));
-    }) as unknown as typeof fetch;
-    const r1 = await core.syncOpenGym(db, acc!.id, fake);
-    expect(r1).toMatchObject({ exercises: 1, weights: 1 });
-    rev = 4;
-    await core.syncOpenGym(db, acc!.id, fake);
-    expect(await db.select().from(exerciseLogs).where(eq(exerciseLogs.personId, personId))).toHaveLength(1);
-    expect((await db.select().from(weightLogs).where(eq(weightLogs.source, "opengym"))).length).toBe(1);
-    const [s] = await db.select().from(dailySummaries).where(eq(dailySummaries.date, "2026-11-02"));
+    await db.delete(integrationAccounts).where(eq(integrationAccounts.personId, personId));
+    const [acc] = await db.insert(integrationAccounts).values({ userId: uid, personId, provider: "opengym", baseUrl: "http://og", credentialsEnc: encrypt("tok"), status: "active", meta }).returning();
+    return acc!;
+  }
+  const ogLogs = () => db.select().from(exerciseLogs).where(and(eq(exerciseLogs.personId, personId), eq(exerciseLogs.source, "opengym")));
+  const ogWeights = () => db.select().from(weightLogs).where(and(eq(weightLogs.personId, personId), eq(weightLogs.source, "opengym")));
+
+  it("sincroniza entrenos y pesajes sin duplicar, con sus ejercicios", async () => {
+    const og = fakeOpenGym();
+    const acc = await ogAccount();
+    const r1 = await core.syncOpenGym(db, acc.id, og.fetch);
+    expect(r1).toMatchObject({ exercises: 2, weights: 1, fetched: true, rev: 3 });
+    expect(og.calls).toEqual(["/api/me", "/api/data/rev", "/api/data"]);
+    og.rev = 4;
+    await core.syncOpenGym(db, acc.id, og.fetch);
+    const logs = await ogLogs();
+    expect(logs).toHaveLength(2);
+    expect(logs.find((l) => l.externalId === "w1")!.details).toMatchObject({ exercises: [{ name: "Sentadilla con barra alta", sets: [{ kg: 80, reps: 8 }] }] });
+    expect(await ogWeights()).toHaveLength(1);
+    const [s] = await db.select().from(dailySummaries).where(and(eq(dailySummaries.personId, personId), eq(dailySummaries.date, "2026-11-02")));
     expect(s?.exerciseKcal).toBeGreaterThan(100);
+    const { integrationAccounts } = await import("@nutria/db");
+    const [a] = await db.select().from(integrationAccounts).where(eq(integrationAccounts.id, acc.id));
+    expect(a!.meta).toMatchObject({ rev: 4, workouts: 2, weighIns: 1, name: "Ana" });
+  });
+
+  it("si la revisión no cambia no descarga el documento", async () => {
+    const og = fakeOpenGym();
+    const acc = await ogAccount({ meCheckedAt: Date.now(), rev: 3 });
+    const r = await core.syncOpenGym(db, acc.id, og.fetch);
+    expect(r).toMatchObject({ fetched: false, rev: 3 });
+    expect(og.calls).toEqual(["/api/data/rev"]);
+    const forced = await core.syncOpenGym(db, acc.id, og.fetch, { force: true });
+    expect(forced.fetched).toBe(true);
+  });
+
+  it("refleja borrados y correcciones hechos en openGym", async () => {
+    const og = fakeOpenGym();
+    const acc = await ogAccount({ meCheckedAt: Date.now() });
+    await core.syncOpenGym(db, acc.id, og.fetch);
+    og.state.workouts = og.state.workouts.slice(0, 1);
+    og.state.bodyweight = [{ d: "2026-11-02", w: 83.6, t: 5 }];
+    og.rev = 5;
+    const r = await core.syncOpenGym(db, acc.id, og.fetch);
+    expect(r.removed).toBe(1);
+    expect((await ogLogs()).map((l) => l.externalId)).toEqual(["w1"]);
+    const ws = await ogWeights();
+    expect(ws).toHaveLength(1);
+    expect(ws[0]!.kg).toBeCloseTo(83.6, 1);
+    og.state.workouts = [];
+    og.state.bodyweight = [];
+    og.rev = 6;
+    expect((await core.syncOpenGym(db, acc.id, og.fetch)).removed).toBe(2);
+    expect(await ogLogs()).toHaveLength(0);
+    expect(await ogWeights()).toHaveLength(0);
+  });
+
+  it("guarda el token renovado por openGym", async () => {
+    const og = fakeOpenGym();
+    og.renew = "tok-nuevo";
+    const acc = await ogAccount();
+    await core.syncOpenGym(db, acc.id, og.fetch);
+    og.token = "tok-nuevo";
+    og.rev = 9;
+    await expect(core.syncOpenGym(db, acc.id, og.fetch)).resolves.toMatchObject({ fetched: true, rev: 9 });
+  });
+
+  it("con el token caducado pide volver a emparejar y avisa una sola vez", async () => {
+    const og = fakeOpenGym();
+    og.token = "otro";
+    const acc = await ogAccount({ meCheckedAt: Date.now() });
+    await expect(core.syncOpenGym(db, acc.id, og.fetch)).rejects.toThrow(/caducado/);
+    await expect(core.syncOpenGym(db, acc.id, og.fetch)).rejects.toThrow(/caducado/);
+    const { integrationAccounts } = await import("@nutria/db");
+    const [a] = await db.select().from(integrationAccounts).where(eq(integrationAccounts.id, acc.id));
+    expect(a!.status).toBe("reauth");
+    const n = await db.select().from(notifications).where(and(eq(notifications.userId, uid), eq(notifications.type, "integration")));
+    expect(n).toHaveLength(1);
+    expect(n[0]!.title).toBe("Vuelve a emparejar openGym");
   });
 });
 
