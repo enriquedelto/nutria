@@ -144,6 +144,8 @@ function EditEntryDialog({ personId, entry, slots, onClose }: { personId: string
   const [grams, setGrams] = useState(entry.grams);
   const [swapping, setSwapping] = useState(false);
   const [picked, setPicked] = useState<string | null>(null);
+  // Deleting has no undo: on a phone it is easy to tap by mistake, so it takes a second tap.
+  const [confirmDelete, setConfirmDelete] = useState(false);
   const ratio = entry.grams > 0 ? grams / entry.grams : 1;
   return (
     <Dialog open onOpenChange={(o) => !o && onClose()}>
@@ -223,17 +225,19 @@ function EditEntryDialog({ personId, entry, slots, onClose }: { personId: string
           <div className="flex justify-between gap-2">
             <Button
               type="button"
-              variant="ghost"
-              className="text-danger"
+              variant={confirmDelete ? "danger" : "ghost"}
+              className={confirmDelete ? undefined : "text-danger"}
               disabled={pending}
-              onClick={() =>
+              onClick={() => {
+                if (!confirmDelete) return setConfirmDelete(true);
                 start(async () => {
                   await removeEntries(personId, [entry.id]);
+                  toast(`${entry.name} borrado`);
                   onClose();
-                })
-              }
+                });
+              }}
             >
-              <Trash2 /> Borrar
+              <Trash2 /> {confirmDelete ? "¿Seguro? Borrar" : "Borrar"}
             </Button>
             <Button type="submit" disabled={pending}>
               Guardar

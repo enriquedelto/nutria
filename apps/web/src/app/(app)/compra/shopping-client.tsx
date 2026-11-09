@@ -179,7 +179,7 @@ export function ShoppingClient({ listId, items, categories, planId, store }: { l
 function Row({ item: i, onToggle, onDelete, onLink }: { item: Item; onToggle: () => void; onDelete: () => void; onLink?: () => void }) {
   return (
     <li className="flex items-center gap-3 px-3 py-2.5">
-      <button type="button" role="checkbox" aria-checked={i.checked} aria-label={i.name} onClick={onToggle} className={cn("grid size-6 shrink-0 place-items-center rounded-full border-2", i.checked ? "border-herb bg-herb text-herb-ink" : "border-line")}>
+      <button type="button" role="checkbox" aria-checked={i.checked} aria-label={i.name} onClick={onToggle} className={cn("relative grid size-6 shrink-0 place-items-center rounded-full border-2 after:absolute after:-inset-2 after:content-['']", i.checked ? "border-herb bg-herb text-herb-ink" : "border-line")}>
         {i.checked ? <Check className="size-4" /> : null}
       </button>
       <button type="button" onClick={onToggle} className={cn("min-w-0 flex-1 text-left", i.checked && "line-through")}>

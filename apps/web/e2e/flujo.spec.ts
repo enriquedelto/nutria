@@ -475,7 +475,7 @@ test("IA en la cocina (simulada): sustituciones y foto de la nevera", async () =
   const dialog = page.getByRole("dialog");
   await expect(dialog.getByRole("button", { name: "Guardar 1" })).toBeVisible();
   await dialog.getByRole("button", { name: "Guardar 1" }).click();
-  await expect(page.getByText("1 productos guardados")).toBeVisible();
+  await expect(page.getByText("1 producto guardado")).toBeVisible();
   await expect(page.getByText("Leche").first()).toBeVisible();
 });
 
@@ -508,6 +508,44 @@ test("todas las páginas cargan sin errores de servidor", async () => {
     await expect(page.getByText(/Internal Server Error|Application error|Algo ha fallado/i), r).toHaveCount(0);
   }
   expect(errors).toEqual([]);
+});
+
+test("diario en el móvil: cambiar gramos y comida, borrar con confirmación; agua; compra", async ({ browser }) => {
+  const ctx = await browser.newContext({ storageState: await adminPage.context().storageState(), viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true });
+  const page = await ctx.newPage();
+  await page.goto("/diario");
+  const entry = () => page.getByRole("button", { name: /Pan blanco/ });
+  await entry().first().click();
+  const dialog = page.getByRole("dialog", { name: "Pan blanco" });
+  await dialog.getByLabel("Cantidad (g)").fill("80");
+  const slot = dialog.getByLabel("Comida");
+  const target = (await slot.inputValue()) === "breakfast" ? "Comida" : "Desayuno";
+  await slot.selectOption({ label: target });
+  await dialog.getByRole("button", { name: "Guardar" }).click();
+  await expect(dialog).toBeHidden();
+  const section = page.locator("section").filter({ has: page.getByRole("heading", { name: target, exact: true }) });
+  await expect(section.getByRole("button", { name: /Pan blanco/ })).toContainText("80 g");
+  await expect(section.getByRole("button", { name: /Pan blanco/ })).not.toContainText("rebanada");
+
+  // Deleting asks for a second tap.
+  await entry().first().click();
+  await dialog.getByRole("button", { name: "Borrar" }).click();
+  await expect(dialog).toBeVisible();
+  await dialog.getByRole("button", { name: "¿Seguro? Borrar" }).click();
+  await expect(page.getByText("Pan blanco borrado")).toBeVisible();
+  await expect(entry()).toHaveCount(0);
+
+  await page.goto("/hoy");
+  await page.getByRole("button", { name: "+250 ml" }).click();
+  await expect(page.getByText(/^0,25s*/s*2 L$/)).toBeVisible();
+
+  await page.goto("/compra");
+  const box = page.getByRole("checkbox").first();
+  await box.click();
+  await expect(box).toHaveAttribute("aria-checked", "true");
+  await box.click();
+  await expect(box).toHaveAttribute("aria-checked", "false");
+  await ctx.close();
 });
 
 /**

@@ -144,9 +144,11 @@ export async function updateEntry(db: Database, personId: string, id: string, pa
     const locked = { ...e.lockedValues, ...(patch.lockedValues ?? {}) };
     nutrients = scaleNutrients(applyLocked(per100, locked), grams);
   }
+  // A serving label ("1 rebanada") no longer describes the entry once the grams change.
+  const serving = patch.grams != null && patch.grams !== e.grams ? { servingLabel: null, servingQty: null } : {};
   const [u] = await db
     .update(diaryEntries)
-    .set({ grams, nutrients, ...macroColumns(nutrients), mealSlot: patch.mealSlot ?? e.mealSlot, date: patch.date ?? e.date, lockedValues: { ...e.lockedValues, ...(patch.lockedValues ?? {}) }, note: patch.note === undefined ? e.note : patch.note })
+    .set({ grams, nutrients, ...macroColumns(nutrients), ...serving, mealSlot: patch.mealSlot ?? e.mealSlot, date: patch.date ?? e.date, lockedValues: { ...e.lockedValues, ...(patch.lockedValues ?? {}) }, note: patch.note === undefined ? e.note : patch.note })
     .where(eq(diaryEntries.id, id))
     .returning();
   await recomputeDay(db, personId, e.date);

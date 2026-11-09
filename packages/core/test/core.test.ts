@@ -163,6 +163,14 @@ describe("diario", () => {
     const back = await core.updateEntry(db, personId, e!.id, { foodId, grams: 100 });
     expect(back!.kcal).toBeCloseTo(130);
   });
+  it("al cambiar los gramos de una ración se quita la etiqueta de la ración", async () => {
+    const [row] = await core.addEntries(db, { personId, userId: uid, date: "2026-11-04", mealSlot: "breakfast", origin: "manual", items: [{ name: "Pan", grams: 40, servingLabel: "1 rebanada", servingQty: 1, per100: { energy_kcal: 265 } }] });
+    const moved = await core.updateEntry(db, personId, row!.id, { mealSlot: "lunch" });
+    expect(moved).toMatchObject({ servingLabel: "1 rebanada", mealSlot: "lunch" });
+    const u = await core.updateEntry(db, personId, row!.id, { grams: 80 });
+    expect(u).toMatchObject({ grams: 80, servingLabel: null, servingQty: null });
+    expect(u!.kcal).toBeCloseTo(212);
+  });
   it("confirmar propuesta de IA y deshacer", async () => {
     const [est] = await db.insert(aiEstimates).values({ userId: uid, personId, kind: "meal" }).returning();
     await core.addEntries(db, { personId, userId: uid, date: "2026-11-03", mealSlot: "dinner", origin: "ai_text", estimateId: est!.id, items: [{ name: "Tortilla", grams: 150, per100: { energy_kcal: 190, protein: 6.5 } }] });
