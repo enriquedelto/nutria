@@ -12,7 +12,33 @@ import { fileToJpeg, type B64Image } from "@/lib/image";
 import { cn } from "@/lib/utils";
 
 export type ChatProposal = { kind: string; summary: string; status?: string };
-export type ChatMessage = { id: string; role: "user" | "assistant"; content: string; proposals: ChatProposal[]; tools?: string[] };
+export type ChatMessage = { id: string; role: "user" | "assistant"; content: string; proposals: ChatProposal[]; tools?: string[]; /** Stable React key while the draft gets its real id. */ key?: string; live?: boolean };
+
+/**
+ * Reveals text progressively. After a tool call the API often delivers the whole answer in one burst,
+ * so this keeps the "being written" feel: whatever is pending appears in ~0.6 s.
+ */
+function Reveal({ text }: { text: string }) {
+  const [n, setN] = useState(0);
+  useEffect(() => {
+    if (n >= text.length) return;
+    const id = setTimeout(() => setN((x) => Math.min(text.length, x + Math.max(3, Math.ceil((text.length - x) / 24)))), 25);
+    return () => clearTimeout(id);
+  }, [n, text]);
+  return <Markdown text={text.slice(0, n)} />;
+}
+
+function useElapsed(running: boolean) {
+  const [s, setS] = useState(0);
+  useEffect(() => {
+    setS(0);
+    if (!running) return;
+    const t0 = Date.now();
+    const id = setInterval(() => setS(Math.floor((Date.now() - t0) / 1000)), 1000);
+    return () => clearInterval(id);
+  }, [running]);
+  return s;
+}
 
 const TOOL_LABELS: Record<string, string> = {
   search_foods: "buscando alimentos",
@@ -45,6 +71,7 @@ export function Chat({ personId, conversationId: initialId, initial, personName,
   const [tool, setTool] = useState<string | null>(null);
   const bottom = useRef<HTMLDivElement>(null);
   const files = useRef<HTMLInputElement>(null);
+  const elapsed = useElapsed(streaming);
 
   // Braces matter: recent Chrome returns a Promise from scrollIntoView, and React would call it as the cleanup.
   useEffect(() => {
@@ -54,7 +81,7 @@ export function Chat({ personId, conversationId: initialId, initial, personName,
   const send = async (text: string) => {
     if (!text.trim() || streaming) return;
     const userMsg: ChatMessage = { id: `u${Date.now()}`, role: "user", content: text, proposals: [] };
-    const draft: ChatMessage = { id: "draft", role: "assistant", content: "", proposals: [] };
+    const draft: ChatMessage = { id: "draft", key: `a${Date.now()}`, live: true, role: "assistant", content: "", proposals: [] };
     setMessages((m) => [...m, userMsg, draft]);
     setInput("");
     const imgs = images;
@@ -98,7 +125,8 @@ export function Chat({ personId, conversationId: initialId, initial, personName,
     } finally {
       setStreaming(false);
       setTool(null);
-      router.refresh();
+      // Let the reveal finish before the refresh (a new conversation remounts the chat with its saved id).
+      setTimeout(() => router.refresh(), 1500);
     }
   };
 
@@ -128,14 +156,15 @@ export function Chat({ personId, conversationId: initialId, initial, personName,
           </div>
         ) : null}
         {messages.map((m) => (
-          <div key={m.id} className={cn("flex", m.role === "user" ? "justify-end" : "justify-start")}>
+          <div key={m.key ?? m.id} className={cn("flex", m.role === "user" ? "justify-end" : "justify-start")}>
             <div className={cn("max-w-[88%] rounded-3xl px-4 py-3", m.role === "user" ? "rounded-br-md bg-herb text-herb-ink" : "rounded-bl-md border border-line bg-card")}>
               {m.role === "assistant" ? (
                 m.content ? (
-                  <Markdown text={m.content} />
+                  m.live ? <Reveal text={m.content} /> : <Markdown text={m.content} />
                 ) : (
                   <span className="flex items-center gap-2 text-sm text-ink-3" role="status">
-                    <Loader2 className="size-4 animate-spin" /> {tool ? `${TOOL_LABELS[tool] ?? tool}…` : "Pensando…"}
+                    <Loader2 className="size-4 animate-spin" /> {tool ? `${TOOL_LABELS[tool] ?? tool}…` : elapsed >= 4 ? "Pensando la respuesta…" : "Pensando…"}
+                    {elapsed >= 2 ? <span className="num text-xs">{elapsed} s</span> : null}
                   </span>
                 )
               ) : (
