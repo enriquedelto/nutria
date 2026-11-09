@@ -537,7 +537,7 @@ test("diario en el móvil: cambiar gramos y comida, borrar con confirmación; ag
 
   await page.goto("/hoy");
   await page.getByRole("button", { name: "+250 ml" }).click();
-  await expect(page.getByText(/^0,25s*/s*2 L$/)).toBeVisible();
+  await expect(page.getByText("0,25 / 2 L")).toBeVisible();
 
   await page.goto("/compra");
   const box = page.getByRole("checkbox").first();
