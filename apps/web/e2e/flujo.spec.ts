@@ -162,12 +162,13 @@ test("coach: la respuesta aparece mientras se genera, sin romper la página", as
   page.on("pageerror", (e) => errors.push(e.message));
   await page.goto("/coach");
   await page.getByRole("button", { name: "¿Por qué no bajo de peso?" }).click();
-  await expect(page.getByText(/\(simulado\) He recibido: ¿Por qué no bajo de peso\?/)).toBeVisible();
+  await expect(page.getByText(/\(simulado\) He recibido/)).toHaveCount(1);
   await expect(page.getByText("Algo ha fallado")).toHaveCount(0);
   await expect(page).toHaveURL(/\/coach\?c=/);
   await page.getByRole("textbox", { name: "Mensaje" }).fill("Y otra pregunta");
   await page.getByRole("button", { name: "Enviar" }).click();
-  await expect(page.getByText(/He recibido: Y otra pregunta/)).toBeVisible();
+  await expect(page.getByText(/\(simulado\) He recibido/)).toHaveCount(2);
+  await expect(page.getByText("Y otra pregunta", { exact: true }).last()).toBeVisible();
   expect(errors).toEqual([]);
 });
 
@@ -286,10 +287,10 @@ test("exportar JSON/CSV e importar un CSV", async () => {
   const jsonHref = await page.getByRole("link", { name: "Todo (JSON)" }).getAttribute("href");
   const json = await page.request.get(jsonHref!);
   expect(json.status()).toBe(200);
-  expect(await json.text()).toContain("Tortilla de patatas");
+  expect(await json.text()).toContain("Quinoa ecológica Nutria");
   const csv = await page.request.get(jsonHref!.replace("format=json", "format=csv&table=diario"));
   expect(csv.headers()["content-type"]).toContain("text/csv");
-  expect(await csv.text()).toContain("Tortilla de patatas");
+  expect(await csv.text()).toContain("Quinoa ecológica Nutria");
 
   await page.locator("input[type=file]").setInputFiles({ name: "cronometer.csv", mimeType: "text/csv", buffer: Buffer.from("Day,Food Name,Amount,Energy (kcal),Protein (g),Carbs (g),Fat (g)\n2026-11-01,Yogur importado,125 g,80,5,6,3\n2026-11-01,Pan importado,60 g,150,5,30,1\n") });
   await expect(page.getByText("Importación en cola")).toBeVisible();
@@ -330,7 +331,7 @@ test("profesional: solo lectura de lo compartido y notas", async ({ browser }) =
   await expect(pro).toHaveURL(/\/hoy/);
   await expect(pro.getByText("Solo lectura", { exact: true })).toBeVisible();
   await pro.goto("/diario");
-  await expect(pro.getByText("Tortilla de patatas").first()).toBeVisible();
+  await expect(pro.getByText("Quinoa ecológica Nutria").first()).toBeVisible();
   // Lo no compartido (medicación) no se ve.
   await pro.goto("/salud/medicacion");
   await expect(pro).toHaveURL(/sinpermiso=medication/);

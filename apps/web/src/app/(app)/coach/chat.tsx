@@ -22,7 +22,7 @@ function Reveal({ text }: { text: string }) {
   const [n, setN] = useState(0);
   useEffect(() => {
     if (n >= text.length) return;
-    const id = setTimeout(() => setN((x) => Math.min(text.length, x + Math.max(3, Math.ceil((text.length - x) / 24)))), 25);
+    const id = setTimeout(() => setN((x) => Math.min(text.length, x + Math.max(8, Math.ceil((text.length - x) / 20)))), 25);
     return () => clearTimeout(id);
   }, [n, text]);
   return <Markdown text={text.slice(0, n)} />;
