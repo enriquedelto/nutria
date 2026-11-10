@@ -15,11 +15,12 @@ import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Dialog, DialogContent } from "@/components/ui/dialog";
 import { Field, Input, Select, Textarea } from "@/components/ui/input";
+import type { BatchSuggestion, PlanCoverageDay } from "@nutria/nutrition";
 import { cn } from "@/lib/utils";
 
 type Member = { id: string; name: string; color: string | null; isChild: boolean };
 type Slot = { key: string; label: string };
-type Recipe = { id: string; title: string; kcal: number | null; prepMin: number | null; tags: string[] };
+type Recipe = { id: string; title: string; kcal: number | null; protein?: number | null; prepMin: number | null; tags: string[] };
 type Item = { id: string; date: string; mealSlot: string; recipeId: string | null; title: string; note: string | null; cooked: boolean; portions: Record<string, { servings: number; grams?: number; kcal?: number }> };
 type Plan = { id: string; personIds: string[]; items: Item[] };
 
@@ -43,6 +44,9 @@ export function PlanBoard(props: {
   prevPlan: { id: string; label: string } | null;
   recipes: Recipe[];
   plan: Plan | null;
+  coverage?: PlanCoverageDay[];
+  coverageName?: string;
+  batches?: BatchSuggestion[];
 }) {
   const { plan, members, days, slots } = props;
   const [pending, start] = useSafeTransition();
@@ -59,6 +63,9 @@ export function PlanBoard(props: {
   const people = members.filter((m) => plan.personIds.includes(m.id));
   const cell = (date: string, slot: string) => plan.items.filter((i) => i.date === date && i.mealSlot === slot);
   const shown = slots.filter((s) => visibleSlots.includes(s.key));
+  const cov = new Map((props.coverage ?? []).map((c) => [c.date, c]));
+  const short = (props.coverage ?? []).filter((c) => c.status === "short");
+  const proteinOf = new Map(props.recipes.map((r) => [r.id, r.protein ?? null]));
 
   return (
     <div className="space-y-4">
@@ -108,6 +115,35 @@ export function PlanBoard(props: {
         </details>
       </div>
 
+      {short.length ? (
+        <p className="no-print rounded-xl bg-warn/20 px-3 py-2 text-sm">
+          <strong>{short.length === 1 ? "Un día se queda corto" : `${short.length} días se quedan cortos`}</strong> para {props.coverageName ?? "ti"} ({short.map((c) => dayLabel(c.date)).join(", ")}): sube raciones o añade un plato con más energía y proteína.
+        </p>
+      ) : null}
+      {props.batches?.length ? (
+        <Card className="no-print">
+          <p className="mb-1 flex items-center gap-2 font-display font-semibold">
+            <ChefHat className="size-4" /> Cocina por lotes
+          </p>
+          <ul className="space-y-1.5 text-sm">
+            {props.batches.map((b) => (
+              <li key={b.recipeId} className="flex flex-wrap items-center justify-between gap-2">
+                <span className="min-w-0">
+                  <span className="font-medium">{b.title}</span>{" "}
+                  <span className="text-ink-2">
+                    · {b.servings.toLocaleString("es-ES")} raciones para {b.dates.map(dayLabel).join(", ")} ·{" "}
+                    {b.storage === "fridge" ? "aguanta en la nevera" : b.storage === "freeze" ? "congela lo de los últimos días" : "mejor en dos tandas (no aguanta tantos días)"}
+                  </span>
+                </span>
+                <Button asChild size="sm" variant="outline">
+                  <Link href={`/recetas/${b.recipeId}/cocinar`}>Cocinar en lote</Link>
+                </Button>
+              </li>
+            ))}
+          </ul>
+        </Card>
+      ) : null}
+
       {/* Desktop/print: table. Mobile: day cards. */}
       <div className="hidden overflow-x-auto md:block print:block">
         <table className="w-full table-fixed border-separate border-spacing-1 text-sm">
@@ -117,6 +153,7 @@ export function PlanBoard(props: {
               {days.map((d) => (
                 <th key={d} className={cn("rounded-md px-1 py-1 text-left font-medium capitalize", d === props.today && "bg-herb/10 text-herb")}>
                   {dayLabel(d)}
+                  <Coverage c={cov.get(d)} />
                 </th>
               ))}
             </tr>
@@ -127,7 +164,7 @@ export function PlanBoard(props: {
                 <th className="pt-2 text-left text-xs font-medium text-ink-3">{s.label}</th>
                 {days.map((d) => (
                   <td key={d} className="rounded-md bg-paper-2/60 p-1">
-                    <Cell items={cell(d, s.key)} names={names} days={days} slots={slots} people={people} onAdd={() => setAdding({ date: d, slot: s.key })} />
+                    <Cell items={cell(d, s.key)} names={names} days={days} slots={slots} people={people} proteinOf={proteinOf} onAdd={() => setAdding({ date: d, slot: s.key })} />
                   </td>
                 ))}
               </tr>
@@ -139,11 +176,12 @@ export function PlanBoard(props: {
         {days.map((d) => (
           <Card key={d} className={cn(d === props.today && "border-herb/60")}>
             <p className="mb-2 font-display font-semibold capitalize">{dayLabel(d)}</p>
+            <Coverage c={cov.get(d)} />
             <div className="space-y-2">
               {shown.map((s) => (
                 <div key={s.key} className="grid grid-cols-[5.5rem_1fr] gap-2">
                   <span className="pt-1.5 text-xs text-ink-3">{s.label}</span>
-                  <Cell items={cell(d, s.key)} names={names} days={days} slots={slots} people={people} onAdd={() => setAdding({ date: d, slot: s.key })} />
+                  <Cell items={cell(d, s.key)} names={names} days={days} slots={slots} people={people} proteinOf={proteinOf} onAdd={() => setAdding({ date: d, slot: s.key })} />
                 </div>
               ))}
             </div>
@@ -156,11 +194,22 @@ export function PlanBoard(props: {
   );
 }
 
-function Cell({ items, names, days, slots, people, onAdd }: { items: Item[]; names: Map<string, string>; days: string[]; slots: Slot[]; people: Member[]; onAdd: () => void }) {
+/** Planned kcal and protein of the day against the person's target for that day. */
+function Coverage({ c }: { c?: PlanCoverageDay }) {
+  if (!c || !c.dishes || c.targetKcal == null || c.targetProtein == null) return null;
+  const tone = c.status === "ok" ? "text-herb" : c.status === "short" ? "text-persimmon" : "text-ink-3";
+  return (
+    <span className={cn("num block text-[11px] font-normal normal-case", tone)} title={c.unknown ? "Hay platos sin receta: el total real será mayor" : "Lo planificado frente al objetivo de ese día"}>
+      {c.kcal.toLocaleString("es-ES")}/{c.targetKcal.toLocaleString("es-ES")} kcal · P {c.protein}/{c.targetProtein} g{c.unknown ? " +" : ""}
+    </span>
+  );
+}
+
+function Cell({ items, names, days, slots, people, proteinOf, onAdd }: { items: Item[]; names: Map<string, string>; days: string[]; slots: Slot[]; people: Member[]; proteinOf: Map<string, number | null>; onAdd: () => void }) {
   return (
     <div className="space-y-1">
       {items.map((i) => (
-        <PlanItem key={i.id} item={i} names={names} days={days} slots={slots} people={people} />
+        <PlanItem key={i.id} item={i} names={names} days={days} slots={slots} people={people} proteinPerServing={i.recipeId ? (proteinOf.get(i.recipeId) ?? null) : null} />
       ))}
       <button type="button" onClick={onAdd} className="no-print flex w-full items-center justify-center rounded-md border border-dashed border-line py-1 text-ink-3 hover:border-herb hover:text-herb" aria-label="Añadir plato">
         <Plus className="size-4" />
@@ -169,7 +218,7 @@ function Cell({ items, names, days, slots, people, onAdd }: { items: Item[]; nam
   );
 }
 
-function PlanItem({ item, names, days, slots, people }: { item: Item; names: Map<string, string>; days: string[]; slots: Slot[]; people: Member[] }) {
+function PlanItem({ item, names, days, slots, people, proteinPerServing }: { item: Item; names: Map<string, string>; days: string[]; slots: Slot[]; people: Member[]; proteinPerServing: number | null }) {
   const [open, setOpen] = useState(false);
   const [pending, start] = useSafeTransition();
   const [cooked, setCooked] = useState(item.cooked);
@@ -205,7 +254,7 @@ function PlanItem({ item, names, days, slots, people }: { item: Item; names: Map
             <div className="space-y-4">
               <div className="space-y-2">
                 {people.map((p) => (
-                  <PortionRow key={p.id} itemId={item.id} person={p} servings={item.portions[p.id]?.servings ?? 0} kcal={item.portions[p.id]?.kcal} />
+                  <PortionRow key={p.id} itemId={item.id} person={p} servings={item.portions[p.id]?.servings ?? 0} kcal={item.portions[p.id]?.kcal} proteinPerServing={proteinPerServing} />
                 ))}
               </div>
               {item.note ? <p className="text-sm whitespace-pre-line text-ink-2">{item.note}</p> : null}
@@ -282,7 +331,7 @@ function PlanItem({ item, names, days, slots, people }: { item: Item; names: Map
   );
 }
 
-function PortionRow({ itemId, person, servings, kcal }: { itemId: string; person: Member; servings: number; kcal?: number }) {
+function PortionRow({ itemId, person, servings, kcal, proteinPerServing }: { itemId: string; person: Member; servings: number; kcal?: number; proteinPerServing: number | null }) {
   const [v, setV] = useState(servings);
   const [, start] = useSafeTransition();
   const set = (n: number) => {
@@ -296,6 +345,7 @@ function PortionRow({ itemId, person, servings, kcal }: { itemId: string; person
       <span className="flex-1 text-sm">
         {person.name}
         {kcal ? <span className="num ml-1 text-xs text-ink-3">≈ {Math.round(kcal)} kcal</span> : null}
+        {proteinPerServing ? <span className="num ml-1 text-xs text-ink-3">· P {Math.round(proteinPerServing * v)} g</span> : null}
       </span>
       <Button size="icon-sm" variant="outline" aria-label="Menos" onClick={() => set(v - 0.25)}>
         −

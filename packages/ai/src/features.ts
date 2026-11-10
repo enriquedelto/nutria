@@ -273,17 +273,32 @@ export async function whatToEat(c: PersonFeatureCtx, input: { remaining: { kcal:
 
 export async function generateMealPlan(
   c: FeatureCtx & { groupId: string },
-  input: { personIds: string[]; from: string; days: number; slots: string[]; maxPrepMinWeekday?: number; budgetPerDay?: number; notes?: string; scopesByPerson: Record<string, ReadonlySet<string>> },
+  input: {
+    personIds: string[];
+    from: string;
+    days: number;
+    slots: string[];
+    maxPrepMinWeekday?: number;
+    budgetPerDay?: number;
+    notes?: string;
+    scopesByPerson: Record<string, ReadonlySet<string>>;
+    /** Per person: the target of each planned day (training/rest) and the ideal protein per main meal. */
+    dayTargets?: Record<string, { proteinPerMeal?: number | null; days: { date: string; kcal: number; protein: number; kind: "training" | "rest" | null }[] }>;
+  },
 ) {
   const people = await Promise.all(
     input.personIds.map(async (id) => {
       const pc = await buildPersonContext(c.db, id, input.scopesByPerson[id] ?? new Set());
-      return `### ${pc.displayName} (id ${id})\n${pc.lines.slice(1).join("\n")}`;
+      const dt = input.dayTargets?.[id];
+      const perDay = dt?.days.length
+        ? `\nObjetivo por día: ${dt.days.map((d) => `${d.date}${d.kind ? ` (${d.kind === "training" ? "entreno" : "descanso"})` : ""} ${Math.round(d.kcal)} kcal, ${Math.round(d.protein)} g proteína`).join("; ")}.${dt.proteinPerMeal ? ` Proteína por comida principal: al menos ${dt.proteinPerMeal} g.` : ""}`
+        : "";
+      return `### ${pc.displayName} (id ${id})\n${pc.lines.slice(1).join("\n")}${perDay}`;
     }),
   );
   const pantry = await c.db.select({ name: pantryItems.name, quantity: pantryItems.quantity, unit: pantryItems.unit, expiresOn: pantryItems.expiresOn }).from(pantryItems).where(eq(pantryItems.groupId, c.groupId)).orderBy(sql`${pantryItems.expiresOn} asc nulls last`).limit(120);
   const recs = await c.db
-    .select({ id: recipes.id, title: recipes.title, kcal: recipes.kcalPerServing, prepMin: recipes.prepMin, cookMin: recipes.cookMin, tags: recipes.tags, cost: recipes.costPerServing, avgStars: sql<number | null>`(select avg(${recipeRatings.stars})::float from ${recipeRatings} where ${recipeRatings.recipeId} = ${recipes.id})`, dislikes: sql<number>`(select count(*)::int from ${recipeRatings} where ${recipeRatings.recipeId} = ${recipes.id} and (${recipeRatings.verdict} = 'dislike' or ${recipeRatings.notEaten}))` })
+    .select({ id: recipes.id, title: recipes.title, kcal: recipes.kcalPerServing, protein: recipes.proteinPerServing, fridgeDays: recipes.fridgeDays, freezable: recipes.freezable, prepMin: recipes.prepMin, cookMin: recipes.cookMin, tags: recipes.tags, cost: recipes.costPerServing, avgStars: sql<number | null>`(select avg(${recipeRatings.stars})::float from ${recipeRatings} where ${recipeRatings.recipeId} = ${recipes.id})`, dislikes: sql<number>`(select count(*)::int from ${recipeRatings} where ${recipeRatings.recipeId} = ${recipes.id} and (${recipeRatings.verdict} = 'dislike' or ${recipeRatings.notEaten}))` })
     .from(recipes)
     .where(eq(recipes.groupId, c.groupId))
     .limit(150);
@@ -294,7 +309,7 @@ export async function generateMealPlan(
     input.notes ? `Indicaciones: ${input.notes}` : null,
     `## Personas\n${people.join("\n\n")}`,
     pantry.length ? `## Despensa\n${pantry.map((p) => `- ${p.name} ${p.quantity} ${p.unit}${p.expiresOn ? ` (caduca ${p.expiresOn})` : ""}`).join("\n")}` : null,
-    recs.length ? `## Recetas guardadas\n${recs.map((r) => `- [${r.id}] ${r.title}${r.kcal ? ` · ${Math.round(r.kcal)} kcal/ración` : ""}${r.prepMin || r.cookMin ? ` · ${(r.prepMin ?? 0) + (r.cookMin ?? 0)} min` : ""}${r.avgStars ? ` · ${round(r.avgStars, 1)}★` : ""}${r.dislikes ? ` · ${r.dislikes} rechazo(s)` : ""}${r.cost ? ` · ${r.cost} €/ración` : ""}`).join("\n")}` : null,
+    recs.length ? `## Recetas guardadas\n${recs.map((r) => `- [${r.id}] ${r.title}${r.kcal ? ` · ${Math.round(r.kcal)} kcal/ración` : ""}${r.protein ? ` · ${Math.round(r.protein)} g proteína` : ""}${r.fridgeDays ? ` · nevera ${r.fridgeDays} d` : ""}${r.freezable ? " · congelable" : ""}${r.prepMin || r.cookMin ? ` · ${(r.prepMin ?? 0) + (r.cookMin ?? 0)} min` : ""}${r.avgStars ? ` · ${round(r.avgStars, 1)}★` : ""}${r.dislikes ? ` · ${r.dislikes} rechazo(s)` : ""}${r.cost ? ` · ${r.cost} €/ración${r.kcal && Number(r.cost) > 0 ? ` (${Math.round(r.kcal / Number(r.cost))} kcal/€)` : ""}` : ""}`).join("\n")}` : null,
   ]
     .filter(Boolean)
     .join("\n\n");

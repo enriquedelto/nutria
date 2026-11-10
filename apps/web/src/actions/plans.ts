@@ -3,10 +3,10 @@ import { UserError } from "@/lib/errors";
 import { refresh } from "next/cache";
 import { z } from "zod";
 import { aiEstimates, and, eq, groups, inArray, mealPlanItems, mealPlans, mealSlots, persons, planRetros, recipeRatings, recipes, type PortionByPerson } from "@nutria/db";
-import { addEntries, targetsForDate } from "@nutria/core";
+import { addEntries, getSportProfile, latestWeight, targetsForDate } from "@nutria/core";
 import { generateMealPlan, summarizeRetro } from "@nutria/ai";
 import { aiAction } from "@/lib/ai";
-import { DEFAULT_SLOT_SHARES, familyPortions } from "@nutria/nutrition";
+import { addDays, DEFAULT_SLOT_SHARES, familyPortions, proteinDoseG } from "@nutria/nutrition";
 import { db } from "@/lib/db";
 import { kitchenGuard } from "@/lib/kitchen";
 import { assertAccess } from "@/lib/session";
@@ -133,7 +133,22 @@ export async function generatePlanDraft(input: z.input<typeof GenIn>) {
   const ps = await plannable(user.id, groupId, v.personIds);
   if (!ps.length) throw new UserError("Sin personas que planificar");
   if (!ps.some((p) => p.scopes.has("ai"))) throw new UserError("Sin permiso de IA");
-  const r = await aiAction(generateMealPlan({ db: db(), userId: user.id, groupId }, { personIds: ps.map((p) => p.id), from: v.weekStart, days: v.days, slots: v.slots, maxPrepMinWeekday: v.maxPrepMinWeekday ?? undefined, budgetPerDay: v.budgetPerDay ?? undefined, notes: v.notes ?? undefined, scopesByPerson: Object.fromEntries(ps.map((p) => [p.id, p.scopes])) }));
+  // Each day's own target (training/rest) and the protein per meal, so the plan fits every day and not an average.
+  const dates = Array.from({ length: v.days }, (_, i) => addDays(v.weekStart, i));
+  const dayTargets = Object.fromEntries(
+    await Promise.all(
+      ps.map(async (p) => {
+        const [days, w, sport, [me]] = await Promise.all([
+          Promise.all(dates.map(async (date) => ({ date, t: await targetsForDate(db(), p.id, date) }))),
+          latestWeight(db(), p.id),
+          getSportProfile(db(), p.id),
+          db().select({ goal: persons.goalType }).from(persons).where(eq(persons.id, p.id)).limit(1),
+        ]);
+        return [p.id, { proteinPerMeal: w && (sport.active || me?.goal === "gain") ? proteinDoseG(w.kg) : null, days: days.filter((d) => d.t).map((d) => ({ date: d.date, kcal: d.t!.kcal, protein: d.t!.protein, kind: d.t!.dayKind })) }] as const;
+      }),
+    ),
+  );
+  const r = await aiAction(generateMealPlan({ db: db(), userId: user.id, groupId }, { dayTargets, personIds: ps.map((p) => p.id), from: v.weekStart, days: v.days, slots: v.slots, maxPrepMinWeekday: v.maxPrepMinWeekday ?? undefined, budgetPerDay: v.budgetPerDay ?? undefined, notes: v.notes ?? undefined, scopesByPerson: Object.fromEntries(ps.map((p) => [p.id, p.scopes])) }));
   return r;
 }
 

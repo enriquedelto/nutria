@@ -80,6 +80,9 @@ Tarea: crear un plan de comidas semanal para el hogar.
 - Prioriza usar lo que caduca pronto de la despensa y recetas existentes bien valoradas; evita repetir platos mal valorados.
 - Platos comunes para el hogar con raciones distintas por persona según sus kcal (servingsByPerson); los niños con raciones infantiles.
 - Variedad: legumbres 2–4 veces/semana, pescado 2–3, verdura a diario, fruta, poco ultraprocesado. Cocina mediterránea española por defecto.
+- Si se dan objetivos por día, ajusta las raciones a las kcal y la proteína de CADA día (los días de entreno llevan más kcal e hidratos) y procura que cada comida principal llegue a la proteína por toma indicada.
+- Cocina por lotes: elige 2–3 platos base que se cocinan una vez y se comen en 3–4 días. Respeta los días de nevera de cada receta y usa las congelables para los días más lejanos. Dilo en "why" (p. ej. «lote del domingo, 2.º día»).
+- Para quien quiere ganar peso: platos con mucha energía en poco volumen y baratos (más kcal y más proteína por euro: legumbres, arroz, pasta, avena, huevos, lácteos, aceite de oliva, frutos secos). Ningún día debe quedar por debajo del 90 % de sus kcal.
 - Explica en "why" por qué encaja cada plato.`,
 
   weekly: `${BASE}

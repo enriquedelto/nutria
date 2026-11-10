@@ -416,6 +416,13 @@ test("plan semanal: añadir la receta y mandarla a la compra", async () => {
   await page.getByRole("button", { name: "Añadir plato" }).first().click();
   await page.getByRole("button", { name: /Garbanzos con espinacas/ }).click();
   await expect(page.getByText("Garbanzos con espinacas").first()).toBeVisible();
+  // Coverage of that day against its own target, and batch cooking once it repeats on another day.
+  await expect(page.getByText(/\/[\d.]+ kcal · P \d+\/\d+ g/).first()).toBeVisible();
+  await expect(page.getByText("Cocina por lotes")).toHaveCount(0);
+  await page.getByRole("button", { name: "Añadir plato" }).nth(2).click();
+  await page.getByRole("button", { name: /Garbanzos con espinacas/ }).click();
+  await expect(page.getByText("Cocina por lotes")).toBeVisible();
+  await expect(page.getByRole("link", { name: "Cocinar en lote" })).toHaveAttribute("href", /\/recetas\/.+\/cocinar/);
   await page.getByRole("button", { name: "A la compra" }).click();
   await expect(page.getByText(/cosas añadidas a la lista/)).toBeVisible();
   await page.goto("/compra");

@@ -334,3 +334,83 @@ export function expiryStatus(expiresOn: string | null, today: string): "expired"
   if (d <= 3) return "soon";
   return "ok";
 }
+
+/* ------------------------- Plan coverage & batch cooking ------------------------ */
+
+export interface PlanDish {
+  date: string;
+  recipeId: string | null;
+  title: string;
+  /** Servings of this person. */
+  servings: number;
+  kcalPerServing: number | null;
+  proteinPerServing: number | null;
+}
+
+export type CoverageStatus = "empty" | "partial" | "short" | "ok";
+export interface PlanCoverageDay {
+  date: string;
+  kcal: number;
+  protein: number;
+  targetKcal: number | null;
+  targetProtein: number | null;
+  dishes: number;
+  /** Dishes without nutrition (free text): the totals are a lower bound. */
+  unknown: number;
+  status: CoverageStatus;
+}
+
+/**
+ * What the planned dishes give one person each day against that day's target (training or rest).
+ * "short" = at least two dishes with known nutrition and under 85 % of kcal or protein.
+ */
+export function planCoverage(dates: string[], dishes: PlanDish[], targets: Record<string, { kcal: number; protein: number } | null | undefined>): PlanCoverageDay[] {
+  return dates.map((date) => {
+    const day = dishes.filter((d) => d.date === date && d.servings > 0);
+    const known = day.filter((d) => d.kcalPerServing != null);
+    const kcal = Math.round(known.reduce((a, d) => a + d.servings * d.kcalPerServing!, 0));
+    const protein = Math.round(known.reduce((a, d) => a + d.servings * (d.proteinPerServing ?? 0), 0));
+    const t = targets[date] ?? null;
+    const unknown = day.length - known.length;
+    let status: CoverageStatus = "empty";
+    if (day.length) {
+      const enough = !!t && kcal >= t.kcal * 0.85 && protein >= t.protein * 0.85;
+      status = enough ? "ok" : known.length >= 2 && !unknown && t ? "short" : "partial";
+    }
+    return { date, kcal, protein, targetKcal: t ? Math.round(t.kcal) : null, targetProtein: t ? Math.round(t.protein) : null, dishes: day.length, unknown, status };
+  });
+}
+
+export interface BatchSuggestion {
+  recipeId: string;
+  title: string;
+  /** Total servings of the household for the week. */
+  servings: number;
+  dates: string[];
+  /** Days between the first and the last time it is eaten. */
+  spanDays: number;
+  /** fridge = keeps in the fridge for the whole span; freeze = freeze the later portions; split = cook twice. */
+  storage: "fridge" | "freeze" | "split";
+}
+
+/** Recipes planned on two or more days: cook once (the first day) for the whole week. */
+export function batchSuggestions(items: { recipeId: string | null; title: string; date: string; servings: number }[], recipes: Record<string, { fridgeDays: number | null; freezable: boolean } | undefined>): BatchSuggestion[] {
+  const by = new Map<string, { title: string; servings: number; dates: Set<string> }>();
+  for (const i of items) {
+    if (!i.recipeId) continue;
+    const cur = by.get(i.recipeId) ?? { title: i.title, servings: 0, dates: new Set<string>() };
+    cur.servings += i.servings;
+    cur.dates.add(i.date);
+    by.set(i.recipeId, cur);
+  }
+  const out: BatchSuggestion[] = [];
+  for (const [recipeId, v] of by) {
+    if (v.dates.size < 2) continue;
+    const dates = [...v.dates].sort();
+    const spanDays = Math.round((Date.parse(dates.at(-1)!) - Date.parse(dates[0]!)) / 86_400_000);
+    const r = recipes[recipeId];
+    const storage = spanDays <= (r?.fridgeDays ?? 3) ? "fridge" : r?.freezable ? "freeze" : "split";
+    out.push({ recipeId, title: v.title, servings: Math.round(v.servings * 4) / 4, dates, spanDays, storage });
+  }
+  return out.sort((a, b) => a.dates[0]!.localeCompare(b.dates[0]!) || b.servings - a.servings);
+}
