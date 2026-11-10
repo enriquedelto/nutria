@@ -18,7 +18,7 @@ const TYPES: { type: string; label: string; hint: string; times?: string[] }[] =
   { type: "supplement", label: "Suplementos", hint: "Según la pauta de cada suplemento" },
   { type: "fasting", label: "Ayuno", hint: "Al completar la meta" },
   { type: "expiry", label: "Caducidades", hint: "Productos de la despensa a punto de caducar" },
-  { type: "weekly_report", label: "Informe semanal", hint: "Cada lunes" },
+  { type: "weekly_report", label: "Informe semanal", hint: "Los domingos a las 20:00, con un cambio para la semana" },
   { type: "bulk_review", label: "Revisión del volumen", hint: "Los lunes, si conviene cambiar las calorías (objetivo ganar)" },
   { type: "progress_photo", label: "Fotos de progreso", hint: "Cada 4 semanas desde tu última foto" },
   { type: "plan_ready", label: "Plan listo", hint: "Cuando la IA termina un plan" },

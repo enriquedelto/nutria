@@ -19,3 +19,4 @@ export * from "./receipts";
 export * from "./openprices";
 export * from "./bulk";
 export * from "./timing";
+export * from "./report";

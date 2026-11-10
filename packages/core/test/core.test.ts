@@ -578,3 +578,35 @@ describe("proteína y timing del entreno", () => {
     expect(pw?.body).toContain("22–29 g");
   });
 });
+
+describe("informe semanal", () => {
+  it("el domingo cubre la semana en curso, guarda «un cambio», avisa y prepara el webhook", async () => {
+    const { createProvider } = await import("@nutria/ai");
+    const [p] = await db.select().from(persons).where(eq(persons.userId, "gym"));
+    const pid = p!.id;
+    expect(core.reportWeekStart("2027-03-07")).toBe("2027-03-01"); // Sunday → this week
+    expect(core.reportWeekStart("2027-03-08")).toBe("2027-03-01"); // Monday → last week
+    await db.insert(webhooks).values({ userId: "gym", url: "https://example.com/hook", secretEnc: encrypt("s"), events: ["report.weekly"] });
+    const x = await core.weeklyReportExtras(db, pid, "2027-03-01");
+    expect(x.adherencia).toMatchObject({ diasRegistrados: 1, diasConProteina: 0 });
+    expect(x.adherencia.objetivoPorDia).toHaveLength(7);
+    expect(x.adherencia.proteinaPorComida).toMatchObject({ tomaIdealG: 29, comidasPrincipales: 1, llegan: 0 });
+    expect(x.entrenos).toMatchObject({ sesiones: 1, minutos: 60 });
+
+    const now = core.zonedTime("2027-03-07", "20:00", "Europe/Madrid");
+    const r = await core.buildWeeklyReport(db, pid, createProvider("mock"), now);
+    expect(r?.oneChange).toContain("yogur");
+    expect(r?.webhooks).toHaveLength(1);
+    expect(r?.webhooks[0]).toMatchObject({ event: "report.weekly", payload: { weekStart: "2027-03-01", weekEnd: "2027-03-07" } });
+    await core.buildWeeklyReport(db, pid, createProvider("mock"), now); // same week: replaced
+    const rows = await db.select().from(insights).where(and(eq(insights.personId, pid), eq(insights.kind, "weekly")));
+    expect(rows).toHaveLength(1);
+    expect(rows[0]).toMatchObject({ periodStart: "2027-03-01", periodEnd: "2027-03-07" });
+    expect((rows[0]!.data as { cambio: string; adherencia: unknown }).cambio).toContain("yogur");
+    expect((rows[0]!.data as { adherencia: unknown }).adherencia).toBeTruthy();
+    const [n] = await db.select().from(notifications).where(eq(notifications.type, "weekly_report"));
+    expect(n?.body).toMatch(/^Un cambio para esta semana: /);
+    // A week without diary days gives no report.
+    expect(await core.buildWeeklyReport(db, pid, createProvider("mock"), core.zonedTime("2028-01-02", "20:00", "Europe/Madrid"))).toBeNull();
+  });
+});

@@ -44,6 +44,7 @@ import {
   uploadDir,
   weeklyAdaptiveTdee,
   weeklyBulkReview,
+  buildWeeklyReport,
   photoReminders,
   type JobName,
   type JobPayloads,
@@ -103,18 +104,16 @@ export const handlers: Handlers = {
     return { persons: n };
   },
 
-  [JOBS.weeklyReport]: async ({ personId }, { db }) => {
+  [JOBS.weeklyReport]: async ({ personId }, { db, boss }) => {
     const provider = aiAvailable();
     if (!provider) return { skipped: "sin IA configurada" };
     const list = personId ? (await selfPersons(db)).filter((p) => p.id === personId) : await selfPersons(db);
     let n = 0;
     for (const p of list) {
-      const start = addDays(weekStart(todayIn(p.timezone)), -7);
       try {
-        const r = await weeklyReport({ db, userId: p.userId!, personId: p.id, scopes: FULL, provider }, start);
-        if (!r.data.dias.length) continue;
-        await db.insert(insights).values({ personId: p.id, kind: "weekly", title: r.title, bodyMd: `${r.summaryMd}\n\n**Destacado**\n${r.highlights.map((h) => `- ${h}`).join("\n")}\n\n**Para la próxima semana**\n${r.suggestions.map((s) => `- ${s}`).join("\n")}`, data: r.data as Record<string, unknown>, periodStart: start, periodEnd: addDays(start, 6) });
-        await notify(db, { userId: p.userId!, type: "weekly_report", title: `📊 ${r.title}`, body: r.highlights[0] ?? "", url: "/progreso/informe", timezone: p.timezone });
+        const r = await buildWeeklyReport(db, p.id, provider);
+        if (!r) continue;
+        for (const h of r.webhooks) await boss.send(JOBS.webhookDeliver, h);
         n++;
       } catch (e) {
         log.warn("informe semanal", { personId: p.id, error: e instanceof Error ? e.message : String(e) });

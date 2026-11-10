@@ -139,6 +139,7 @@ export const WeeklyReport = z.object({
   summaryMd: z.string(),
   highlights: z.array(z.string()),
   suggestions: z.array(z.string()),
+  oneChange: z.string().describe("Un único cambio concreto y pequeño para esta semana, en una frase"),
 });
 export type WeeklyReport = z.infer<typeof WeeklyReport>;
 

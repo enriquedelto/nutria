@@ -496,7 +496,7 @@ export function defaultMockHandlers(): Record<string, MockHandler> {
     }),
     pantry_photo: () => ({ items: [{ name: "Leche", quantity: 1, unit: "ud", location: "nevera", expiresInDays: 5 }] }),
     meal_plan: () => ({ days: [], notes: "Plan simulado" }),
-    weekly_report: () => ({ title: "Semana simulada", summaryMd: "Todo en orden (simulado).", highlights: [], suggestions: [] }),
+    weekly_report: () => ({ title: "Semana simulada", summaryMd: "Todo en orden (simulado).", highlights: ["Proteína cumplida 5 de 7 días"], suggestions: ["Pésate tres veces"], oneChange: "Añade un yogur con frutos secos a la merienda" }),
     substitutions: () => ({ options: [{ ingredient: "nata", substitute: "yogur griego", reason: "menos grasa", ratio: "1:1" }] }),
     what_to_eat: () => ({ options: [{ title: "Yogur con fruta", why: "Encaja con tus macros", items: [{ name: "Yogur natural", grams: 125 }] }] }),
     correlation_explain: () => ({ bodyMd: "Posible relación (simulado). No es un diagnóstico." }),

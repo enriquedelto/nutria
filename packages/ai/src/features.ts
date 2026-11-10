@@ -334,7 +334,7 @@ export async function summarizeRetro(c: FeatureCtx & { groupId: string }, input:
 
 /* ------------------------------ weekly report ---------------------------- */
 
-export async function weeklyReport(c: PersonFeatureCtx, weekStartDate: string) {
+export async function weeklyReport(c: PersonFeatureCtx, weekStartDate: string, extras: Record<string, unknown> = {}) {
   const end = addDays(weekStartDate, 6);
   const pc = await buildPersonContext(c.db, c.personId, c.scopes);
   const [target] = await c.db.select().from(targetSets).where(and(eq(targetSets.personId, c.personId), eq(targetSets.isDefault, true))).limit(1);
@@ -360,6 +360,7 @@ export async function weeklyReport(c: PersonFeatureCtx, weekStartDate: string) {
     carencias: gaps,
     cuerpo: body,
     salud: health,
+    ...extras,
   };
   const { data: report } = await call(c, "weekly_report", PROMPTS.weekly, [{ type: "text", text: `${contextBlock(pc.lines)}\n\nDatos (JSON):\n${JSON.stringify(data)}` }], S.WeeklyReport, "medium");
   return { ...report, data };

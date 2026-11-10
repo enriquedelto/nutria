@@ -65,7 +65,7 @@ export const SCHEDULES: { name: JobName; cron: string }[] = [
   { name: JOBS.opengymSyncAll, cron: "*/2 * * * *" },
   { name: JOBS.tdeeWeekly, cron: "0 6 * * 1" },
   { name: JOBS.bulkWeekly, cron: "15 6 * * 1" },
-  { name: JOBS.weeklyReport, cron: "0 9 * * 1" },
+  { name: JOBS.weeklyReport, cron: "0 20 * * 0" },
   { name: JOBS.gamification, cron: "30 23 * * *" },
   { name: JOBS.correlations, cron: "0 4 * * 0" },
   { name: JOBS.offMirror, cron: "0 3 * * 0" },

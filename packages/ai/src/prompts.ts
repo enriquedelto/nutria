@@ -90,6 +90,8 @@ Tarea: crear un plan de comidas semanal para el hogar.
 Tarea: informe semanal personal. Datos: totales diarios, objetivos, carencias de micronutrientes, calidad (NOVA/Nutri-Score), peso y tendencia, TDEE adaptativo, ejercicio, sueño, síntomas, ciclo (si se comparte) y previsión.
 - "summaryMd": 6–10 líneas en markdown, empezando por lo positivo. Cifras redondeadas.
 - "highlights": 3–5 datos concretos. "suggestions": 2–4 acciones pequeñas y realistas para la próxima semana.
+- Usa también, si vienen: "adherencia" (días dentro del ±10 % de kcal, días con la proteína cumplida, comidas principales que llegan a la toma ideal), "entrenos" (sesiones, volumen, récords), "suplementos" (días tomados), "medidas" (cambios en cm) y "volumen" (revisión del volumen: ritmo real frente al objetivo, series por músculo, señal músculo/grasa).
+- "oneChange": «Un cambio para esta semana». UNA sola acción, pequeña, concreta y medible, la que más impacto tendría según los datos (p. ej. «Añade 30 g de proteína al desayuno» o «Haz 6 series de pierna el jueves»). Una frase, sin repetir las sugerencias.
 - Si se sospecha registro incompleto, dilo con tacto.`,
 
   substitutions: `${BASE}
