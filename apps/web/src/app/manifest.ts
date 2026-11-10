@@ -22,6 +22,8 @@ export default function manifest(): MetadataRoute.Manifest {
     ],
     shortcuts: [
       { name: "Registrar comida", short_name: "Registrar", url: "/registrar", icons: [{ src: "/icons/icon-192.png", sizes: "192x192" }] },
+      { name: "Como ayer", short_name: "Como ayer", url: "/hoy?rapido=ayer", icons: [{ src: "/icons/icon-192.png", sizes: "192x192" }] },
+      { name: "Batido de proteína", short_name: "Batido", url: "/hoy?rapido=batido", icons: [{ src: "/icons/icon-192.png", sizes: "192x192" }] },
       { name: "Escanear código", short_name: "Escanear", url: "/buscar?escanear=1", icons: [{ src: "/icons/icon-192.png", sizes: "192x192" }] },
       { name: "Añadir agua", short_name: "Agua", url: "/hoy?agua=250", icons: [{ src: "/icons/icon-192.png", sizes: "192x192" }] },
       { name: "Coach", short_name: "Coach", url: "/coach", icons: [{ src: "/icons/icon-192.png", sizes: "192x192" }] },

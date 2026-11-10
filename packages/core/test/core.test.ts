@@ -610,3 +610,41 @@ describe("informe semanal", () => {
     expect(await core.buildWeeklyReport(db, pid, createProvider("mock"), core.zonedTime("2028-01-02", "20:00", "Europe/Madrid"))).toBeNull();
   });
 });
+
+describe("registro rápido", () => {
+  it("plantillas en un toque, sugerencia de comidas repetidas, «como ayer» y batido", async () => {
+    const [p] = await db.select().from(persons).where(eq(persons.userId, "gym"));
+    const pid = p!.id;
+    const mk = async (name: string, protein: number) => (await db.insert(foods).values({ source: "custom", name, kcal: 100, protein, carbs: 10, fat: 2, nutrients: { energy_kcal: 100, protein } }).returning())[0]!.id;
+    const [avena, leche] = [await mk("Avena", 13), await mk("Leche", 3)];
+    const days = ["2027-04-05", "2027-04-07", "2027-04-08"];
+    for (const d of days) await core.addEntries(db, { personId: pid, userId: "gym", date: d, mealSlot: "breakfast", origin: "manual", items: [{ foodId: avena, grams: 60 }, { foodId: leche, grams: 250 }] });
+    await core.addEntries(db, { personId: pid, userId: "gym", date: "2027-04-08", mealSlot: "lunch", origin: "manual", items: [{ foodId: avena, grams: 60 }] });
+
+    const sug = await core.templateSuggestions(db, pid, "2027-04-09");
+    expect(sug).toHaveLength(1);
+    expect(sug[0]).toMatchObject({ slot: "breakfast", date: "2027-04-08", times: 3, names: ["Avena", "Leche"] });
+    const t = await core.saveMealAsTemplate(db, pid, sug[0]!.date, "breakfast", "Desayuno de avena");
+    expect(t.items).toHaveLength(2);
+    expect(await core.templateSuggestions(db, pid, "2027-04-09")).toHaveLength(0); // already a template
+
+    // «Lo de siempre» at breakfast time logs the template and counts the use.
+    const at = (t: string) => core.zonedTime("2027-04-09", t, "Europe/Madrid");
+    const usual = await core.quickLog(db, { personId: pid, userId: "gym", kind: "usual" }, at("08:10"));
+    expect(usual).toEqual({ ok: true, message: "Registrado en desayuno: Desayuno de avena" });
+    expect(await db.select().from(diaryEntries).where(and(eq(diaryEntries.personId, pid), eq(diaryEntries.date, "2027-04-09"), eq(diaryEntries.mealSlot, "breakfast")))).toHaveLength(2);
+    expect((await core.listTemplates(db, pid))[0]!.useCount).toBe(1);
+    expect((await core.quickLog(db, { personId: pid, userId: "gym", kind: "usual" }, at("14:40"))).message).toMatch(/Aún no tienes una plantilla para comida/);
+
+    // «Como ayer»: copies the same meal once.
+    expect(await core.quickLog(db, { personId: pid, userId: "gym", kind: "yesterday", slot: "lunch" }, at("14:40"))).toEqual({ ok: true, message: "Copiado de ayer: 1 alimento en comida" });
+    expect((await core.quickLog(db, { personId: pid, userId: "gym", kind: "yesterday", slot: "lunch" }, at("14:40"))).ok).toBe(false);
+    expect((await core.quickLog(db, { personId: pid, userId: "gym", kind: "yesterday", slot: "dinner" }, at("21:00"))).message).toBe("Ayer no registraste cena");
+
+    // Shake: needs whey in the supplements (or a «Batido» template), then logs it once.
+    expect((await core.quickLog(db, { personId: pid, userId: "gym", kind: "shake" }, at("19:00"))).ok).toBe(false);
+    await core.addSupplementPlan(db, pid, "gym", { code: "whey", dose: 30, doseUnit: "g", gramsPerDose: 30, times: [], daysOfWeek: [1, 2, 3, 4, 5, 6, 7] });
+    expect((await core.quickLog(db, { personId: pid, userId: "gym", kind: "shake" }, at("19:00"))).message).toMatch(/^Batido registrado: /);
+    expect((await core.quickLog(db, { personId: pid, userId: "gym", kind: "shake" }, at("19:05"))).message).toBe("El batido de hoy ya estaba registrado");
+  });
+});

@@ -718,6 +718,38 @@ async function allRoutes(page: Page) {
   return [...ROUTES, ...[recipe, recipe && `${recipe}/editar`, recipe && `${recipe}/cocinar`, person, retro, ticket, ticket && `${ticket}?editar=1`, food].filter((x): x is string => !!x)];
 }
 
+test("registro rápido: plantilla en un toque, atajos y acciones de los avisos", async () => {
+  const page = adminPage;
+  await page.goto("/hoy");
+  // Breakfast has at least the creatine dose taken in the sport test.
+  const breakfast = page.locator("section").filter({ has: page.getByRole("heading", { name: "Desayuno" }) });
+  await breakfast.getByRole("button", { name: "Más opciones" }).click();
+  await page.getByRole("menuitem", { name: "Guardar como plantilla" }).click();
+  const dialog = page.getByRole("dialog");
+  await dialog.getByLabel("Nombre").fill("Desayuno e2e");
+  await dialog.getByRole("button", { name: "Guardar plantilla" }).click();
+  await expect(page.getByText("Plantilla guardada")).toBeVisible();
+
+  await page.goto("/buscar?ver=plantillas&comida=dinner");
+  await expect(page.getByText("Desayuno e2e")).toBeVisible();
+  await page.getByRole("button", { name: "Registrar Desayuno e2e en Cena" }).click();
+  await expect(page.getByText(/Desayuno e2e: \d+ alimentos? registrados? en cena/)).toBeVisible();
+  await page.reload();
+  await expect(page.getByText(/usada 1 vez/)).toBeVisible();
+
+  // The endpoint behind the notification buttons always answers with a message.
+  const shake = await page.request.post("/api/diary/quick", { data: { kind: "shake" } });
+  expect(shake.status()).toBe(200);
+  expect(((await shake.json()) as { message: string }).message).toMatch(/batido|Batido|proteína/);
+  expect((await page.request.post("/api/diary/quick", { data: { kind: "nope" } })).status()).toBe(400);
+  // App shortcut: logs (or explains why not) and cleans the URL.
+  await page.goto("/hoy?rapido=ayer");
+  await expect(page.getByText(/Copiado de ayer|Ayer no registraste|Ya hay algo registrado/)).toBeVisible();
+  await expect(page).toHaveURL(/\/hoy$/);
+  const manifest = (await (await page.request.get("/manifest.webmanifest")).json()) as { shortcuts: { url: string }[] };
+  expect(manifest.shortcuts.map((s) => s.url)).toEqual(expect.arrayContaining(["/hoy?rapido=ayer", "/hoy?rapido=batido"]));
+});
+
 test("todas las páginas cargan sin errores de servidor", async () => {
   const page = adminPage;
   const errors: string[] = [];

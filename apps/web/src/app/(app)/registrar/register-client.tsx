@@ -48,7 +48,7 @@ type Row = {
   confidence: number;
 };
 
-export function RegisterClient({ ctx, aiEnabled, sharedImages }: { ctx: DayContext; aiEnabled: boolean; sharedImages: string[] }) {
+export function RegisterClient({ ctx, aiEnabled, sharedImages, voice = false }: { ctx: DayContext; aiEnabled: boolean; sharedImages: string[]; voice?: boolean }) {
   const params = useSearchParams();
   const router = useRouter();
   const [text, setText] = useState(params.get("texto") ?? "");
@@ -206,6 +206,7 @@ export function RegisterClient({ ctx, aiEnabled, sharedImages }: { ctx: DayConte
           ) : null}
           <div className="flex flex-wrap gap-2">
             <VoiceInput
+              autoStart={voice}
               onText={(t) => {
                 setText(t);
                 setMode("voice");

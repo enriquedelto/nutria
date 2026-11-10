@@ -31,6 +31,7 @@ async function Content({ searchParams }: { searchParams: Promise<Record<string, 
       <RegisterClient
         aiEnabled={aiConfigured() && ctx.scopes.has("ai")}
         sharedImages={shared}
+        voice={sp.voz === "1"}
         ctx={{
           personId: ctx.person.id,
           date,

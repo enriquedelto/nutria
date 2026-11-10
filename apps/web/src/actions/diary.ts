@@ -3,7 +3,7 @@ import { UserError } from "@/lib/errors";
 import { refresh } from "next/cache";
 import { z } from "zod";
 import { and, dailySummaries, eq, foodFavorites, foods, isNull, mealTemplates, or, persons, waterLogs, type MealTemplateItem } from "@nutria/db";
-import { copyMeal, deleteEntries, recomputeDay, undoAiAction, updateEntry } from "@nutria/core";
+import { copyMeal, deleteEntries, logTemplate, recomputeDay, saveMealAsTemplate, undoAiAction, updateEntry } from "@nutria/core";
 import { db } from "@/lib/db";
 import { addDiaryItems, translateIfNeeded, type AddPayload } from "@/lib/diary-service";
 import { assertAccess, getApiUser } from "@/lib/session";
@@ -91,6 +91,31 @@ export async function saveTemplate(personId: string, name: string, mealSlot: str
   await assertAccess(u.id, personId, "diary", true);
   await db().insert(mealTemplates).values({ personId, name: z.string().min(1).max(80).parse(name), mealSlot, items });
   refresh();
+}
+
+/** Save a logged meal as a template (its foods and grams). */
+export async function saveMealTemplate(personId: string, day: string, slot: string, name: string) {
+  const u = await user();
+  await assertAccess(u.id, personId, "diary", true);
+  try {
+    await saveMealAsTemplate(db(), personId, date.parse(day), z.string().min(1).max(40).parse(slot), z.string().trim().min(1).max(80).parse(name));
+  } catch (e) {
+    throw new UserError(e instanceof z.ZodError ? "Ponle un nombre a la plantilla" : e instanceof Error ? e.message : "No se pudo guardar");
+  }
+  refresh();
+}
+
+/** Log every food of a template in one go. Returns how many entries were added. */
+export async function logTemplateAction(personId: string, templateId: string, day: string, slot: string) {
+  const u = await user();
+  await assertAccess(u.id, personId, "diary", true);
+  try {
+    const r = await logTemplate(db(), { personId, userId: u.id, templateId: z.string().uuid().parse(templateId), date: date.parse(day), slot: z.string().min(1).max(40).parse(slot) });
+    refresh();
+    return r.rows.length;
+  } catch (e) {
+    throw new UserError(e instanceof Error && !(e instanceof z.ZodError) ? e.message : "No se pudo registrar");
+  }
 }
 
 export async function deleteTemplate(personId: string, id: string) {

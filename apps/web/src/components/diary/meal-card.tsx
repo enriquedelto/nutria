@@ -3,10 +3,10 @@ import { submitForm } from "@/lib/forms";
 import { useState } from "react";
 import { useSafeTransition } from "@/lib/use-safe-transition";
 import Link from "next/link";
-import { ArrowLeftRight, Copy, MoreHorizontal, Plus, Sparkles, Trash2 } from "lucide-react";
+import { ArrowLeftRight, BookmarkPlus, Copy, History, MoreHorizontal, Plus, Sparkles, Trash2 } from "lucide-react";
 import { DropdownMenu } from "radix-ui";
 import { toast } from "sonner";
-import { copyMealTo, editEntry, removeEntries } from "@/actions/diary";
+import { copyMealTo, editEntry, removeEntries, saveMealTemplate } from "@/actions/diary";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent } from "@/components/ui/dialog";
 import { FoodPicker } from "@/components/food/food-picker";
@@ -42,6 +42,7 @@ export function MealCard({
   slots,
   canWrite,
   proteinDose,
+  yesterday,
 }: {
   personId: string;
   date: string;
@@ -52,9 +53,13 @@ export function MealCard({
   canWrite: boolean;
   /** Ideal protein for this meal (main meals of people training or gaining). */
   proteinDose?: number | null;
+  /** Yesterday had this meal logged: an empty meal offers «Como ayer». */
+  yesterday?: boolean;
 }) {
   const [pending, start] = useSafeTransition();
   const [editing, setEditing] = useState<MealEntry | null>(null);
+  const [naming, setNaming] = useState(false);
+  const prevDay = new Date(Date.parse(date + "T12:00:00Z") - 86_400_000).toISOString().slice(0, 10);
   const kcal = entries.reduce((a, e) => a + e.kcal, 0);
   const protein = entries.reduce((a, e) => a + e.protein, 0);
   const pStatus = proteinDose ? mealProteinStatus(protein, proteinDose) : null;
@@ -109,6 +114,9 @@ export function MealCard({
                     >
                       <Copy className="size-4" /> Copiar a mañana
                     </DropdownMenu.Item>
+                    <DropdownMenu.Item className="flex cursor-pointer items-center gap-2 rounded-xl px-2 py-2 outline-none data-[highlighted]:bg-paper-2" onSelect={() => setNaming(true)}>
+                      <BookmarkPlus className="size-4" /> Guardar como plantilla
+                    </DropdownMenu.Item>
                     <DropdownMenu.Item
                       className="flex cursor-pointer items-center gap-2 rounded-xl px-2 py-2 text-danger outline-none data-[highlighted]:bg-paper-2"
                       onSelect={() =>
@@ -127,6 +135,46 @@ export function MealCard({
           </div>
         ) : null}
       </header>
+      {!entries.length && yesterday && canWrite ? (
+        <div className="border-t border-line px-4 py-2">
+          <Button
+            size="sm"
+            variant="outline"
+            disabled={pending}
+            onClick={() =>
+              start(async () => {
+                const n = await copyMealTo(personId, prevDay, date, slot, slot);
+                toast.success(`${label}: ${n} ${n === 1 ? "alimento copiado" : "alimentos copiados"} de ayer`);
+              })
+            }
+          >
+            <History /> Como ayer
+          </Button>
+        </div>
+      ) : null}
+      {naming ? (
+        <Dialog open onOpenChange={setNaming}>
+          <DialogContent title="Guardar como plantilla" description="Se guardan los alimentos y sus gramos. Luego la registras en un toque desde Buscar › Plantillas o desde el aviso de la comida.">
+            <form
+              className="space-y-3"
+              onSubmit={submitForm((fd) =>
+                start(async () => {
+                  await saveMealTemplate(personId, date, slot, String(fd.get("name") ?? ""));
+                  setNaming(false);
+                  toast.success("Plantilla guardada");
+                }),
+              )}
+            >
+              <Field label="Nombre">
+                <Input name="name" defaultValue={`${label} habitual`} maxLength={80} required autoFocus />
+              </Field>
+              <Button type="submit" className="w-full" disabled={pending}>
+                Guardar plantilla
+              </Button>
+            </form>
+          </DialogContent>
+        </Dialog>
+      ) : null}
       {entries.length ? (
         <ul className={pending ? "opacity-60" : undefined}>
           {entries.map((e) => (

@@ -16,7 +16,7 @@ declare global {
  * Dictation: Web Speech API when available (Chrome/Android), otherwise records audio and sends
  * it to /api/ai/transcribe (faster-whisper on the NUC).
  */
-export function VoiceInput({ onText, className }: { onText: (text: string, final: boolean) => void; className?: string }) {
+export function VoiceInput({ onText, className, autoStart = false }: { onText: (text: string, final: boolean) => void; className?: string; /** Start listening on mount (from the «Dictar» notification action). Browsers may still ask for a tap. */ autoStart?: boolean }) {
   const [state, setState] = useState<"idle" | "listening" | "recording" | "transcribing">("idle");
   const rec = useRef<SR | null>(null);
   const media = useRef<MediaRecorder | null>(null);
@@ -78,6 +78,13 @@ export function VoiceInput({ onText, className }: { onText: (text: string, final
   };
 
   const busy = state === "listening" || state === "recording";
+  const auto = useRef(autoStart);
+  useEffect(() => {
+    if (!auto.current) return;
+    auto.current = false;
+    void start().catch(() => undefined);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
   return (
     <Button type="button" variant={busy ? "accent" : "outline"} size="lg" className={className} onClick={busy ? stop : start} disabled={state === "transcribing"} aria-pressed={busy}>
       {state === "transcribing" ? <Loader2 className="animate-spin" /> : busy ? <Square /> : <Mic />}

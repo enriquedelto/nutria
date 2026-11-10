@@ -26,7 +26,7 @@ import {
 import { addDays, expiryStatus, isoDow, photoReminderDue, proteinGapG, todayIn } from "@nutria/nutrition";
 import { targetsForDate } from "./targets";
 import { proteinIdeas, proteinToday } from "./timing";
-import { notify } from "./notify";
+import { notify, QUICK_ACTIONS } from "./notify";
 import { supplementTakenOn } from "./supplements";
 
 /** Users that should receive reminders for a person (owners/managers). */
@@ -126,7 +126,7 @@ export async function remindersTick(db: Database, now = new Date(), windowMin = 
     for (const t of times) {
       const at = zonedTime(today, t, p.timezone);
       if (at > since && at <= now) {
-        await notify(db, p.type.startsWith("custom:") ? { userId: p.userId, type: "custom", title: `⏰ ${String(p.config.title ?? "Recordatorio")}`, url: String(p.config.url ?? "/hoy"), tag: p.type, timezone: p.timezone } : p.type === "water" ? { userId: p.userId, type: "water", title: "💧 ¿Un vaso de agua?", url: "/hoy?agua=250", tag: "water", timezone: p.timezone } : { userId: p.userId, type: "meal_reminder", title: "🍽️ ¿Registramos la comida?", url: "/registrar", tag: "meal", timezone: p.timezone });
+        await notify(db, p.type.startsWith("custom:") ? { userId: p.userId, type: "custom", title: `⏰ ${String(p.config.title ?? "Recordatorio")}`, url: String(p.config.url ?? "/hoy"), tag: p.type, timezone: p.timezone } : p.type === "water" ? { userId: p.userId, type: "water", title: "💧 ¿Un vaso de agua?", url: "/hoy?agua=250", tag: "water", timezone: p.timezone } : { userId: p.userId, type: "meal_reminder", title: "🍽️ ¿Registramos la comida?", url: "/registrar", tag: "meal", timezone: p.timezone, actions: [QUICK_ACTIONS.usual, QUICK_ACTIONS.dictate] });
         sent++;
       }
     }

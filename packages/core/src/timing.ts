@@ -1,7 +1,7 @@
 /** Nutrient timing around training: usual training time, the plan for today and quick protein ideas. */
 import { and, dailySummaries, desc, diaryEntries, eq, exerciseLogs, gte, isNotNull, persons, sql, type Database } from "@nutria/db";
 import { addDays, isoDow, medianTime, proteinDoseG, timingPhase, todayIn, trainingTiming, type TimingPhase, type TrainingTiming } from "@nutria/nutrition";
-import { notify } from "./notify";
+import { notify, QUICK_ACTIONS } from "./notify";
 import { dayKindFor, getSportProfile } from "./sport";
 import { latestWeight } from "./targets";
 
@@ -97,6 +97,6 @@ export async function notifyPostWorkout(db: Database, personId: string, fresh: {
   const [p] = await db.select({ userId: persons.userId, timezone: persons.timezone }).from(persons).where(eq(persons.id, personId)).limit(1);
   if (!p?.userId) return false;
   const grams = weightKg ? `${Math.round(0.3 * weightKg)}–${Math.round(0.4 * weightKg)} g` : "25–35 g";
-  await notify(db, { userId: p.userId, type: "post_workout", title: "💪 Entreno registrado. ¿Tu batido?", body: `${grams} de proteína con hidratos en las próximas 2 h.`, url: "/hoy#entreno", tag: "post-workout", timezone: p.timezone });
+  await notify(db, { userId: p.userId, type: "post_workout", title: "💪 Entreno registrado. ¿Tu batido?", body: `${grams} de proteína con hidratos en las próximas 2 h.`, url: "/hoy#entreno", tag: "post-workout", timezone: p.timezone, actions: [QUICK_ACTIONS.shake] });
   return true;
 }

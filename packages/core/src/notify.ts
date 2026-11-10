@@ -24,7 +24,22 @@ export interface NotifyInput {
   /** Skip the push if the user is in quiet hours (in-app notification is still stored). */
   respectQuietHours?: boolean;
   timezone?: string;
+  /** Buttons on the notification: open a page (`url`) or call an endpoint without opening the app (`post`). */
+  actions?: NotifyAction[];
 }
+
+export interface NotifyAction {
+  action: string;
+  title: string;
+  url?: string;
+  post?: { url: string; body: Record<string, unknown> };
+}
+
+export const QUICK_ACTIONS = {
+  usual: { action: "usual", title: "Lo de siempre", post: { url: "/api/diary/quick", body: { kind: "usual" } } },
+  dictate: { action: "dictate", title: "Dictar", url: "/registrar?voz=1" },
+  shake: { action: "shake", title: "Registrar batido", post: { url: "/api/diary/quick", body: { kind: "shake" } } },
+} satisfies Record<string, NotifyAction>;
 
 function inQuietHours(range: unknown, timezone: string, now = new Date()): boolean {
   if (!Array.isArray(range) || range.length !== 2) return false;
@@ -43,7 +58,7 @@ export async function notify(db: Database, n: NotifyInput): Promise<{ stored: bo
   if (n.respectQuietHours !== false && inQuietHours(pref?.config.quietHours ?? quiet?.config.quietHours, n.timezone ?? "Europe/Madrid")) return { stored: true, pushed: 0 };
   if (!ensureVapid()) return { stored: true, pushed: 0 };
   const subs = await db.select().from(pushSubscriptions).where(eq(pushSubscriptions.userId, n.userId));
-  const payload = JSON.stringify({ title: n.title, body: n.body ?? "", url: n.url ?? "/", tag: n.tag ?? n.type });
+  const payload = JSON.stringify({ title: n.title, body: n.body ?? "", url: n.url ?? "/", tag: n.tag ?? n.type, ...(n.actions?.length ? { actions: n.actions } : {}) });
   const dead: string[] = [];
   let pushed = 0;
   await Promise.all(

@@ -12,6 +12,7 @@ import { Sparkline } from "@/components/charts/sparkline";
 import { DoseButton } from "@/components/health/dose-button";
 import { SupplementButton } from "@/components/health/supplement-button";
 import { TrainingCard } from "@/components/diary/training-card";
+import { QuickParam, TemplateSuggestion } from "@/components/diary/quick-bits";
 import { HOME_CARDS } from "@/lib/home-cards";
 import { getDay, getHomeExtras } from "@/lib/data/day";
 import { getPersonContext } from "@/lib/session";
@@ -41,8 +42,11 @@ async function Today() {
     entreno: extras.training ? <TrainingCard key="entreno" plan={extras.training} proteinLeft={day.target ? Math.round(day.target.protein - (day.totals.protein ?? 0)) : null} /> : null,
     comidas: (
       <div key="comidas" className="space-y-3 sm:col-span-2">
+        {ctx.canWrite && extras.templateSuggestion ? (
+          <TemplateSuggestion personId={ctx.person.id} slot={extras.templateSuggestion.slot} slotLabel={slots.find((s) => s.key === extras.templateSuggestion!.slot)?.label ?? "Comida"} date={extras.templateSuggestion.date} times={extras.templateSuggestion.times} names={extras.templateSuggestion.names} />
+        ) : null}
         {day.meals.map((m) => (
-          <MealCard key={m.key} personId={ctx.person.id} date={date} slot={m.key} label={m.label} entries={m.entries} slots={slots} canWrite={ctx.canWrite} proteinDose={m.main ? day.proteinDose : null} />
+          <MealCard key={m.key} personId={ctx.person.id} date={date} slot={m.key} label={m.label} entries={m.entries} slots={slots} canWrite={ctx.canWrite} proteinDose={m.main ? day.proteinDose : null} yesterday={extras.yesterdaySlots.includes(m.key)} />
         ))}
       </div>
     ),
@@ -159,6 +163,7 @@ async function Today() {
 
   return (
     <>
+      {ctx.canWrite && ctx.person.isSelf ? <QuickParam /> : null}
       <div className="mb-5 flex flex-wrap items-end justify-between gap-3">
         <div>
           <p className="text-sm font-medium text-ink-2 first-letter:uppercase">{dateLong(date)}</p>

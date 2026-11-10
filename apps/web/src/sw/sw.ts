@@ -43,7 +43,8 @@ const serwist = new Serwist({
 
 serwist.addEventListeners();
 
-type PushPayload = { title: string; body?: string; url?: string; tag?: string; icon?: string };
+type PushAction = { action: string; title: string; url?: string; post?: { url: string; body: Record<string, unknown> } };
+type PushPayload = { title: string; body?: string; url?: string; tag?: string; icon?: string; actions?: PushAction[] };
 
 self.addEventListener("push", (event) => {
   let data: PushPayload = { title: "Nutria" };
@@ -58,16 +59,32 @@ self.addEventListener("push", (event) => {
       tag: data.tag,
       icon: data.icon ?? "/icons/icon-192.png",
       badge: "/icons/badge-72.png",
-      data: { url: data.url ?? "/hoy" },
-    }),
+      data: { url: data.url ?? "/hoy", actions: data.actions ?? [] },
+      // Action buttons (Android/desktop): «Lo de siempre», «Dictar», «Registrar batido».
+      ...(data.actions?.length ? { actions: data.actions.slice(0, 2).map((a) => ({ action: a.action, title: a.title })) } : {}),
+    } as NotificationOptions),
   );
 });
 
 self.addEventListener("notificationclick", (event) => {
   event.notification.close();
-  const url = (event.notification.data as { url?: string } | undefined)?.url ?? "/hoy";
+  const nd = event.notification.data as { url?: string; actions?: PushAction[] } | undefined;
+  const picked = event.action ? nd?.actions?.find((a) => a.action === event.action) : undefined;
+  const url = picked?.url ?? nd?.url ?? "/hoy";
   event.waitUntil(
     (async () => {
+      // One-tap action: do it in the background and say what happened, without opening the app.
+      if (picked?.post) {
+        let message = "Sin conexión: ábrelo en la app";
+        try {
+          const r = await fetch(picked.post.url, { method: "POST", credentials: "same-origin", headers: { "content-type": "application/json" }, body: JSON.stringify(picked.post.body) });
+          message = ((await r.json()) as { message?: string }).message ?? message;
+        } catch {
+          /* offline */
+        }
+        await self.registration.showNotification("Nutria", { body: message, tag: "quick-result", icon: "/icons/icon-192.png", badge: "/icons/badge-72.png", data: { url: "/hoy" } });
+        return;
+      }
       const all = await self.clients.matchAll({ type: "window", includeUncontrolled: true });
       const existing = all.find((c) => new URL(c.url).origin === self.location.origin);
       if (existing) {

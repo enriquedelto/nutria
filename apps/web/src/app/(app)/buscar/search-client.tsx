@@ -13,6 +13,7 @@ import { Dialog, DialogContent } from "@/components/ui/dialog";
 import { Empty } from "@/components/ui/empty";
 import { Field, Input, Select } from "@/components/ui/input";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Templates, type TemplateBrief } from "./templates";
 import { n0 } from "@/lib/format";
 import { newClientId, sendOrQueue } from "@/lib/offline-queue";
 import type { FoodBrief } from "@/lib/data/foods";
@@ -20,10 +21,10 @@ import { Explore } from "./explore";
 
 type Listed = FoodBrief & { lastGrams?: number };
 
-const TABS = ["recientes", "frecuentes", "favoritos", "explorar"] as const;
+const TABS = ["recientes", "frecuentes", "favoritos", "plantillas", "explorar"] as const;
 type Tab = (typeof TABS)[number];
 
-export function SearchClient({ ctx, lists, hasAllergens }: { ctx: DayContext; lists: { recent: Listed[]; frequent: Listed[]; favorites: Listed[] }; hasAllergens: boolean }) {
+export function SearchClient({ ctx, lists, hasAllergens, templates, canWrite }: { ctx: DayContext; lists: { recent: Listed[]; frequent: Listed[]; favorites: Listed[] }; hasAllergens: boolean; templates: TemplateBrief[]; canWrite: boolean }) {
   const params = useSearchParams();
   const router = useRouter();
   const pathname = usePathname();
@@ -161,8 +162,12 @@ export function SearchClient({ ctx, lists, hasAllergens }: { ctx: DayContext; li
             <TabsTrigger value="recientes">Recientes</TabsTrigger>
             <TabsTrigger value="frecuentes">Frecuentes</TabsTrigger>
             <TabsTrigger value="favoritos">Favoritos</TabsTrigger>
+            <TabsTrigger value="plantillas">Plantillas</TabsTrigger>
             <TabsTrigger value="explorar">Explorar</TabsTrigger>
           </TabsList>
+          <TabsContent value="plantillas" className="mt-3">
+            {canWrite ? <Templates personId={ctx.personId} date={ctx.date} slot={ctx.slot} slotLabel={ctx.slots.find((s) => s.key === ctx.slot)?.label ?? "Comida"} templates={templates} /> : <Empty title="Solo lectura">No puedes registrar comidas de esta persona.</Empty>}
+          </TabsContent>
           <TabsContent value="explorar" className="mt-3">
             {exploring ? <Explore personId={ctx.personId} q={q} hasAllergens={hasAllergens} onOpen={(id) => setOpen({ id })} /> : null}
           </TabsContent>
