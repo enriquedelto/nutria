@@ -639,7 +639,7 @@ test("webhooks: salida firmada (Home Assistant) y peso de entrada con token", as
   expect(((await health.json()) as { saved: { steps: number; sleep: number; heartDays: number } }).saved).toMatchObject({ steps: 1, sleep: 1, heartDays: 1 });
   expect((await page.request.post("/api/hooks/health", { data: { steps: 1 } })).status()).toBe(401);
   await page.goto("/salud/sueno");
-  await expect(page.getByText(/7,5s*h/).first()).toBeVisible();
+  await expect(page.getByText("7,5 h", { exact: false }).first()).toBeVisible();
   await page.goto("/ajustes/datos");
   const href = await page.getByRole("link", { name: "Todo (JSON)" }).getAttribute("href");
   const pesos = ((await (await page.request.get(href!)).json()) as { data: { pesos: { kg: number; source: string }[] } }).data.pesos;
