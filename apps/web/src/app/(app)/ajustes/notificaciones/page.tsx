@@ -1,5 +1,5 @@
 import { Suspense } from "react";
-import { count, eq, notificationPrefs, pushSubscriptions } from "@nutria/db";
+import { count, eq, notificationPrefs, persons, pushSubscriptions } from "@nutria/db";
 import { PageHeader } from "@/components/page-header";
 import { Card, CardHeader } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/empty";
@@ -12,6 +12,8 @@ export const metadata = { title: "Avisos" };
 const TYPES: { type: string; label: string; hint: string; times?: string[] }[] = [
   { type: "meal_reminder", label: "Registrar comidas", hint: "A las horas que elijas, si aún no has registrado", times: ["14:30", "21:30"] },
   { type: "water", label: "Beber agua", hint: "Recordatorio suave", times: ["11:00", "17:00"] },
+  { type: "protein", label: "Proteína del día", hint: "Por la tarde, si aún te faltan 20 g o más (activo de serie con el objetivo «ganar»)", times: ["20:00"] },
+  { type: "post_workout", label: "Después de entrenar", hint: "Cuando llega tu entreno de openGym: proteína en las 2 h siguientes" },
   { type: "medication", label: "Medicación", hint: "A la hora de cada toma (ignora el silencio)" },
   { type: "supplement", label: "Suplementos", hint: "Según la pauta de cada suplemento" },
   { type: "fasting", label: "Ayuno", hint: "Al completar la meta" },
@@ -25,9 +27,10 @@ const TYPES: { type: string; label: string; hint: string; times?: string[] }[] =
 
 async function Content() {
   const u = await getCurrentUser();
-  const [prefs, [subs]] = await Promise.all([
+  const [prefs, [subs], [me]] = await Promise.all([
     db().select().from(notificationPrefs).where(eq(notificationPrefs.userId, u.id)),
     db().select({ n: count() }).from(pushSubscriptions).where(eq(pushSubscriptions.userId, u.id)),
+    db().select({ goal: persons.goalType }).from(persons).where(eq(persons.userId, u.id)).limit(1),
   ]);
   const by = new Map(prefs.map((p) => [p.type, p]));
   const custom = prefs.filter((p) => p.type.startsWith("custom:"));
@@ -45,7 +48,7 @@ async function Content() {
             const p = by.get(t.type);
             const times = Array.isArray(p?.config.times) ? (p!.config.times as string[]) : (t.times ?? []);
             // Reminders with times are opt-in; event notifications are on unless disabled.
-            const enabled = p ? p.enabled : !t.times;
+            const enabled = p ? p.enabled : t.type === "protein" ? me?.goal === "gain" : !t.times;
             return <PrefRow key={t.type} type={t.type} label={t.label} hint={t.hint} enabled={enabled} times={times} withTimes={!!t.times} />;
           })}
         </ul>

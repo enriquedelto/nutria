@@ -93,7 +93,7 @@ async function Content({ searchParams }: { searchParams: Promise<Record<string, 
           </Card>
           {day.meals.map((m) => (
             <div key={m.key} className="space-y-1">
-              <MealCard personId={ctx.person.id} date={date} slot={m.key} label={m.label} entries={m.entries} slots={slots} canWrite={ctx.canWrite} />
+              <MealCard personId={ctx.person.id} date={date} slot={m.key} label={m.label} entries={m.entries} slots={slots} canWrite={ctx.canWrite} proteinDose={m.main ? day.proteinDose : null} />
               {m.entries.length && ctx.canWrite ? <FeelingButton personId={ctx.person.id} date={date} slot={m.key} current={feelings.find((f) => f.mealSlot === m.key) ?? null} /> : null}
             </div>
           ))}

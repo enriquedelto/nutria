@@ -22,7 +22,9 @@ import {
   foods,
   type Database,
 } from "@nutria/db";
-import { addDays, expiryStatus, isoDow, todayIn } from "@nutria/nutrition";
+import { addDays, expiryStatus, isoDow, proteinGapG, todayIn } from "@nutria/nutrition";
+import { targetsForDate } from "./targets";
+import { proteinIdeas, proteinToday } from "./timing";
 import { notify } from "./notify";
 import { supplementTakenOn } from "./supplements";
 
@@ -127,6 +129,34 @@ export async function remindersTick(db: Database, now = new Date(), windowMin = 
         sent++;
       }
     }
+  }
+
+  // Evening protein nudge: on by default for people gaining, or when enabled in Avisos (config.times[0], default 20:00).
+  const prot = await db
+    .select({ personId: persons.id, userId: persons.userId, timezone: persons.timezone, config: notificationPrefs.config })
+    .from(persons)
+    .leftJoin(notificationPrefs, and(eq(notificationPrefs.userId, persons.userId), eq(notificationPrefs.type, "protein")))
+    .where(sql`${persons.userId} is not null and (${notificationPrefs.enabled} is true or (${notificationPrefs.id} is null and ${persons.goalType} = 'gain'))`);
+  for (const p of prot) {
+    const today = todayIn(p.timezone, now);
+    const t = Array.isArray(p.config?.times) && typeof p.config.times[0] === "string" ? (p.config.times[0] as string) : "20:00";
+    const at = zonedTime(today, t, p.timezone);
+    if (at <= since || at > now) continue;
+    const [target, eaten] = await Promise.all([targetsForDate(db, p.personId, today), proteinToday(db, p.personId, today)]);
+    // Nothing logged today is a logging problem, not a protein one.
+    const gap = target && eaten.entries ? proteinGapG(target.protein, eaten.protein) : 0;
+    if (!gap) continue;
+    const ideas = await proteinIdeas(db, p.personId, today);
+    await notify(db, {
+      userId: p.userId!,
+      type: "protein",
+      title: `🥚 Te faltan ${gap} g de proteína`,
+      body: ideas.length ? `Ideas: ${ideas.map((i) => `${i.name} (${i.protein} g)`).join(", ")}` : "Un lácteo, huevos, legumbre o un batido antes de acostarte.",
+      url: "/hoy",
+      tag: "protein",
+      timezone: p.timezone,
+    });
+    sent++;
   }
 
   // Fasting target reached.

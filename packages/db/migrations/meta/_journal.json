@@ -64,6 +64,13 @@
       "when": 1794268170070,
       "tag": "0008_kcal_adjust",
       "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "7",
+      "when": 1794301352441,
+      "tag": "0009_home_card_entreno",
+      "breakpoints": true
     }
   ]
 }

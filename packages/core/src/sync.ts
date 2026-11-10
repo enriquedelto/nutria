@@ -21,6 +21,7 @@ import { recomputeDay } from "./summaries";
 import { latestWeight } from "./targets";
 import { applyPlannedDays, plannedDaysFromWeek } from "./sport";
 import { notify } from "./notify";
+import { notifyPostWorkout } from "./timing";
 
 /* ---------------------------------- foods --------------------------------- */
 
@@ -258,6 +259,7 @@ export async function syncOpenGym(db: Database, accountId: string, f?: typeof fe
     const w = await latestWeight(db, personId);
     const mapped = mapOpenGymState(state ?? {}, w?.kg ?? 75);
     const dates = new Set<string>();
+    let fresh: typeof mapped.exercises = [];
 
     const exIds = mapped.exercises.map((e) => e.externalId);
     const goneEx = await db
@@ -266,6 +268,8 @@ export async function syncOpenGym(db: Database, accountId: string, f?: typeof fe
       .returning({ date: exerciseLogs.date });
     goneEx.forEach((r) => dates.add(r.date));
     if (mapped.exercises.length) {
+      const had = new Set((await db.select({ x: exerciseLogs.externalId }).from(exerciseLogs).where(and(eq(exerciseLogs.personId, personId), eq(exerciseLogs.source, "opengym")))).map((r) => r.x));
+      fresh = mapped.exercises.filter((e) => !had.has(e.externalId));
       const rows = await db
         .insert(exerciseLogs)
         .values(
@@ -319,6 +323,7 @@ export async function syncOpenGym(db: Database, accountId: string, f?: typeof fe
         });
     }
     for (const d of dates) await recomputeDay(db, personId, d);
+    await notifyPostWorkout(db, personId, fresh, w?.kg ?? null).catch(() => undefined);
     meta.rev = rev;
     meta.plannedDays = plannedDaysFromWeek(state?.week);
     await applyPlannedDays(db, personId, meta.plannedDays as number[]);

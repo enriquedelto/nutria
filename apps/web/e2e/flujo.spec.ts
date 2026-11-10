@@ -138,6 +138,23 @@ test("revisión del volumen: sin datos todavía, a mano desde Progreso", async (
   await expect(card.getByText(/Sin entrenos de openGym/)).toBeVisible();
 });
 
+test("proteína por comida y tarjeta del entreno en Hoy", async () => {
+  const page = adminPage; // 62,5 kg, sport profile on: ideal dose max(25, 0.4 g/kg) = 25 g
+  await page.goto("/hoy");
+  await expect(page.getByText("Sin registrar · ideal ≥ 25 g de proteína").first()).toBeVisible();
+  // Snacks have no protein target.
+  await expect(page.locator("section").filter({ has: page.getByRole("heading", { name: "Merienda" }) }).getByText("Sin registrar", { exact: true })).toBeVisible();
+  // Training days (Mon/Wed/Fri in the sport test) show what to eat before and after.
+  if (await page.getByText("Día de entreno: más hidratos").count()) {
+    const card = page.locator("#entreno");
+    await expect(card.getByText(/Aún no sé a qué hora entrenas|Sueles entrenar/)).toBeVisible();
+    await expect(card.getByText(/19–25 g de proteína con hidratos/)).toBeVisible();
+  } else await expect(page.locator("#entreno")).toHaveCount(0);
+  await page.goto("/ajustes/notificaciones");
+  await expect(page.getByText("Proteína del día")).toBeVisible();
+  await expect(page.getByText("Después de entrenar")).toBeVisible();
+});
+
 test("registro por IA (simulada) llega al diario", async () => {
   const page = adminPage;
   await page.goto("/registrar");

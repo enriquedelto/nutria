@@ -19,6 +19,7 @@ import {
   medicationDoses,
   medications,
   notifications,
+  notificationPrefs,
   personAccess,
   prices,
   personAchievements,
@@ -535,5 +536,45 @@ describe("revisión del volumen", () => {
     expect(t2.carbs).toBe(313);
     // Not for other goals.
     expect(await core.weeklyBulkReview(db, personId, now)).toBeNull();
+  });
+});
+
+describe("proteína y timing del entreno", () => {
+  const at = (d: string, t: string) => core.zonedTime(d, t, "Europe/Madrid");
+  it("hora habitual, plan del día de entreno, aviso de proteína y aviso tras entrenar", async () => {
+    const [p] = await db.select().from(persons).where(eq(persons.userId, "gym"));
+    const pid = p!.id;
+    const D = "2027-03-01"; // Monday
+    for (const d of ["2027-02-15", "2027-02-22"]) await db.insert(exerciseLogs).values({ personId: pid, date: d, startedAt: at(d, d.endsWith("15") ? "18:20" : "18:40"), name: "Torso", durationMin: 70, kcal: 300 });
+    expect(await core.usualTrainingTime(db, pid, "Europe/Madrid", D, 1)).toMatchObject({ time: "18:30", durationMin: 70, samples: 2 });
+    // Not a planned day and nothing logged: rest day, no card.
+    expect(await core.trainingDayPlan(db, pid, at(D, "16:00"))).toBeNull();
+    await core.saveSportProfile(db, pid, true, { trainingDays: [1] });
+
+    const [f] = await db.insert(foods).values({ source: "custom", name: "Queso batido", kcal: 46, protein: 8, carbs: 3.5, fat: 0.2, nutrients: { energy_kcal: 46, protein: 8 } }).returning();
+    await core.addEntries(db, { personId: pid, userId: "gym", date: D, mealSlot: "lunch", origin: "manual", items: [{ foodId: f!.id, grams: 300 }] });
+    const plan = await core.trainingDayPlan(db, pid, at(D, "16:00"));
+    expect(plan).toMatchObject({ phase: "pre", done: false, known: true, proteinDoseG: 29 });
+    expect(plan!.timing).toMatchObject({ start: "18:30", preFrom: "15:30", postUntil: "21:40" });
+    expect(plan!.ideas[0]).toMatchObject({ name: "Queso batido", grams: 300, protein: 24 });
+
+    // 20:00: protein missing → nudge with the person's own ideas; not when disabled.
+    await core.remindersTick(db, at(D, "20:02"));
+    const [n] = await db.select().from(notifications).where(eq(notifications.type, "protein"));
+    expect(n?.title).toMatch(/Te faltan \d+ g de proteína/);
+    expect(n?.body).toContain("Queso batido (24 g)");
+    await db.insert(notificationPrefs).values({ userId: "gym", type: "protein", enabled: false, config: {} });
+    await core.remindersTick(db, at(D, "20:02"));
+    expect(await db.select().from(notifications).where(eq(notifications.type, "protein"))).toHaveLength(1);
+
+    // Workout logged today: real times, already in the post window.
+    await db.insert(exerciseLogs).values({ personId: pid, date: D, startedAt: at(D, "17:00"), name: "Torso", durationMin: 60, kcal: 300 });
+    const done = await core.trainingDayPlan(db, pid, at(D, "18:30"));
+    expect(done).toMatchObject({ phase: "post", done: true });
+    expect(done!.timing).toMatchObject({ start: "17:00", end: "18:00", postUntil: "20:00" });
+    expect(await core.notifyPostWorkout(db, pid, [{ startedAt: at(D, "17:00"), durationMin: 60 }], 72, at(D, "18:30"))).toBe(true);
+    expect(await core.notifyPostWorkout(db, pid, [{ startedAt: at("2027-02-22", "18:40"), durationMin: 70 }], 72, at(D, "18:30"))).toBe(false);
+    const [pw] = await db.select().from(notifications).where(eq(notifications.type, "post_workout"));
+    expect(pw?.body).toContain("22–29 g");
   });
 });

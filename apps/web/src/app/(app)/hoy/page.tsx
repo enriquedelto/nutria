@@ -11,6 +11,7 @@ import { WaterCard } from "@/components/diary/water-card";
 import { Sparkline } from "@/components/charts/sparkline";
 import { DoseButton } from "@/components/health/dose-button";
 import { SupplementButton } from "@/components/health/supplement-button";
+import { TrainingCard } from "@/components/diary/training-card";
 import { HOME_CARDS } from "@/lib/home-cards";
 import { getDay, getHomeExtras } from "@/lib/data/day";
 import { getPersonContext } from "@/lib/session";
@@ -37,10 +38,11 @@ async function Today() {
         ) : null}
       </Card>
     ),
+    entreno: extras.training ? <TrainingCard key="entreno" plan={extras.training} proteinLeft={day.target ? Math.round(day.target.protein - (day.totals.protein ?? 0)) : null} /> : null,
     comidas: (
       <div key="comidas" className="space-y-3 sm:col-span-2">
         {day.meals.map((m) => (
-          <MealCard key={m.key} personId={ctx.person.id} date={date} slot={m.key} label={m.label} entries={m.entries} slots={slots} canWrite={ctx.canWrite} />
+          <MealCard key={m.key} personId={ctx.person.id} date={date} slot={m.key} label={m.label} entries={m.entries} slots={slots} canWrite={ctx.canWrite} proteinDose={m.main ? day.proteinDose : null} />
         ))}
       </div>
     ),

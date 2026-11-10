@@ -11,7 +11,9 @@ import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent } from "@/components/ui/dialog";
 import { FoodPicker } from "@/components/food/food-picker";
 import { Field, Input, Select } from "@/components/ui/input";
+import { mealProteinStatus } from "@nutria/nutrition";
 import { n0 } from "@/lib/format";
+import { cn } from "@/lib/utils";
 
 export type MealEntry = {
   id: string;
@@ -39,6 +41,7 @@ export function MealCard({
   entries,
   slots,
   canWrite,
+  proteinDose,
 }: {
   personId: string;
   date: string;
@@ -47,10 +50,14 @@ export function MealCard({
   entries: MealEntry[];
   slots: { key: string; label: string }[];
   canWrite: boolean;
+  /** Ideal protein for this meal (main meals of people training or gaining). */
+  proteinDose?: number | null;
 }) {
   const [pending, start] = useSafeTransition();
   const [editing, setEditing] = useState<MealEntry | null>(null);
   const kcal = entries.reduce((a, e) => a + e.kcal, 0);
+  const protein = entries.reduce((a, e) => a + e.protein, 0);
+  const pStatus = proteinDose ? mealProteinStatus(protein, proteinDose) : null;
   const tomorrow = new Date(Date.parse(date + "T12:00:00Z") + 86_400_000).toISOString().slice(0, 10);
 
   return (
@@ -58,7 +65,24 @@ export function MealCard({
       <header className="flex items-center justify-between gap-2 px-4 pb-2 pt-3">
         <div>
           <h3 className="font-display text-lg font-semibold">{label}</h3>
-          <p className="num text-xs text-ink-3">{entries.length ? `${n0(kcal)} kcal · P ${n0(entries.reduce((a, e) => a + e.protein, 0))} g` : "Sin registrar"}</p>
+          <p className="num text-xs text-ink-3">
+            {entries.length ? (
+              <>
+                {n0(kcal)} kcal ·{" "}
+                {pStatus && proteinDose ? (
+                  <span className={cn("font-medium", pStatus === "ok" ? "text-herb" : pStatus === "near" ? "text-ink-2" : "text-persimmon")} title="Proteína de esta comida frente a la toma ideal (0,4 g/kg)">
+                    P {n0(protein)} de {n0(proteinDose)} g{pStatus === "ok" ? " ✓" : ""}
+                  </span>
+                ) : (
+                  `P ${n0(protein)} g`
+                )}
+              </>
+            ) : proteinDose ? (
+              `Sin registrar · ideal ≥ ${n0(proteinDose)} g de proteína`
+            ) : (
+              "Sin registrar"
+            )}
+          </p>
         </div>
         {canWrite ? (
           <div className="flex items-center gap-1">
