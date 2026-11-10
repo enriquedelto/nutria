@@ -28,6 +28,26 @@ export const HYPERTROPHY_SETS = { min: 10, max: 20 } as const;
 /** Muscles the guideline is shown for (forearms and abs get plenty of indirect work). */
 export const MAIN_MUSCLES: MuscleGroup[] = ["pecho", "espalda", "hombros", "biceps", "triceps", "cuadriceps", "isquios", "gluteos", "gemelos"];
 
+/** Custom exercises (not in the catalogue): muscles guessed from the name, first match wins. */
+const NAME_RULES: [RegExp, MuscleGroup[]][] = [
+  [/hip thrust|puente de gl[uú]teo|glute bridge|patada de gl[uú]teo|abducci/i, ["gluteos", "isquios"]],
+  [/curl femoral|femoral|isquio|leg curl|nordic/i, ["isquios"]],
+  [/peso muerto|deadlift/i, ["isquios", "gluteos", "espalda"]],
+  [/sentadilla|squat|prensa|leg press|extensi[oó]n de (cu[aá]driceps|piernas)|leg extension/i, ["cuadriceps", "gluteos"]],
+  [/zancada|lunge|b[uú]lgara|step.?up/i, ["cuadriceps", "gluteos"]],
+  [/gemelo|calf|pantorrilla/i, ["gemelos"]],
+  [/press (de )?banca|bench|aperturas|pec.?deck|fondos en paralelas|flex[ií]on|push.?up|press inclinado|cruce de poleas/i, ["pecho", "triceps", "hombros"]],
+  [/press (militar|de hombro)|overhead press|elevaci[oó]n(es)? lateral|p[aá]jaro|face pull|hombro/i, ["hombros", "triceps"]],
+  [/dominada|pull.?up|chin.?up|jal[oó]n|lat pulldown|remo|row|pullover/i, ["espalda", "biceps"]],
+  [/tr[ií]ceps|press franc[eé]s|fondos|dip|pushdown|extensi[oó]n de codo/i, ["triceps"]],
+  [/curl|b[ií]ceps/i, ["biceps", "antebrazo"]],
+  [/encogimiento|shrug|trapecio|hiperextensi|lumbar/i, ["espalda"]],
+  [/abdominal|crunch|plancha|plank|rueda|elevaci[oó]n de piernas|oblicuo/i, ["abdomen"]],
+];
+export function musclesFromName(name: string): MuscleGroup[] {
+  return NAME_RULES.find(([re]) => re.test(name))?.[1] ?? [];
+}
+
 /** A working set: not a warm-up and with reps or time. */
 const isWorkSet = (s: { warmup?: boolean; reps: number | null; sec?: number }) => !s.warmup && ((s.reps ?? 0) > 0 || (s.sec ?? 0) > 0);
 
@@ -35,13 +55,13 @@ const isWorkSet = (s: { warmup?: boolean; reps: number | null; sec?: number }) =
  * Working sets per muscle between two dates (inclusive): a full set for the exercise's main
  * muscle (first of the list) and half a set for each secondary one.
  */
-export function setsByMuscle(logs: TrainingLog[], musclesOf: (exerciseId: string) => readonly MuscleGroup[], from: string, to: string) {
+export function setsByMuscle(logs: TrainingLog[], musclesOf: (exerciseId: string, name: string) => readonly MuscleGroup[], from: string, to: string) {
   const out = Object.fromEntries(MUSCLE_GROUPS.map((m) => [m.key, 0])) as Record<MuscleGroup, number>;
   for (const l of logs) {
     if (l.date < from || l.date > to) continue;
     for (const ex of workoutExercises(l.details)) {
       const n = ex.sets.filter(isWorkSet).length;
-      musclesOf(ex.id).forEach((m, i) => (out[m] += i === 0 ? n : n / 2));
+      musclesOf(ex.id, ex.name).forEach((m, i) => (out[m] += i === 0 ? n : n / 2));
     }
   }
   return out;

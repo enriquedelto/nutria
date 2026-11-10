@@ -66,6 +66,20 @@ describe("series por músculo y fuerza", () => {
   });
 });
 
+describe("músculos por nombre (ejercicios propios)", () => {
+  it("deduce el músculo principal", async () => {
+    const { musclesFromName } = await import("../src");
+    expect(musclesFromName("Hip thrust")[0]).toBe("gluteos");
+    expect(musclesFromName("Curl femoral tumbado")[0]).toBe("isquios");
+    expect(musclesFromName("Curl martillo")[0]).toBe("biceps");
+    expect(musclesFromName("Press banca inclinado")[0]).toBe("pecho");
+    expect(musclesFromName("Jalón al pecho")[0]).toBe("espalda");
+    expect(musclesFromName("Fondos de tríceps")[0]).toBe("triceps");
+    expect(musclesFromName("Zancada en mi banco")[0]).toBe("cuadriceps");
+    expect(musclesFromName("Caminar")).toEqual([]);
+  });
+});
+
 describe("bodySignal", () => {
   it("peso y fuerza suben, cintura estable → músculo", () => {
     expect(bodySignal({ weightChangeKg: 0.8, strengthChangePct: 5, waistChangeCm: 0.3 }).kind).toBe("lean");

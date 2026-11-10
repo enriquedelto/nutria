@@ -1,6 +1,6 @@
 /** Weekly bulk review (goal "gain"): rate vs. target, kcal proposal, sets per muscle, strength and waist. */
 import { and, bodyMeasurements, desc, eq, exerciseLogs, gte, insights, lt, persons, targetSets, type Database } from "@nutria/db";
-import { addDays, bodySignal, bulkReview, MAIN_MUSCLES, setsByMuscle, strengthChangePct, trainingProgress, type BodySignalKind, type BulkVerdict, type MuscleGroup } from "@nutria/nutrition";
+import { addDays, bodySignal, bulkReview, MAIN_MUSCLES, musclesFromName, setsByMuscle, strengthChangePct, trainingProgress, type BodySignalKind, type BulkVerdict, type MuscleGroup } from "@nutria/nutrition";
 import MUSCLES from "./opengym-muscles.json";
 import { notify } from "./notify";
 import { adaptiveSnapshot, recomputeTargets } from "./targets";
@@ -9,8 +9,8 @@ export const BULK_REVIEW = "bulk_review";
 
 const MUSCLE_OF = MUSCLES as Record<string, string>;
 const NONE: MuscleGroup[] = [];
-/** Muscles of an openGym catalogue exercise, main one first (custom exercises have none). */
-export const exerciseMuscles = (id: string): MuscleGroup[] => (MUSCLE_OF[id]?.split(",") as MuscleGroup[] | undefined) ?? NONE;
+/** Muscles of an exercise, main one first: from the openGym catalogue, else guessed from its name. */
+export const exerciseMuscles = (id: string, name = ""): MuscleGroup[] => (MUSCLE_OF[id]?.split(",") as MuscleGroup[] | undefined) ?? (name ? musclesFromName(name) : NONE);
 
 export interface BulkReviewData {
   verdict: BulkVerdict;
@@ -78,7 +78,7 @@ export async function weeklyBulkReview(db: Database, personId: string, now = new
   ]);
   const week = setsByMuscle(logs, exerciseMuscles, addDays(end, -6), end);
   const four = setsByMuscle(logs, exerciseMuscles, addDays(end, -27), end);
-  const trainedSessions = logs.filter((l) => l.date >= addDays(end, -27) && Array.isArray(l.details.exercises) && (l.details.exercises as { id?: string }[]).some((e) => e?.id && exerciseMuscles(e.id).length)).length;
+  const trainedSessions = logs.filter((l) => l.date >= addDays(end, -27) && Array.isArray(l.details.exercises) && (l.details.exercises as { id?: string; name?: string }[]).some((e) => e?.id && exerciseMuscles(e.id, e.name).length)).length;
   const strength = strengthChangePct(logs, today);
   const lifts = trainingProgress(logs, today, 6, 3).lifts.map((l) => ({ name: l.name, e1rm: l.best.e1rm, change: l.change, trend: l.trend }));
   const waistChangeCm = waist.length >= 2 && waist.at(-1)!.date >= addDays(waist[0]!.date, 21) ? Math.round((waist.at(-1)!.cm - waist[0]!.cm) * 10) / 10 : null;
