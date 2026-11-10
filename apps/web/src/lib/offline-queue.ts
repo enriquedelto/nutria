@@ -67,3 +67,14 @@ export async function flushQueue() {
   window.dispatchEvent(new Event("nutria-queue"));
   return sent;
 }
+
+export type DiaryOp =
+  | { op: "water"; personId: string; date: string; ml: number }
+  | { op: "copy"; personId: string; fromDate: string; toDate: string; fromSlot?: string; toSlot?: string }
+  | { op: "supplement"; personId: string; scheduleId: string; date: string; taken: boolean }
+  | { op: "template"; personId: string; templateId: string; date: string; slot: string };
+
+/** Small diary write that survives being offline: sent now, or parked and replayed later. */
+export function diaryOp(op: DiaryOp) {
+  return sendOrQueue<{ ok: boolean; n: number }>("/api/diary/ops", { ...op, clientId: newClientId() });
+}

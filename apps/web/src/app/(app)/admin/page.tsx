@@ -13,6 +13,7 @@ import { requireAdmin } from "@/lib/session";
 import { aiConfigured } from "@/lib/ai";
 import { InviteHousehold, RoleToggle, RunJob, ResetLink } from "./admin-client";
 
+import { BackupsCard } from "./backups";
 export const metadata = { title: "Administración" };
 
 type JobRow = { name: string; state: string; n: number };
@@ -146,6 +147,8 @@ async function Content() {
           <RunJob job="storeCrawl" label="Catálogo de Mercadona" />
         </div>
       </Card>
+
+      <BackupsCard />
 
       <Card>
         <CardHeader title="Trabajos (7 días)" subtitle={jobs.ok ? "Cola pg-boss" : "No se pudo leer la cola (¿worker sin arrancar?)"} />

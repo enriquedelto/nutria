@@ -98,16 +98,10 @@ services:
       PGPASSWORD: ${POSTGRES_PASSWORD}
     volumes:
       - ${NUTRIA_DATA:-./data}/backups:/backups
-    entrypoint: ["sh", "-c"]
-    command:
-      - |
-        while true; do
-          f=/backups/nutria-$$(date +%F).dump
-          pg_dump -h postgres -U nutria -d nutria --format=custom --file="$$f.tmp" && mv "$$f.tmp" "$$f" && echo "backup $$f"
-          find /backups -name 'nutria-*.dump' -mtime +14 -delete
-          find /backups -name 'premigrate-*.dump' -mtime +30 -delete
-          sleep 86400
-        done
+      - ${NUTRIA_DATA:-./data}/uploads:/uploads:ro
+      - ./backup.sh:/backup.sh:ro
+      - ./restore-test.sh:/restore-test.sh:ro
+    entrypoint: ["sh", "/backup.sh"]
     depends_on:
       postgres:
         condition: service_healthy

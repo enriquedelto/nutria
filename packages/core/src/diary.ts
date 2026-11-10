@@ -164,12 +164,13 @@ export async function deleteEntries(db: Database, personId: string, ids: string[
 }
 
 /** Copy a meal (or a whole day when mealSlot is omitted) to another date/slot. */
-export async function copyMeal(db: Database, input: { personId: string; userId: string; fromDate: string; toDate: string; fromSlot?: string; toSlot?: string }) {
+export async function copyMeal(db: Database, input: { personId: string; userId: string; fromDate: string; toDate: string; fromSlot?: string; toSlot?: string; /** Makes the copy idempotent (offline replays). */ clientId?: string }) {
   const src = await db.select().from(diaryEntries).where(and(eq(diaryEntries.personId, input.personId), eq(diaryEntries.date, input.fromDate), input.fromSlot ? eq(diaryEntries.mealSlot, input.fromSlot) : undefined));
   if (!src.length) return [];
   const rows = await db
     .insert(diaryEntries)
-    .values(src.map(({ id: _id, createdAt: _c, updatedAt: _u, clientId: _cl, eatenAt: _e, ...e }) => ({ ...e, date: input.toDate, mealSlot: input.toSlot ?? e.mealSlot, origin: "manual", createdBy: input.userId, aiEstimateId: null })))
+    .values(src.map(({ id: _id, createdAt: _c, updatedAt: _u, clientId: _cl, eatenAt: _e, ...e }, i) => ({ ...e, date: input.toDate, mealSlot: input.toSlot ?? e.mealSlot, origin: "manual", createdBy: input.userId, aiEstimateId: null, clientId: input.clientId ? `${input.clientId}:${i}` : null })))
+    .onConflictDoNothing({ target: diaryEntries.clientId, where: sql`${diaryEntries.clientId} is not null` })
     .returning();
   await recomputeDay(db, input.personId, input.toDate);
   return rows;

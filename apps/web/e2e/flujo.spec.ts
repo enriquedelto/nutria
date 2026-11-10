@@ -114,8 +114,8 @@ test("deporte: volumen, días de entreno, objetivos por día y creatina marcada 
 
   await page.goto("/hoy");
   await expect(page.getByText(/Día de (entreno|descanso)/)).toBeVisible();
-  // The button turns «tomada» optimistically: wait for the server action before reloading.
-  const saved = page.waitForResponse((r) => r.request().method() === "POST" && new URL(r.url()).pathname === "/hoy");
+  // The button turns «tomada» optimistically: wait for the request before reloading.
+  const saved = page.waitForResponse((r) => r.request().method() === "POST" && new URL(r.url()).pathname === "/api/diary/ops");
   await page.getByRole("button", { name: "Marcar Creatina monohidrato como tomada" }).click();
   await expect(page.getByRole("button", { name: "Creatina monohidrato: tomada" })).toBeVisible();
   await saved;
@@ -471,6 +471,7 @@ test("administración: usuarios y uso de la IA", async () => {
   await expect(page.getByRole("heading", { name: "Administración" })).toBeVisible();
   await expect(page.getByText(SECOND.email)).toBeVisible();
   await expect(page.getByText("meal_text")).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Copias de seguridad" })).toBeVisible();
 });
 
 test("los errores del servidor llegan con su mensaje en producción", async () => {
@@ -895,4 +896,23 @@ test("en el móvil, ninguna página desborda ni da errores", async ({ browser })
   if (dir) writeFileSync(join(dir, "report.json"), JSON.stringify({ hard, report }, null, 2));
   await ctx.close();
   expect(hard).toEqual([]);
+});
+
+// Informative: JS downloaded to render a page from a cold cache (compressed bytes over the wire).
+test("medida: JavaScript inicial por página", async ({ browser }) => {
+  const sizes: Record<string, number> = {};
+  for (const route of ["/hoy", "/buscar", "/progreso", "/compra/precios"]) {
+    const ctx = await browser.newContext({ storageState: await adminPage.context().storageState(), serviceWorkers: "block" });
+    const page = await ctx.newPage();
+    let bytes = 0;
+    page.on("response", (r) => {
+      if (!/\/_next\/static\/.*\.js/.test(r.url())) return;
+      void r.body().then((b) => (bytes += Number(r.headers()["content-length"] ?? b.length))).catch(() => undefined);
+    });
+    await page.goto(route, { waitUntil: "networkidle" });
+    sizes[route] = Math.round(bytes / 1024);
+    await ctx.close();
+  }
+  console.log(`JS_INICIAL_KB ${JSON.stringify(sizes)}`);
+  expect(sizes["/hoy"]).toBeGreaterThan(0);
 });

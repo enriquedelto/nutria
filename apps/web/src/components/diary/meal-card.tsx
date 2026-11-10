@@ -6,7 +6,9 @@ import Link from "next/link";
 import { ArrowLeftRight, BookmarkPlus, Copy, History, MoreHorizontal, Plus, Sparkles, Trash2 } from "lucide-react";
 import { DropdownMenu } from "radix-ui";
 import { toast } from "sonner";
-import { copyMealTo, editEntry, removeEntries, saveMealTemplate } from "@/actions/diary";
+import { editEntry, removeEntries, saveMealTemplate } from "@/actions/diary";
+import { diaryOp } from "@/lib/offline-queue";
+import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent } from "@/components/ui/dialog";
 import { FoodPicker } from "@/components/food/food-picker";
@@ -59,6 +61,13 @@ export function MealCard({
   const [pending, start] = useSafeTransition();
   const [editing, setEditing] = useState<MealEntry | null>(null);
   const [naming, setNaming] = useState(false);
+  const router = useRouter();
+  /** Copy a meal between days; offline it is parked and done later. */
+  const copy = async (fromDate: string, toDate: string) => {
+    const r = await diaryOp({ op: "copy", personId, fromDate, toDate, fromSlot: slot, toSlot: slot });
+    if (!r.queued) router.refresh();
+    return r;
+  };
   const prevDay = new Date(Date.parse(date + "T12:00:00Z") - 86_400_000).toISOString().slice(0, 10);
   const kcal = entries.reduce((a, e) => a + e.kcal, 0);
   const protein = entries.reduce((a, e) => a + e.protein, 0);
@@ -110,7 +119,12 @@ export function MealCard({
                   <DropdownMenu.Content align="end" className="z-50 min-w-52 rounded-2xl border border-line bg-card p-1.5 text-sm shadow-xl">
                     <DropdownMenu.Item
                       className="flex cursor-pointer items-center gap-2 rounded-xl px-2 py-2 outline-none data-[highlighted]:bg-paper-2"
-                      onSelect={() => start(async () => void toast.success(`Copiado a mañana (${await copyMealTo(personId, date, tomorrow, slot)})`))}
+                      onSelect={() =>
+                        start(async () => {
+                          const r = await copy(date, tomorrow);
+                          toast.success(r.queued ? "Sin conexión: se copiará a mañana al volver" : `Copiado a mañana (${r.data?.n ?? 0})`);
+                        })
+                      }
                     >
                       <Copy className="size-4" /> Copiar a mañana
                     </DropdownMenu.Item>
@@ -143,8 +157,9 @@ export function MealCard({
             disabled={pending}
             onClick={() =>
               start(async () => {
-                const n = await copyMealTo(personId, prevDay, date, slot, slot);
-                toast.success(`${label}: ${n} ${n === 1 ? "alimento copiado" : "alimentos copiados"} de ayer`);
+                const r = await copy(prevDay, date);
+                const n = r.data?.n ?? 0;
+                toast.success(r.queued ? "Sin conexión: se copiará al volver" : `${label}: ${n} ${n === 1 ? "alimento copiado" : "alimentos copiados"} de ayer`);
               })
             }
           >

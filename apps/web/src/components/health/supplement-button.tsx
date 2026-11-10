@@ -1,15 +1,18 @@
 "use client";
-import { useOptimistic } from "react";
+import { useOptimistic, useState } from "react";
+import { useRouter } from "next/navigation";
 import { useSafeTransition } from "@/lib/use-safe-transition";
 import { Check } from "lucide-react";
 import { toast } from "sonner";
-import { markSupplement } from "@/actions/health";
+import { diaryOp } from "@/lib/offline-queue";
 import { errorText } from "@/lib/errors";
 import { cn } from "@/lib/utils";
 
 /** Mark today's dose of a supplement plan (logs it in the diary). */
 export function SupplementButton({ personId, scheduleId, date, taken, name, disabled }: { personId: string; scheduleId: string; date: string; taken: boolean; name: string; disabled?: boolean }) {
-  const [t, set] = useOptimistic(taken);
+  const [queued, setQueued] = useState<boolean | null>(null);
+  const [t, set] = useOptimistic(queued ?? taken);
+  const router = useRouter();
   const [, start] = useSafeTransition();
   return (
     <button
@@ -21,7 +24,12 @@ export function SupplementButton({ personId, scheduleId, date, taken, name, disa
         start(async () => {
           set(!t);
           try {
-            await markSupplement(personId, scheduleId, date, !t);
+            const r = await diaryOp({ op: "supplement", personId, scheduleId, date, taken: !t });
+            if (r.queued) setQueued(!t);
+            else {
+              setQueued(null);
+              router.refresh();
+            }
           } catch (e) {
             toast.error(errorText(e, "Error"));
           }

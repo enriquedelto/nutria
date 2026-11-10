@@ -1,7 +1,9 @@
 "use client";
 import { Trash2, Zap } from "lucide-react";
 import { toast } from "sonner";
-import { deleteTemplate, logTemplateAction } from "@/actions/diary";
+import { useRouter } from "next/navigation";
+import { deleteTemplate } from "@/actions/diary";
+import { diaryOp } from "@/lib/offline-queue";
 import { Button } from "@/components/ui/button";
 import { Empty } from "@/components/ui/empty";
 import { useSafeTransition } from "@/lib/use-safe-transition";
@@ -11,6 +13,7 @@ export type TemplateBrief = { id: string; name: string; mealSlot: string | null;
 /** Saved meals: one tap logs all their foods in the meal being edited. */
 export function Templates({ personId, date, slot, slotLabel, templates }: { personId: string; date: string; slot: string; slotLabel: string; templates: TemplateBrief[] }) {
   const [pending, start] = useSafeTransition();
+  const router = useRouter();
   if (!templates.length)
     return (
       <Empty title="Aún no tienes plantillas">
@@ -34,8 +37,10 @@ export function Templates({ personId, date, slot, slotLabel, templates }: { pers
             aria-label={`Registrar ${t.name} en ${slotLabel}`}
             onClick={() =>
               start(async () => {
-                const n = await logTemplateAction(personId, t.id, date, slot);
-                toast.success(`${t.name}: ${n} ${n === 1 ? "alimento registrado" : "alimentos registrados"} en ${slotLabel.toLowerCase()}`);
+                const r = await diaryOp({ op: "template", personId, templateId: t.id, date, slot });
+                const n = r.data?.n ?? 0;
+                toast.success(r.queued ? `Sin conexión: «${t.name}» se registrará al volver` : `${t.name}: ${n} ${n === 1 ? "alimento registrado" : "alimentos registrados"} en ${slotLabel.toLowerCase()}`);
+                if (!r.queued) router.refresh();
               })
             }
           >

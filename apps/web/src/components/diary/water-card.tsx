@@ -1,16 +1,18 @@
 "use client";
-import { useEffect, useOptimistic, useRef } from "react";
+import { useEffect, useOptimistic, useRef, useState } from "react";
 import { useSafeTransition } from "@/lib/use-safe-transition";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Droplet, Minus } from "lucide-react";
 import { toast } from "sonner";
-import { addWater } from "@/actions/diary";
+import { diaryOp } from "@/lib/offline-queue";
 import { Button } from "@/components/ui/button";
 import { Bar } from "@/components/ui/progress";
 import { n0 } from "@/lib/format";
 
 export function WaterCard({ personId, date, ml, goal, canWrite }: { personId: string; date: string; ml: number; goal: number; canWrite: boolean }) {
-  const [optimistic, add] = useOptimistic(ml, (s, d: number) => Math.max(0, s + d));
+  // Offline: what is parked in the queue still counts on screen until the server has it.
+  const [queued, setQueued] = useState(0);
+  const [optimistic, add] = useOptimistic(Math.max(0, ml + queued), (s, d: number) => Math.max(0, s + d));
   const [, start] = useSafeTransition();
   const params = useSearchParams();
   const router = useRouter();
@@ -18,7 +20,9 @@ export function WaterCard({ personId, date, ml, goal, canWrite }: { personId: st
   const log = (d: number) =>
     start(async () => {
       add(d);
-      await addWater(personId, date, d);
+      const r = await diaryOp({ op: "water", personId, date, ml: d });
+      if (r.queued) setQueued((q) => q + d);
+      else router.refresh();
     });
 
   // App shortcut: /hoy?agua=250

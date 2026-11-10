@@ -20,7 +20,7 @@ export async function listTemplates(db: Database, personId: string) {
 }
 
 /** Log a template in one go (to its own meal unless another slot is given) and count the use. */
-export async function logTemplate(db: Database, input: { personId: string; userId: string; templateId: string; date: string; slot?: string | null }) {
+export async function logTemplate(db: Database, input: { personId: string; userId: string; templateId: string; date: string; slot?: string | null; /** Makes it idempotent (offline replays). */ clientId?: string }) {
   const [t] = await db.select().from(mealTemplates).where(and(eq(mealTemplates.id, input.templateId), eq(mealTemplates.personId, input.personId))).limit(1);
   if (!t) throw new Error("Plantilla no encontrada");
   const items = t.items.filter((i) => i.foodId);
@@ -31,9 +31,9 @@ export async function logTemplate(db: Database, input: { personId: string; userI
     date: input.date,
     mealSlot: input.slot ?? t.mealSlot ?? "lunch",
     origin: "manual",
-    items: items.map((i) => ({ foodId: i.foodId!, recipeId: i.recipeId, grams: i.grams, servingLabel: i.servingLabel })),
+    items: items.map((i, n) => ({ foodId: i.foodId!, recipeId: i.recipeId, grams: i.grams, servingLabel: i.servingLabel, clientId: input.clientId ? `${input.clientId}:${n}` : undefined })),
   });
-  await db.update(mealTemplates).set({ useCount: sql`${mealTemplates.useCount} + 1`, updatedAt: new Date() }).where(eq(mealTemplates.id, t.id));
+  if (rows.length || !input.clientId) await db.update(mealTemplates).set({ useCount: sql`${mealTemplates.useCount} + 1`, updatedAt: new Date() }).where(eq(mealTemplates.id, t.id));
   return { template: t, rows };
 }
 
