@@ -13,6 +13,7 @@ import {
   medications,
   notificationPrefs,
   pantryItems,
+  progressPhotos,
   personAccess,
   persons,
   fastingSessions,
@@ -22,7 +23,7 @@ import {
   foods,
   type Database,
 } from "@nutria/db";
-import { addDays, expiryStatus, isoDow, proteinGapG, todayIn } from "@nutria/nutrition";
+import { addDays, expiryStatus, isoDow, photoReminderDue, proteinGapG, todayIn } from "@nutria/nutrition";
 import { targetsForDate } from "./targets";
 import { proteinIdeas, proteinToday } from "./timing";
 import { notify } from "./notify";
@@ -207,4 +208,21 @@ export async function ensureMealSlots(db: Database, personId: string) {
     { key: "dinner", label: "Cena", defaultTime: "21:30", sortOrder: 5, kcalShare: 0.25 },
   ];
   await db.insert(mealSlots).values(defaults.map((d) => ({ ...d, personId }))).onConflictDoNothing();
+}
+
+/** Daily: people who take progress photos get a nudge every 4 weeks after the last one. */
+export async function photoReminders(db: Database, now = new Date()) {
+  const rows = await db
+    .select({ personId: persons.id, userId: persons.userId, timezone: persons.timezone, last: sql<string>`max(${progressPhotos.date})` })
+    .from(progressPhotos)
+    .innerJoin(persons, eq(persons.id, progressPhotos.personId))
+    .where(sql`${persons.userId} is not null`)
+    .groupBy(persons.id);
+  let sent = 0;
+  for (const r of rows) {
+    if (!photoReminderDue(r.last, todayIn(r.timezone, now))) continue;
+    await notify(db, { userId: r.userId!, type: "progress_photo", title: "📷 Toca foto de progreso", body: "Han pasado 4 semanas desde la última. Misma luz, misma postura.", url: "/progreso", tag: "progress-photo", timezone: r.timezone });
+    sent++;
+  }
+  return sent;
 }

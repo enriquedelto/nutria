@@ -17,3 +17,4 @@ export * from "./receipts";
 export * from "./training";
 export * from "./bulk";
 export * from "./timing";
+export * from "./body";

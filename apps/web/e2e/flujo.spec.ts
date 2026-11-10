@@ -155,6 +155,34 @@ test("proteína por comida y tarjeta del entreno en Hoy", async () => {
   await expect(page.getByText("Después de entrenar")).toBeVisible();
 });
 
+test("medidas: gráfica por zona y composición corporal estimada con la cinta", async () => {
+  const page = adminPage;
+  await page.goto("/progreso");
+  const comp = page.locator("#composicion");
+  await expect(comp.getByText(/Mide cuello y cintura/)).toBeVisible();
+  const save = async (values: Record<string, string>, date?: string) => {
+    await page.getByRole("button", { name: "Medidas" }).click();
+    const dialog = page.getByRole("dialog");
+    if (date) await dialog.getByLabel("Fecha").fill(date);
+    for (const [label, v] of Object.entries(values)) await dialog.getByLabel(label, { exact: true }).fill(v);
+    await dialog.getByRole("button", { name: "Guardar" }).click();
+    await expect(dialog).toHaveCount(0);
+  };
+  await save({ Cintura: "70", Cadera: "96", Cuello: "32", Hombros: "104", Gemelo: "35" });
+  await expect(comp.getByText("Estimada con la cinta", { exact: false })).toBeVisible();
+  await expect(comp.getByText("Masa magra")).toBeVisible();
+  await expect(comp.getByText(/FFMI/)).toBeVisible();
+  await expect(page.getByText("Hombros")).toBeVisible();
+  // A second day draws the chart, with one chip per measured zone.
+  const d = new Date(Date.now() - 3 * 86_400_000).toISOString().slice(0, 10);
+  await save({ Cintura: "71", Cadera: "96", Cuello: "32" }, d);
+  const chips = page.getByRole("group", { name: "Medida que se muestra" });
+  await expect(chips.getByRole("button", { name: "Cintura" })).toHaveAttribute("aria-pressed", "true");
+  await chips.getByRole("button", { name: "Cadera" }).click();
+  await expect(page.getByText(/Cadera: 0 cm desde el primer registro \(2 medidas\)/)).toBeVisible();
+  await expect(page.getByRole("group", { name: "Dato de composición que se muestra" })).toBeVisible();
+});
+
 test("registro por IA (simulada) llega al diario", async () => {
   const page = adminPage;
   await page.goto("/registrar");

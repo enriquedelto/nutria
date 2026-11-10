@@ -44,6 +44,7 @@ import {
   uploadDir,
   weeklyAdaptiveTdee,
   weeklyBulkReview,
+  photoReminders,
   type JobName,
   type JobPayloads,
   assignFoodGroups,
@@ -124,7 +125,7 @@ export const handlers: Handlers = {
 
   [JOBS.remindersTick]: async (_d, { db }) => ({ sent: await remindersTick(db) }),
   [JOBS.medicationDoses]: async (_d, { db }) => ({ created: await generateMedicationDoses(db) }),
-  [JOBS.expiryCheck]: async (_d, { db }) => ({ sent: await expiryCheck(db) }),
+  [JOBS.expiryCheck]: async (_d, { db }) => ({ sent: await expiryCheck(db), photos: await photoReminders(db) }),
 
   [JOBS.opengymSync]: async ({ accountId, force }, { db }) => syncOpenGym(db, accountId, undefined, { force }),
   [JOBS.opengymSyncAll]: async (_d, { db, boss }) => {

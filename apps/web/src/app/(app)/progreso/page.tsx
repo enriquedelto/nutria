@@ -2,7 +2,7 @@ import { Suspense } from "react";
 import { AlertTriangle } from "lucide-react";
 import { and, asc, avg, bodyMeasurements, dailySummaries, desc, eq, goals, gte, persons, progressPhotos, targetSets, tdeeEstimates, weightLogs } from "@nutria/db";
 import { latestBulkReview } from "@nutria/core";
-import { addDays, continuous, daysToGoal, forecastWeight, todayIn, trendWeights } from "@nutria/nutrition";
+import { addDays, compositionSeries, continuous, daysBetween, daysToGoal, ffmiLabel, forecastWeight, MEASURE_SITES, SITE_LABEL, todayIn, trendWeights } from "@nutria/nutrition";
 import { WeightChart, type WeightPoint } from "@/components/charts/weight-chart";
 import Link from "next/link";
 import { PageHeader } from "@/components/page-header";
@@ -13,11 +13,11 @@ import { db } from "@/lib/db";
 import { dateLong, dateShort, kg, n0, n1 } from "@/lib/format";
 import { requireScope } from "@/lib/session";
 import { BulkCard } from "./bulk-card";
+import { MeasureChart } from "./measure-chart";
 import { AcceptTdee, GoalForm, MeasurementsForm, PhotoCompare, PhotoUpload, WeightForm, WeightList } from "./progress-forms";
 
 export const metadata = { title: "Progreso" };
 
-const SITE_NAMES: Record<string, string> = { waist: "Cintura", hips: "Cadera", chest: "Pecho", arm: "Brazo", thigh: "Muslo", neck: "Cuello" };
 
 async function Content() {
   const ctx = await requireScope("body");
@@ -28,10 +28,10 @@ async function Content() {
     db().select().from(weightLogs).where(and(eq(weightLogs.personId, pid), gte(weightLogs.date, from))).orderBy(asc(weightLogs.date)),
     db().select().from(tdeeEstimates).where(eq(tdeeEstimates.personId, pid)).orderBy(desc(tdeeEstimates.date)).limit(1),
     db().select().from(goals).where(and(eq(goals.personId, pid), eq(goals.status, "active"), eq(goals.type, "weight"))).limit(1),
-    db().select().from(bodyMeasurements).where(eq(bodyMeasurements.personId, pid)).orderBy(desc(bodyMeasurements.date)).limit(60),
+    db().select().from(bodyMeasurements).where(eq(bodyMeasurements.personId, pid)).orderBy(desc(bodyMeasurements.date)).limit(400),
     ctx.scopes.has("photos") ? db().select().from(progressPhotos).where(eq(progressPhotos.personId, pid)).orderBy(desc(progressPhotos.date)) : Promise.resolve([]),
     db().select({ kcal: avg(dailySummaries.kcal) }).from(dailySummaries).where(and(eq(dailySummaries.personId, pid), gte(dailySummaries.date, addDays(today, -14)), gte(dailySummaries.entries, 1))),
-    db().select({ goal: persons.goalType, adjust: targetSets.kcalAdjust }).from(persons).leftJoin(targetSets, and(eq(targetSets.personId, persons.id), eq(targetSets.isDefault, true))).where(eq(persons.id, pid)).limit(1),
+    db().select({ goal: persons.goalType, adjust: targetSets.kcalAdjust, sex: persons.sex, heightCm: persons.heightCm }).from(persons).leftJoin(targetSets, and(eq(targetSets.personId, persons.id), eq(targetSets.isDefault, true))).where(eq(persons.id, pid)).limit(1),
   ]);
   const bulk = me?.goal === "gain" ? await latestBulkReview(db(), pid) : null;
 
@@ -55,6 +55,20 @@ async function Content() {
   }
   const latestBySite = new Map<string, { cm: number; date: string }>();
   for (const m of measures) if (!latestBySite.has(m.site)) latestBySite.set(m.site, { cm: m.cm, date: m.date });
+  const siteSeries = MEASURE_SITES.map((s) => ({ key: s.key, label: s.label, unit: "cm", points: measures.filter((m) => m.site === s.key).map((m) => ({ date: m.date, value: m.cm })).reverse() }));
+  const sitesShown = [...MEASURE_SITES.map((s) => s.key as string).filter((k) => latestBySite.has(k)), ...[...latestBySite.keys()].filter((k) => !(k in SITE_LABEL))];
+  const comp = compositionSeries({ sex: me?.sex ?? null, heightCm: me?.heightCm ?? null, weights: weights.map((w) => ({ date: w.date, kg: w.kg, bodyFatPct: w.bodyFatPct })), measures });
+  const lastComp = comp.at(-1) ?? null;
+  const prevComp = lastComp ? ([...comp].reverse().find((c) => daysBetween(c.date, lastComp.date) >= 21) ?? null) : null;
+  const signed = (v: number, unit: string) => `${v > 0 ? "+" : ""}${n1(v)} ${unit}`;
+  const nearKg = (date: string) => {
+    let best: { kg: number; d: number } | null = null;
+    for (const w of weights) {
+      const d = Math.abs(daysBetween(w.date, date));
+      if (d <= 7 && (!best || d < best.d)) best = { kg: w.kg, d };
+    }
+    return best?.kg ?? null;
+  };
 
   return (
     <div className="grid gap-4 lg:grid-cols-[1fr_20rem]">
@@ -147,24 +161,72 @@ async function Content() {
           <CardHeader title="Medidas" action={ctx.canWrite ? <MeasurementsForm personId={pid} today={today} /> : null} />
           {latestBySite.size ? (
             <ul className="space-y-1 text-sm">
-              {[...latestBySite].map(([site, v]) => (
-                <li key={site} className="flex justify-between">
-                  <span>{SITE_NAMES[site] ?? site}</span>
-                  <span className="num text-ink-2">
-                    {n1(v.cm)} cm <span className="text-xs text-ink-3">· {dateShort(v.date)}</span>
-                  </span>
-                </li>
-              ))}
+              {sitesShown.map((site) => {
+                const v = latestBySite.get(site)!;
+                return (
+                  <li key={site} className="flex justify-between">
+                    <span>{SITE_LABEL[site] ?? site}</span>
+                    <span className="num text-ink-2">
+                      {n1(v.cm)} cm <span className="text-xs text-ink-3">· {dateShort(v.date)}</span>
+                    </span>
+                  </li>
+                );
+              })}
             </ul>
           ) : (
-            <p className="text-sm text-ink-3">Sin medidas.</p>
+            <p className="text-sm text-ink-3">Sin medidas. Con la cinta métrica verás si lo que cambia es músculo o grasa.</p>
+          )}
+          <MeasureChart series={siteSeries} label="Medida que se muestra" />
+        </Card>
+
+        <Card id="composicion">
+          <CardHeader title="Composición corporal" subtitle={lastComp ? `${lastComp.source === "navy" ? "Estimada con la cinta (cuello y cintura)" : "Con tu % de grasa medido"} · ${dateShort(lastComp.date)}` : undefined} />
+          {lastComp ? (
+            <div className="space-y-2 text-sm">
+              <div className="grid grid-cols-3 gap-2 text-center">
+                <div className="rounded-xl bg-paper-2 p-2">
+                  <p className="text-xs text-ink-3">Grasa</p>
+                  <p className="num font-display text-xl font-semibold">{n1(lastComp.bodyFatPct)} %</p>
+                </div>
+                <div className="rounded-xl bg-paper-2 p-2">
+                  <p className="text-xs text-ink-3">Masa magra</p>
+                  <p className="num font-display text-xl font-semibold">{n1(lastComp.leanKg)} kg</p>
+                </div>
+                <div className="rounded-xl bg-paper-2 p-2">
+                  <p className="text-xs text-ink-3">Masa grasa</p>
+                  <p className="num font-display text-xl font-semibold">{n1(lastComp.fatKg)} kg</p>
+                </div>
+              </div>
+              {prevComp ? (
+                <p className="text-ink-2">
+                  Desde el {dateShort(prevComp.date)}: magra <strong className="num">{signed(lastComp.leanKg - prevComp.leanKg, "kg")}</strong>, grasa <strong className="num">{signed(lastComp.fatKg - prevComp.fatKg, "kg")}</strong>.
+                </p>
+              ) : null}
+              <p className="text-ink-2">
+                FFMI <strong className="num">{n1(lastComp.ffmiNorm)}</strong>
+                {me?.sex ? ` (${ffmiLabel(lastComp.ffmiNorm, me.sex)})` : ""}: masa magra para tu altura.
+              </p>
+              {lastComp.source === "navy" ? <p className="text-xs text-ink-3">La estimación con cinta tiene un error de ±3–4 puntos: fíate de la tendencia, no del número exacto.</p> : null}
+              <MeasureChart
+                label="Dato de composición que se muestra"
+                series={[
+                  { key: "lean", label: "Masa magra", unit: "kg", points: comp.map((c) => ({ date: c.date, value: c.leanKg })) },
+                  { key: "fat", label: "Masa grasa", unit: "kg", points: comp.map((c) => ({ date: c.date, value: c.fatKg })) },
+                  { key: "pct", label: "% de grasa", unit: "%", points: comp.map((c) => ({ date: c.date, value: c.bodyFatPct })) },
+                ]}
+              />
+            </div>
+          ) : (
+            <p className="text-sm text-ink-3">
+              {me?.heightCm ? `Mide cuello y cintura${me.sex === "female" ? " y cadera" : ""} el mismo día (con un pesaje esa semana) y estimaré tu % de grasa, o anótalo al registrar el peso si tu báscula lo da.` : "Falta tu altura en el perfil."}
+            </p>
           )}
         </Card>
 
         {ctx.scopes.has("photos") ? (
           <Card>
             <CardHeader title="Fotos" action={ctx.canWrite ? <PhotoUpload personId={pid} today={today} /> : null} />
-            <PhotoCompare photos={photos.map((p) => ({ id: p.id, date: p.date, pose: p.pose }))} />
+            <PhotoCompare photos={photos.map((p) => ({ id: p.id, date: p.date, pose: p.pose, kg: nearKg(p.date) }))} />
           </Card>
         ) : null}
       </div>

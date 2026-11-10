@@ -10,6 +10,7 @@ import { acceptTdee, applyBulkReviewAction, clearKcalAdjust, deleteWeight, logMe
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent } from "@/components/ui/dialog";
 import { Field, Input, Select } from "@/components/ui/input";
+import { MEASURE_SITES } from "@nutria/nutrition";
 import { fileToJpeg } from "@/lib/image";
 import { dateShort, kg, sourceLabel } from "@/lib/format";
 
@@ -145,7 +146,7 @@ export function GoalForm({ personId, current }: { personId: string; current: { t
   );
 }
 
-const SITES: [string, string][] = [["waist", "Cintura"], ["hips", "Cadera"], ["chest", "Pecho"], ["arm", "Brazo"], ["thigh", "Muslo"], ["neck", "Cuello"]];
+const SITES = MEASURE_SITES.map((s) => [s.key, s.label] as const);
 
 
 export function MeasurementsForm({ personId, today }: { personId: string; today: string }) {
@@ -158,7 +159,7 @@ export function MeasurementsForm({ personId, today }: { personId: string; today:
       </Button>
       {open ? (
         <Dialog open onOpenChange={setOpen}>
-          <DialogContent title="Medidas (cm)">
+          <DialogContent title="Medidas (cm)" description="Con cuello y cintura (y cadera en mujeres) se estima tu % de grasa. Mide siempre igual: por la mañana, relajado.">
             <form className="space-y-3" onSubmit={submitForm((fd) => start(async () => {
               const sites: Record<string, number> = {};
               for (const [k] of SITES) if (fd.get(k)) sites[k] = Number(fd.get(k));
@@ -221,7 +222,7 @@ export function PhotoUpload({ personId, today }: { personId: string; today: stri
   );
 }
 
-export function PhotoCompare({ photos }: { photos: { id: string; date: string; pose: string }[] }) {
+export function PhotoCompare({ photos }: { photos: { id: string; date: string; pose: string; kg?: number | null }[] }) {
   const [a, setA] = useState(photos.at(-1)?.id ?? "");
   const [b, setB] = useState(photos[0]?.id ?? "");
   const router = useRouter();
@@ -244,6 +245,15 @@ export function PhotoCompare({ photos }: { photos: { id: string; date: string; p
             </Select>
             {/* eslint-disable-next-line @next/next/no-img-element */}
             {id ? <img src={`/api/photos/${id}`} alt="Foto de progreso" className="aspect-[3/4] w-full rounded-xl bg-paper-2 object-cover" loading="lazy" /> : null}
+            {(() => {
+              const ph = photos.find((x) => x.id === id);
+              return ph ? (
+                <p className="num text-center text-xs text-ink-2">
+                  {dateShort(ph.date)}
+                  {ph.kg != null ? ` · ${kg(ph.kg)}` : ""}
+                </p>
+              ) : null;
+            })()}
           </div>
         ))}
       </div>
