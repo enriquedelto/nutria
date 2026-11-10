@@ -508,3 +508,22 @@ export const dailySummaries = pgTable(
   (t) => [uniqueIndex("daily_summaries_pk").on(t.personId, t.date)],
 );
 
+
+/** Heart rate per day from a watch/band (inbound /api/hooks/health). */
+export const heartRateDaily = pgTable(
+  "heart_rate_daily",
+  {
+    id: id(),
+    personId: uuid()
+      .notNull()
+      .references(() => persons.id, { onDelete: "cascade" }),
+    date: date({ mode: "string" }).notNull(),
+    minBpm: smallint(),
+    avgBpm: real(),
+    maxBpm: smallint(),
+    restingBpm: smallint(),
+    samples: integer().notNull().default(0),
+    ...timestamps(),
+  },
+  (t) => [uniqueIndex().on(t.personId, t.date)],
+);

@@ -71,6 +71,13 @@
       "when": 1794301352441,
       "tag": "0009_home_card_entreno",
       "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "7",
+      "when": 1794316634121,
+      "tag": "0010_heart_rate_daily",
+      "breakpoints": true
     }
   ]
 }

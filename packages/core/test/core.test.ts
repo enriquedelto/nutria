@@ -648,3 +648,55 @@ describe("registro rápido", () => {
     expect((await core.quickLog(db, { personId: pid, userId: "gym", kind: "shake" }, at("19:05"))).message).toBe("El batido de hoy ya estaba registrado");
   });
 });
+
+describe("datos del móvil", () => {
+  it("pasos, sueño, pulso, peso y ejercicio en el formato de Health Connect, sin duplicar al reenviar", async () => {
+    const { stepLogs, sleepLogs, heartRateDaily } = await import("@nutria/db");
+    const [p] = await db.select().from(persons).where(eq(persons.userId, "gym"));
+    const pid = p!.id;
+    const payload = {
+      timestamp: "2027-05-10T21:00:00Z",
+      steps: [
+        { count: 4200, start_time: "2027-05-10T06:00:00Z", end_time: "2027-05-10T10:00:00Z" },
+        { count: 3800, start_time: "2027-05-10T10:00:00Z", end_time: "2027-05-10T18:00:00Z" },
+        { count: 900, start_time: "2027-05-09T22:30:00Z", end_time: "2027-05-09T23:00:00Z" }, // 00:30 in Madrid → day 10
+      ],
+      sleep: [{ session_end_time: "2027-05-10T05:30:00Z", duration_seconds: 27000 }],
+      heart_rate: [
+        { bpm: 58, time: "2027-05-10T04:00:00Z" },
+        { bpm: 142, time: "2027-05-10T17:00:00Z" },
+        { bpm: 70, time: "2027-05-10T12:00:00Z" },
+      ],
+      resting_heart_rate: [{ bpm: 54, time: "2027-05-10T05:00:00Z" }],
+      weight: [{ kilograms: 73.4, time: "2027-05-10T06:10:00Z" }],
+      exercise: [{ type: "running", start_time: "2027-05-10T17:00:00Z", end_time: "2027-05-10T17:40:00Z" }],
+      unknown_block: [{ a: 1 }],
+    };
+    const data = core.parseHealthPayload(payload, "Europe/Madrid");
+    expect(data.steps).toEqual([{ date: "2027-05-10", steps: 8900 }]);
+    expect(data.sleep[0]).toMatchObject({ date: "2027-05-10", hours: 7.5 });
+    expect(data.heart[0]).toMatchObject({ date: "2027-05-10", min: 58, max: 142, avg: 90, resting: 54, samples: 3 });
+    expect(data.exercise[0]).toMatchObject({ name: "Correr", minutes: 40 });
+
+    expect(await core.importHealthData(db, pid, data)).toEqual({ steps: 1, sleep: 1, heartDays: 1, weights: 1, exercise: 1 });
+    // Same batch again, then a partial one: nothing is duplicated and the counts never go down.
+    expect((await core.importHealthData(db, pid, data)).weights).toBe(0);
+    await core.importHealthData(db, pid, core.parseHealthPayload({ steps: [{ count: 5000, start_time: "2027-05-10T06:00:00Z" }], heart_rate: [{ bpm: 50, time: "2027-05-10T03:00:00Z" }] }, "Europe/Madrid"));
+    const [st] = await db.select().from(stepLogs).where(and(eq(stepLogs.personId, pid), eq(stepLogs.date, "2027-05-10")));
+    expect(st).toMatchObject({ steps: 8900 });
+    expect(st!.kcal).toBeGreaterThan(200);
+    const [sl] = await db.select().from(sleepLogs).where(and(eq(sleepLogs.personId, pid), eq(sleepLogs.date, "2027-05-10")));
+    expect(sl!.hours).toBe(7.5);
+    const [h] = await db.select().from(heartRateDaily).where(and(eq(heartRateDaily.personId, pid), eq(heartRateDaily.date, "2027-05-10")));
+    expect(h).toMatchObject({ minBpm: 50, maxBpm: 142, avgBpm: 90, restingBpm: 54, samples: 3 });
+    expect(await db.select().from(weightLogs).where(and(eq(weightLogs.personId, pid), eq(weightLogs.source, "health")))).toHaveLength(1);
+    const ex = await db.select().from(exerciseLogs).where(and(eq(exerciseLogs.personId, pid), eq(exerciseLogs.source, "health")));
+    expect(ex).toHaveLength(1);
+    expect(ex[0]).toMatchObject({ name: "Correr", durationMin: 40 });
+    // Simple shape, and a gym day already covered by openGym is not counted twice.
+    await db.insert(exerciseLogs).values({ personId: pid, date: "2027-05-11", name: "Pierna", durationMin: 60, kcal: 300, source: "opengym", externalId: "og-x" });
+    const r = await core.importHealthData(db, pid, core.parseHealthPayload({ steps: 3000, date: "2027-05-11", exercise: [{ activity: "strength_training", start: "2027-05-11T17:00:00Z", minutes: 55 }] }, "Europe/Madrid"));
+    expect(r).toMatchObject({ steps: 1, exercise: 0 });
+    expect(core.parseHealthPayload(null, "Europe/Madrid")).toEqual({ steps: [], sleep: [], heart: [], weights: [], exercise: [] });
+  });
+});

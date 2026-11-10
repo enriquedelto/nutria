@@ -629,6 +629,17 @@ test("webhooks: salida firmada (Home Assistant) y peso de entrada con token", as
   expect(res.status(), await res.text()).toBeLessThan(300);
   const again = await page.request.post("/api/hooks/weight", { headers: { authorization: `Bearer ${token}` }, data: { kg: 63.4, id: "bascula-1" } });
   expect(again.status()).toBeLessThan(300); // idempotente
+  // Phone/watch data (Health Connect format): steps and sleep land on their pages.
+  const now = new Date();
+  const health = await page.request.post("/api/hooks/health", {
+    headers: { authorization: `Bearer ${token}` },
+    data: { steps: [{ count: 8200, start_time: now.toISOString() }], sleep: [{ session_end_time: now.toISOString(), duration_seconds: 27000 }], heart_rate: [{ bpm: 61, time: now.toISOString() }] },
+  });
+  expect(health.status(), await health.text()).toBe(200);
+  expect(((await health.json()) as { saved: { steps: number; sleep: number; heartDays: number } }).saved).toMatchObject({ steps: 1, sleep: 1, heartDays: 1 });
+  expect((await page.request.post("/api/hooks/health", { data: { steps: 1 } })).status()).toBe(401);
+  await page.goto("/salud/sueno");
+  await expect(page.getByText(/7,5s*h/).first()).toBeVisible();
   await page.goto("/ajustes/datos");
   const href = await page.getByRole("link", { name: "Todo (JSON)" }).getAttribute("href");
   const pesos = ((await (await page.request.get(href!)).json()) as { data: { pesos: { kg: number; source: string }[] } }).data.pesos;

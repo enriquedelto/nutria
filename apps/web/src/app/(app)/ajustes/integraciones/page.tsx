@@ -129,6 +129,11 @@ async function Content() {
           <CodeLine text={`claude mcp add --transport http nutria ${base}/api/mcp --header "Authorization: Bearer <tu token>"`} />
           <p className="text-sm font-medium">Registrar el peso desde otra app (báscula, Atajos, Home Assistant)</p>
           <CodeLine text={`curl -X POST ${base}/api/hooks/weight -H "Authorization: Bearer <token con escribir>" -H "Content-Type: application/json" -d '{"kg": 72.4}'`} />
+          <p className="text-sm font-medium">Cuando tengas reloj o pulsera: pasos, sueño, pulso y ejercicio</p>
+          <p className="text-sm text-ink-2">
+            En Android, una app que lea Health Connect y lo envíe por webhook (p. ej. «Health Connect Webhook») con esta dirección y la cabecera <code>Authorization: Bearer &lt;token con escribir&gt;</code>. También vale desde Atajos de iOS o Home Assistant. Reenviar lo mismo no duplica nada.
+          </p>
+          <CodeLine text={`curl -X POST ${base}/api/hooks/health -H "Authorization: Bearer <token con escribir>" -H "Content-Type: application/json" -d '{"steps":[{"count":8200,"start_time":"2026-11-10T07:00:00Z"}],"sleep":[{"session_end_time":"2026-11-10T06:30:00Z","duration_seconds":27000}]}'`} />
         </div>
       </Card>
 
