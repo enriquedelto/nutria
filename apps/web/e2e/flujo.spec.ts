@@ -170,9 +170,9 @@ test("medidas: gráfica por zona y composición corporal estimada con la cinta",
   };
   await save({ Cintura: "70", Cadera: "96", Cuello: "32", Hombros: "104", Gemelo: "35" });
   await expect(comp.getByText("Estimada con la cinta", { exact: false })).toBeVisible();
-  await expect(comp.getByText("Masa magra")).toBeVisible();
+  await expect(comp.getByText("Masa magra", { exact: true })).toBeVisible();
   await expect(comp.getByText(/FFMI/)).toBeVisible();
-  await expect(page.getByText("Hombros")).toBeVisible();
+  await expect(page.getByText("Hombros", { exact: true }).first()).toBeVisible();
   // A second day draws the chart, with one chip per measured zone.
   const d = new Date(Date.now() - 3 * 86_400_000).toISOString().slice(0, 10);
   await save({ Cintura: "71", Cadera: "96", Cuello: "32" }, d);
