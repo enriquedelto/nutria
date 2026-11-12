@@ -16,8 +16,9 @@ x-app: &app
     - ${NUTRIA_DATA:-./data}/backups:/data/backups
   # En el NUC el dominio de openGym resuelve a 127.0.0.1, que dentro del contenedor no es el host:
   # se manda al host (Caddy en *:443), con el mismo nombre para que el TLS valga.
+  # OPENGYM_HOST en .env: el nombre de openGym sin https:// (sin openGym, puede quedarse así).
   extra_hosts:
-    - "gym.tu-dominio.example:host-gateway"
+    - "${OPENGYM_HOST:-opengym.invalid}:host-gateway"
   restart: unless-stopped
   depends_on:
     postgres:

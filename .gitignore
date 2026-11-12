@@ -18,3 +18,27 @@ test-results/
 apps/web/public/sw.js
 apps/web/playwright-report/
 apps/web/test-results/
+
+# Skills de terceros: se descargan de su origen (ver .claude/skills/SOURCES.md)
+.claude/skills/better-auth-best-practices/
+.claude/skills/better-auth-create-auth/
+.claude/skills/better-auth-emailAndPassword/
+.claude/skills/better-auth-organization/
+.claude/skills/better-auth-security/
+.claude/skills/better-auth-twoFactor/
+.claude/skills/composition-patterns/
+.claude/skills/drizzle-orm/
+.claude/skills/frontend-design/
+.claude/skills/mcp-builder/
+.claude/skills/next-bundle-optimizer/
+.claude/skills/next-cache-components-adoption/
+.claude/skills/next-dev-loop/
+.claude/skills/playwright-cli/
+.claude/skills/postgres-best-practices/
+.claude/skills/react-best-practices/
+.claude/skills/shadcn/
+.claude/skills/tailwind/
+.claude/skills/vitest-testing/
+.claude/skills/web-design-guidelines/
+.claude/skills/webapp-testing/
+.claude/skills/zod-validation/

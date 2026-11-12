@@ -1,5 +1,7 @@
 # Procedencia de las skills (descargadas y revisadas el 2026-11-08)
 
+> No se incluyen en el repositorio público: descárgalas de su origen (tabla siguiente) en `.claude/skills/<nombre>/`; `.gitignore` las deja fuera.
+
 | Skill(s) | Origen | Tipo |
 |---|---|---|
 | next-dev-loop, next-cache-components-adoption, next-bundle-optimizer | vercel/next.js `canary/skills` | oficial |

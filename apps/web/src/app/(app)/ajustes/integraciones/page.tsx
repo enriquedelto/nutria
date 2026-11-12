@@ -71,7 +71,7 @@ async function Content() {
         ) : canManage ? (
           <>
             <p className="mb-3 text-sm text-ink-2">{OG_STEPS}</p>
-            <OpenGymConnect personId={ctx.person.id} defaultUrl={process.env.OPENGYM_URL ?? "https://gym.tu-dominio.example"} />
+            <OpenGymConnect personId={ctx.person.id} defaultUrl={process.env.OPENGYM_URL ?? ""} />
           </>
         ) : (
           <p className="text-sm text-ink-3">Solo quien gestiona a esta persona puede conectarla.</p>
