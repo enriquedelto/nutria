@@ -2,12 +2,12 @@
 import { UserError } from "@/lib/errors";
 import { refresh } from "next/cache";
 import { z } from "zod";
-import { and, challengeParticipants, challenges, eq, persons } from "@nutria/db";
+import { and, challengeParticipants, challenges, eq, inArray, persons } from "@nutria/db";
 import { evaluateAchievements, scoreChallenge, updateStreaks } from "@nutria/core";
 import { todayIn } from "@nutria/nutrition";
 import { db } from "@/lib/db";
 import { kitchenGuard } from "@/lib/kitchen";
-import { assertAccess } from "@/lib/session";
+import { accessibleAmong, assertAccess } from "@/lib/session";
 
 const uuid = z.string().uuid();
 const day = z.string().regex(/^\d{4}-\d{2}-\d{2}$/);
@@ -22,16 +22,10 @@ async function ownChallenge(id: string, groupId: string) {
 
 /** Only persons of the group the user can at least read the diary of can be enrolled. */
 async function enrollable(userId: string, groupId: string, personIds: string[]) {
-  const ok: string[] = [];
-  for (const pid of personIds) {
-    const [p] = await db().select({ id: persons.id }).from(persons).where(and(eq(persons.id, pid), eq(persons.groupId, groupId))).limit(1);
-    if (!p) continue;
-    try {
-      await assertAccess(userId, pid, "diary", true);
-      ok.push(pid);
-    } catch {}
-  }
-  return ok;
+  if (!personIds.length) return [];
+  const inGroup = await db().select({ id: persons.id }).from(persons).where(and(inArray(persons.id, personIds), eq(persons.groupId, groupId)));
+  const ids = personIds.filter((pid) => inGroup.some((p) => p.id === pid));
+  return (await accessibleAmong(userId, ids, "diary", true)).map((a) => a.personId);
 }
 
 export async function createChallenge(input: { title: string; description?: string; metric: ChallengeMetric; startDate: string; endDate: string; personIds: string[]; target?: number | null }) {

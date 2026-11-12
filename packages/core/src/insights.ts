@@ -1,5 +1,5 @@
 /** Weekly symptom ↔ food correlations (stored as insights; AI explains the strongest ones). */
-import { and, diaryEntries, eq, foods, gte, insights, recipeIngredients, symptomLogs, type Database } from "@nutria/db";
+import { and, diaryEntries, eq, foods, gte, inArray, insights, recipeIngredients, symptomLogs, type Database } from "@nutria/db";
 import { explainCorrelation, type AiProvider } from "@nutria/ai";
 import { ingredientKey, symptomCorrelations, type ExposureEvent } from "@nutria/nutrition";
 
@@ -23,10 +23,8 @@ export async function runCorrelations(db: Database, input: { personId: string; u
   if (syms.length < 3) return [];
   const recipeIds = [...new Set(entries.map((e) => e.recipeId).filter((x): x is string => !!x))];
   const ingByRecipe = new Map<string, string[]>();
-  for (const id of recipeIds) {
-    const ings = await db.select({ raw: recipeIngredients.rawText }).from(recipeIngredients).where(eq(recipeIngredients.recipeId, id));
-    ingByRecipe.set(id, ings.map((i) => ingredientKey(i.raw)));
-  }
+  const ings = recipeIds.length ? await db.select({ recipeId: recipeIngredients.recipeId, raw: recipeIngredients.rawText }).from(recipeIngredients).where(inArray(recipeIngredients.recipeId, recipeIds)) : [];
+  for (const i of ings) ingByRecipe.set(i.recipeId, [...(ingByRecipe.get(i.recipeId) ?? []), ingredientKey(i.raw)]);
   const exposures: ExposureEvent[] = entries.flatMap((e) => {
     const at = (e.at ?? e.createdAt).getTime();
     const keys = [...keysFor(e), ...(e.recipeId ? (ingByRecipe.get(e.recipeId) ?? []) : [])];

@@ -229,16 +229,20 @@ export async function shoppingFromPlan(db: Database, input: { groupId: string; p
   );
   const list = await openShoppingList(db, input.groupId, input.planId);
   const existing = await db.select().from(shoppingItems).where(and(eq(shoppingItems.listId, list.id), eq(shoppingItems.checked, false)));
-  let added = 0;
+  const byKey = new Map<string, (typeof existing)[number]>();
+  for (const e of existing) if (!byKey.has(ingredientKey(e.name))) byKey.set(ingredientKey(e.name), e);
+  const fresh: (typeof shoppingItems.$inferInsert)[] = [];
   for (const l of lines) {
-    const dup = existing.find((e) => ingredientKey(e.name) === l.key);
+    const dup = byKey.get(l.key);
     if (dup) {
+      // Merging into an existing line is rare (re-adding the same plan): one update each is fine.
       if (l.grams != null && dup.unit === "g") await db.update(shoppingItems).set({ quantity: Math.round((dup.quantity ?? 0) + l.grams), fromRecipes: [...new Set([...dup.fromRecipes, ...l.fromRecipes])] }).where(eq(shoppingItems.id, dup.id));
       continue;
     }
-    await db.insert(shoppingItems).values({ listId: list.id, foodId: l.foodId, name: l.name, quantity: l.grams ?? l.quantity, unit: l.grams != null ? "g" : l.unit, category: l.category, fromRecipes: l.fromRecipes });
-    added++;
+    fresh.push({ listId: list.id, foodId: l.foodId, name: l.name, quantity: l.grams ?? l.quantity, unit: l.grams != null ? "g" : l.unit, category: l.category, fromRecipes: l.fromRecipes });
   }
+  if (fresh.length) await db.insert(shoppingItems).values(fresh);
+  const added = fresh.length;
   await db.update(shoppingLists).set({ planId: input.planId, updatedAt: new Date() }).where(eq(shoppingLists.id, list.id));
   return { listId: list.id, added, total: lines.length };
 }

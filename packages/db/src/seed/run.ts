@@ -1,6 +1,6 @@
 /** Idempotent seed of reference catalogues. Usage: DATABASE_URL=... pnpm db:seed */
 import { sql } from "drizzle-orm";
-import { DRV, DRUG_FOOD_INTERACTIONS, FASTING_PROTOCOLS, NUTRIENTS } from "@nutria/nutrition";
+import { DRUG_FOOD_INTERACTIONS, NUTRIENTS } from "@nutria/nutrition";
 import type { PgDatabase, PgQueryResultHKT } from "drizzle-orm/pg-core";
 import {
   achievements,
@@ -8,9 +8,7 @@ import {
   additives,
   conditions,
   drugFoodInteractions,
-  fastingProtocols,
   labParameters,
-  nutrientReferences,
   nutrients,
   stores,
 } from "../schema";
@@ -41,29 +39,10 @@ export async function seedReference(db: AnyDb) {
         set: { nameEs: sql`excluded.name_es`, nameEn: sql`excluded.name_en`, unit: sql`excluded.unit`, category: sql`excluded.category`, sortOrder: sql`excluded.sort_order`, upperLimit: sql`excluded.upper_limit`, offKey: sql`excluded.off_key`, ciqualKey: sql`excluded.ciqual_key` },
       });
 
-    await tx.delete(nutrientReferences);
-    const known = new Set(NUTRIENTS.map((n) => n.code));
-    await tx.insert(nutrientReferences).values(
-      DRV.filter((r) => known.has(r.code)).map((r) => ({
-        nutrientCode: r.code,
-        sex: r.sex,
-        ageMinYears: r.ageMin,
-        ageMaxYears: r.ageMax,
-        lifeStage: r.lifeStage,
-        kind: r.kind,
-        amount: r.amount,
-      })),
-    );
-
     await tx
       .insert(activities)
       .values(ACTIVITIES)
       .onConflictDoUpdate({ target: activities.code, set: { nameEs: sql`excluded.name_es`, category: sql`excluded.category`, met: sql`excluded.met` } });
-
-    await tx
-      .insert(fastingProtocols)
-      .values(FASTING_PROTOCOLS.map((p) => ({ code: p.code, nameEs: p.nameEs, fastHours: p.fastHours, description: p.description })))
-      .onConflictDoNothing();
 
     await tx
       .insert(conditions)

@@ -6,6 +6,7 @@ import {
   and,
   eq,
   gte,
+  inArray,
   isNull,
   lte,
   mealSlots,
@@ -39,6 +40,16 @@ async function caretakers(db: Database, personId: string): Promise<string[]> {
   return [...new Set([...rows.map((r) => r.userId), ...(own?.userId ? [own.userId] : [])])];
 }
 
+/** caretakers() cached for one pass (a person with several due items is looked up once). */
+function caretakersCache(db: Database) {
+  const cache = new Map<string, Promise<string[]>>();
+  return (personId: string) => {
+    let p = cache.get(personId);
+    if (!p) cache.set(personId, (p = caretakers(db, personId)));
+    return p;
+  };
+}
+
 /** Wall-clock date+time in a zone → UTC Date. */
 export function zonedTime(date: string, hhmm: string, timeZone: string): Date {
   const guess = new Date(`${date}T${hhmm.slice(0, 5)}:00Z`);
@@ -54,25 +65,30 @@ export async function generateMedicationDoses(db: Database, now = new Date()) {
     .from(medications)
     .innerJoin(persons, eq(persons.id, medications.personId))
     .where(eq(medications.active, true));
-  let created = 0;
+  const wanted: { medicationId: string; personId: string; scheduledAt: Date }[] = [];
   for (const m of meds) {
     const today = todayIn(m.timezone, now);
     if ((m.startDate && today < m.startDate) || (m.endDate && today > m.endDate)) continue;
     if (!m.daysOfWeek.includes(isoDow(today))) continue;
-    for (const t of m.times) {
-      const at = zonedTime(today, t, m.timezone);
-      const exists = await db.select({ id: medicationDoses.id }).from(medicationDoses).where(and(eq(medicationDoses.medicationId, m.id), eq(medicationDoses.scheduledAt, at))).limit(1);
-      if (exists.length) continue;
-      await db.insert(medicationDoses).values({ medicationId: m.id, personId: m.personId, scheduledAt: at });
-      created++;
-    }
+    for (const t of m.times) wanted.push({ medicationId: m.id, personId: m.personId, scheduledAt: zonedTime(today, t, m.timezone) });
   }
-  return created;
+  if (!wanted.length) return 0;
+  // One lookup of the doses already created for these medications in today's window, one insert.
+  const times = wanted.map((w) => w.scheduledAt.getTime());
+  const existing = await db
+    .select({ medicationId: medicationDoses.medicationId, at: medicationDoses.scheduledAt })
+    .from(medicationDoses)
+    .where(and(inArray(medicationDoses.medicationId, [...new Set(wanted.map((w) => w.medicationId))]), gte(medicationDoses.scheduledAt, new Date(Math.min(...times))), lte(medicationDoses.scheduledAt, new Date(Math.max(...times)))));
+  const have = new Set(existing.map((e) => `${e.medicationId}|${e.at.getTime()}`));
+  const fresh = [...new Map(wanted.filter((w) => !have.has(`${w.medicationId}|${w.scheduledAt.getTime()}`)).map((w) => [`${w.medicationId}|${w.scheduledAt.getTime()}`, w])).values()];
+  if (fresh.length) await db.insert(medicationDoses).values(fresh);
+  return fresh.length;
 }
 
 /** Fire due reminders within the last `windowMin` minutes (de-duplicated by `notifiedAt`-like markers). */
 export async function remindersTick(db: Database, now = new Date(), windowMin = 5) {
   const since = new Date(now.getTime() - windowMin * 60_000);
+  const caretakersOf = caretakersCache(db);
   let sent = 0;
 
   // Medication doses due now and still pending.
@@ -84,7 +100,7 @@ export async function remindersTick(db: Database, now = new Date(), windowMin = 
     .where(and(eq(medicationDoses.status, "pending"), gte(medicationDoses.scheduledAt, since), lte(medicationDoses.scheduledAt, now)));
   for (const d of due) {
     const hint = d.withFood === "fasting" ? " · en ayunas" : d.withFood === "with_food" ? " · con comida" : d.withFood === "after_food" ? " · después de comer" : "";
-    for (const userId of await caretakers(db, d.personId)) {
+    for (const userId of await caretakersOf(d.personId)) {
       await notify(db, { userId, type: "medication", title: `💊 ${d.name}${d.dose ? ` (${d.dose})` : ""}`, body: `${d.person}${hint}`, url: `/salud/medicacion?dosis=${d.id}`, tag: `med-${d.id}`, respectQuietHours: false, timezone: d.timezone });
       sent++;
     }
@@ -105,7 +121,7 @@ export async function remindersTick(db: Database, now = new Date(), windowMin = 
       if (at <= since || at > now) continue;
       // Already logged today (from Hoy or the diary): no reminder.
       if (await supplementTakenOn(db, s.personId, s.foodId, today)) continue;
-      for (const userId of await caretakers(db, s.personId)) {
+      for (const userId of await caretakersOf(s.personId)) {
         await notify(db, { userId, type: "supplement", title: `Suplemento: ${s.name}`, url: "/hoy", tag: `sup-${s.id}`, timezone: s.timezone });
         sent++;
       }
@@ -168,7 +184,7 @@ export async function remindersTick(db: Database, now = new Date(), windowMin = 
     .where(isNull(fastingSessions.endedAt));
   for (const f of fasts) {
     const goal = new Date(f.startedAt.getTime() + f.targetHours * 3_600_000);
-    if (goal > since && goal <= now) for (const userId of await caretakers(db, f.personId)) {
+    if (goal > since && goal <= now) for (const userId of await caretakersOf(f.personId)) {
       await notify(db, { userId, type: "fasting", title: `⏱️ ¡${f.targetHours} h de ayuno completadas!`, url: "/salud/ayuno", tag: `fast-${f.id}`, timezone: f.timezone });
       sent++;
     }

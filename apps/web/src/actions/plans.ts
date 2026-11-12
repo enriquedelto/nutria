@@ -9,7 +9,7 @@ import { aiAction } from "@/lib/ai";
 import { addDays, DEFAULT_SLOT_SHARES, familyPortions, proteinDoseG } from "@nutria/nutrition";
 import { db } from "@/lib/db";
 import { kitchenGuard } from "@/lib/kitchen";
-import { assertAccess } from "@/lib/session";
+import { accessibleAmong, assertAccess } from "@/lib/session";
 
 const uuid = z.string().uuid();
 const day = z.string().regex(/^\d{4}-\d{2}-\d{2}$/);
@@ -23,14 +23,8 @@ async function ownPlan(planId: string, groupId: string) {
 /** Group persons the user may read (diary scope) — the only ones that can be planned for. */
 async function plannable(userId: string, groupId: string, ids: string[]) {
   const rows = await db().select({ id: persons.id }).from(persons).where(and(eq(persons.groupId, groupId), inArray(persons.id, ids)));
-  const ok: { id: string; scopes: ReadonlySet<string> }[] = [];
-  for (const r of rows) {
-    try {
-      const a = await assertAccess(userId, r.id, "diary");
-      ok.push({ id: r.id, scopes: a.scopes });
-    } catch {}
-  }
-  return ok;
+  const ok = await accessibleAmong(userId, rows.map((r) => r.id), "diary");
+  return ok.map((a) => ({ id: a.personId, scopes: a.scopes as ReadonlySet<string> }));
 }
 
 export async function createPlan(weekStart: string, personIds: string[]) {
@@ -217,13 +211,8 @@ export async function retroProposal(planId: string) {
       return `### ${who}\n${lines.join("\n")}${a.comment ? `\nComentario: ${a.comment}` : ""}`;
     })
     .join("\n\n");
-  const editable = [];
-  for (const x of people) {
-    try {
-      const a = await assertAccess(user.id, x.id, "diary", true);
-      if (a.role === "owner" || a.role === "manager") editable.push(x);
-    } catch {}
-  }
+  const managed = new Set((await accessibleAmong(user.id, people.map((x) => x.id), "diary", true)).filter((a) => a.role === "owner" || a.role === "manager").map((a) => a.personId));
+  const editable = people.filter((x) => managed.has(x.id));
   const r = await aiAction(summarizeRetro({ db: db(), userId: user.id, groupId }, { planId: p.id, feedback, household: g?.md ?? "", perPerson: editable.map((x) => ({ personId: x.id, name: x.name, current: x.md })) }));
   return { ...r, names: Object.fromEntries(editable.map((x) => [x.id, x.name])) };
 }

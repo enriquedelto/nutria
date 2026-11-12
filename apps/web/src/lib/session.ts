@@ -2,7 +2,7 @@ import "server-only";
 import { UserError } from "@/lib/errors";
 import { cookies, headers } from "next/headers";
 import { redirect } from "next/navigation";
-import { eq, getPersonAccess, listAccessiblePersons, user as userTable, type AccessScope } from "@nutria/db";
+import { eq, getPersonAccess, getPersonAccessMany, listAccessiblePersons, user as userTable, type AccessScope } from "@nutria/db";
 import { auth } from "./auth";
 import { db } from "./db";
 
@@ -84,4 +84,13 @@ export async function assertAccess(userId: string, personId: string, scope: Acce
   const access = await getPersonAccess(db(), userId, personId);
   if (!access || !access.scopes.has(scope) || (write && !access.canWrite)) throw new UserError("Sin permiso para esta persona");
   return access;
+}
+
+/** The subset of `personIds` the user has `scope` on (and write, if asked), in input order. Never throws for missing access. */
+export async function accessibleAmong(userId: string, personIds: string[], scope: AccessScope, write = false) {
+  const map = await getPersonAccessMany(db(), userId, personIds);
+  return personIds.flatMap((id) => {
+    const a = map.get(id);
+    return a && a.scopes.has(scope) && (!write || a.canWrite) ? [a] : [];
+  });
 }

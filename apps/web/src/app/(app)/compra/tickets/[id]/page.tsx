@@ -59,6 +59,7 @@ async function Content({ params, searchParams }: { params: Promise<{ id: string 
         {images.length ? <Thumbs id={r.id} images={images} /> : null}
         <Card>
           <CardHeader title={`${items.length} ${items.length === 1 ? "línea" : "líneas"}`} subtitle={r.total != null ? `Total ${eur.format(r.total)}` : undefined} />
+          {!items.length ? <p className="text-sm text-ink-2">Este ticket no tiene líneas guardadas.</p> : null}
           <ul className="divide-y divide-line text-sm">
             {items.map((i) => (
               <li key={i.id} className="flex items-center justify-between gap-3 py-2">

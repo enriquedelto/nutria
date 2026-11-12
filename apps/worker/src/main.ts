@@ -2,9 +2,10 @@
  * Nutria worker: pg-boss queues + cron (Europe/Madrid). All business logic lives in @nutria/core;
  * here we only wire jobs, fan out per-person work and log.
  */
+import { writeFile } from "node:fs/promises";
 import { PgBoss } from "pg-boss";
-import { closeDb, getDb } from "@nutria/db";
-import { JOBS, SCHEDULES, type JobName, type JobPayloads } from "@nutria/core";
+import { closeDb, getDb, sql } from "@nutria/db";
+import { errorSummary, JOBS, SCHEDULES, type JobName, type JobPayloads } from "@nutria/core";
 import { handlers } from "./handlers";
 import { log } from "./log";
 
@@ -12,15 +13,40 @@ const url = process.env.DATABASE_URL;
 if (!url) throw new Error("DATABASE_URL no está definida");
 
 const boss = new PgBoss({ connectionString: url, schema: "pgboss", application_name: "nutria-worker" } as ConstructorParameters<typeof PgBoss>[0]);
-boss.on("error", (e: Error) => log.error("pg-boss", { error: e.message }));
+
+/**
+ * pg-boss keeps retrying on its own after a database outage, but a long one (full disk, recovery
+ * mode) can leave it wedged. If errors keep coming for 5 minutes with no healthy heartbeat in
+ * between, exit and let Docker (restart: unless-stopped) start a clean process.
+ */
+const STUCK_MS = 5 * 60_000;
+let failingSince: number | null = null;
+boss.on("error", (e: Error) => {
+  log.error("pg-boss", { error: e.message });
+  failingSince ??= Date.now();
+  if (Date.now() - failingSince > STUCK_MS) {
+    log.error("pg-boss sin recuperarse, reiniciando el worker", { since: new Date(failingSince).toISOString() });
+    process.exit(1);
+  }
+});
+
+/** Heartbeat for the compose healthcheck: touch /tmp/alive while the database answers. */
+function heartbeat(db: ReturnType<typeof getDb>) {
+  const beat = async () => {
+    try {
+      await db.execute(sql`select 1`);
+      failingSince = null;
+      await writeFile("/tmp/alive", new Date().toISOString());
+    } catch (e) {
+      failingSince ??= Date.now();
+      log.warn("latido sin BD", { error: errorSummary(e) });
+    }
+  };
+  void beat();
+  setInterval(() => void beat(), 60_000).unref();
+}
 
 /** Queue options: heavy imports get long expirations and a single worker. */
-/** Short error for logs: the root cause, without SQL text or parameters (they may hold personal data). */
-function errorSummary(e: unknown): string {
-  const root = (e as { cause?: unknown })?.cause ?? e;
-  const msg = root instanceof Error ? root.message : String(root);
-  return msg.startsWith("Failed query:") ? "Fallo de SQL" : msg.slice(0, 300);
-}
 const HEAVY = new Set<JobName>([JOBS.offMirror, JOBS.ciqualImport, JOBS.storeCrawl, JOBS.translateFoods]);
 
 async function main() {
@@ -50,6 +76,7 @@ async function main() {
       }
     });
   }
+  heartbeat(db);
   log.info("worker listo", { queues: Object.values(JOBS).length, schedules: SCHEDULES.length });
 }
 

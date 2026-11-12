@@ -483,6 +483,19 @@ test("los errores del servidor llegan con su mensaje en producción", async () =
   await expect(page.getByText(/Fecha no válida/)).toBeVisible();
 });
 
+test("sondeos de bots a server actions: 404 sin llegar a Next; las acciones reales siguen funcionando", async ({ request }) => {
+  for (const id of ["x", "0", "a".repeat(41), "z".repeat(42)]) {
+    const r = await request.post("/", { headers: { "Next-Action": id, "Content-Type": "text/plain;charset=UTF-8" }, data: "[]" });
+    expect(r.status(), id).toBe(404);
+  }
+  // A real action from the UI still goes through (previous test already submitted one; do another).
+  const page = adminPage;
+  await page.goto("/despensa");
+  await page.getByLabel("Producto").fill("Arroz");
+  await page.getByRole("button", { name: "Añadir" }).click();
+  await expect(page.getByText("Arroz").first()).toBeVisible();
+});
+
 test("batch cooking: cocinar con tuppers y comer de uno", async () => {
   const page = adminPage;
   await page.goto("/recetas");

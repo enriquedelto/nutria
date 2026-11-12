@@ -1,11 +1,12 @@
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { WebStandardStreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/webStandardStreamableHttp.js";
 import { z } from "zod";
-import { audit, deleteEntries, recomputeTargets } from "@nutria/core";
+import { audit, deleteEntries } from "@nutria/core";
 import { listAccessiblePersons, waterLogs, weightLogs, type AccessScope } from "@nutria/db";
 import { READ_TOOLS, type ToolContext } from "@nutria/ai";
 import { todayIn } from "@nutria/nutrition";
 import { db } from "@/lib/db";
+import { recomputeTargetsSafe } from "@/lib/targets";
 import { addDiaryItems } from "@/lib/diary-service";
 import { emit } from "@/lib/events";
 import { HttpError } from "@/lib/api";
@@ -72,7 +73,7 @@ function buildServer(auth: TokenAuth, req: Request) {
         const { person } = await tokenPerson(auth, a.personId, "body", true);
         const date = a.date ?? todayIn(person.timezone);
         await db().insert(weightLogs).values({ personId: person.id, date, kg: a.kg, bodyFatPct: a.bodyFatPct ?? null, source: "mcp", measuredAt: new Date() });
-        await recomputeTargets(db(), person.id).catch(() => undefined);
+        await recomputeTargetsSafe(person.id);
         void emit(auth.userId, "weight.logged", { personId: person.id, date, kg: a.kg });
         return text({ ok: true, date, kg: a.kg });
       }),

@@ -80,6 +80,30 @@ export async function getPersonAccess(db: Database, userId: string, personId: st
   return own ? { personId, role: "owner", scopes: new Set(ACCESS_SCOPES), canWrite: true } : null;
 }
 
+/** getPersonAccess for several persons in two queries (no per-person round trips). */
+export async function getPersonAccessMany(db: Database, userId: string, personIds: string[]): Promise<Map<string, PersonAccessInfo>> {
+  const out = new Map<string, PersonAccessInfo>();
+  const ids = [...new Set(personIds)];
+  if (!ids.length) return out;
+  const rows = await db
+    .select({ personId: personAccess.personId, role: personAccess.role, scopes: personAccess.scopes, canWrite: personAccess.canWrite, expiresAt: personAccess.expiresAt })
+    .from(personAccess)
+    .where(and(eq(personAccess.userId, userId), inArray(personAccess.personId, ids)));
+  const now = new Date();
+  for (const r of rows) {
+    if (r.expiresAt && r.expiresAt < now) continue;
+    const full = r.role === "owner" || r.role === "manager";
+    out.set(r.personId, { personId: r.personId, role: r.role, scopes: new Set(full ? ACCESS_SCOPES : r.scopes), canWrite: full || r.canWrite });
+  }
+  const explicit = new Set(rows.map((r) => r.personId));
+  const rest = ids.filter((id) => !explicit.has(id));
+  if (rest.length) {
+    const own = await db.select({ id: persons.id }).from(persons).where(and(inArray(persons.id, rest), eq(persons.userId, userId)));
+    for (const o of own) out.set(o.id, { personId: o.id, role: "owner", scopes: new Set(ACCESS_SCOPES), canWrite: true });
+  }
+  return out;
+}
+
 /** Persons the user can see, with role (for the person switcher). */
 export async function listAccessiblePersons(db: Database, userId: string) {
   return db

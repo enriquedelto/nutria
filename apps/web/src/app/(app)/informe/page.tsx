@@ -4,7 +4,7 @@ import { and, asc, dailySummaries, desc, eq, gte, lte, professionalNotes, sympto
 import { targetsForDate } from "@nutria/core";
 import { todayIn } from "@nutria/nutrition";
 import { Button } from "@/components/ui/button";
-import { Skeleton } from "@/components/ui/empty";
+import { Empty, Skeleton } from "@/components/ui/empty";
 import { db } from "@/lib/db";
 import { dateLong, dateShort, isDate, kg, n0, n1, nutrient, nutrientName } from "@/lib/format";
 import { requireScope } from "@/lib/session";
@@ -69,6 +69,12 @@ async function Content({ searchParams }: { searchParams: PageProps<"/informe">["
           Del {dateLong(from)} al {dateLong(to)} · {logged.length} de {days.length || Math.round((Date.parse(to) - Date.parse(from)) / 86_400_000) + 1} días con registro
         </p>
       </header>
+
+      {!logged.length ? (
+        <Empty title="No hay comidas registradas en estas fechas" className="no-print">
+          <p>Elige otro rango arriba o registra unos días en el diario: las medias salen solo de los días con registro.</p>
+        </Empty>
+      ) : null}
 
       <section>
         <h2 className="mb-2 text-base font-semibold">Energía y macronutrientes (media diaria)</h2>

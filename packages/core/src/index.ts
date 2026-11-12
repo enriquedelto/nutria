@@ -22,3 +22,4 @@ export * from "./timing";
 export * from "./report";
 export * from "./templates";
 export * from "./health-import";
+export * from "./disk";

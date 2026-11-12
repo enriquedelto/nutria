@@ -8,6 +8,7 @@ import { addMemory, deleteMemory, saveHouseholdPreferences } from "@/actions/ai"
 import { Markdown } from "@/components/markdown";
 import { Button } from "@/components/ui/button";
 import { Card, CardHeader } from "@/components/ui/card";
+import { Empty } from "@/components/ui/empty";
 import { Field, Select, Textarea } from "@/components/ui/input";
 
 const CATS: Record<string, string> = { gustos: "Gustos", rutina: "Rutina", salud: "Salud", objetivos: "Objetivos", cocina: "Cocina", otros: "Otros" };
@@ -101,6 +102,11 @@ export function MemoryClient({
             </ul>
           ) : null}
         </Card>
+      ) : null}
+      {!memories.length ? (
+        <Empty title="Aún no recuerdo nada de ti">
+          <p>Añade algo arriba («no como cerdo», «entreno a las 19:00»…) o pulsa «Sacar recuerdos de la última conversación» tras charlar con el coach.</p>
+        </Empty>
       ) : null}
       {Object.entries(CATS).map(([cat, title]) => {
         const list = memories.filter((m) => m.category === cat);

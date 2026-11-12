@@ -144,18 +144,21 @@ export async function scoreChallenge(db: Database, challengeId: string, today = 
   const end = c.endDate < today ? c.endDate : today;
   const parts = await db.select().from(challengeParticipants).where(eq(challengeParticipants.challengeId, c.id));
   const metric = String((c.rule as Record<string, unknown>).metric ?? "logging_days");
-  for (const part of parts) {
-    let score = 0;
-    if (metric === "steps") {
-      const res = await db.execute<{ s: number }>(sql`select coalesce(sum(steps), 0)::int as s from step_logs where person_id = ${part.personId} and date between ${c.startDate} and ${end}`);
-      const rows = rowsOf<{ s: number }>(res);
-      score = Math.floor((rows[0]?.s ?? 0) / 1000);
-    } else {
-      const f = await dayFlags(db, part.personId, c.startDate, end);
-      const key = ({ logging_days: "logging", water_days: "water", protein_days: "protein", veggie_days: "veggies" } as const)[metric as "logging_days"] ?? "logging";
-      score = f[key].length;
-    }
-    await db.update(challengeParticipants).set({ score, progress: { [metric]: score } }).where(eq(challengeParticipants.id, part.id));
-  }
+  // Participants are scored in parallel (a challenge has a handful of people; each needs its own day flags).
+  await Promise.all(
+    parts.map(async (part) => {
+      let score = 0;
+      if (metric === "steps") {
+        const res = await db.execute<{ s: number }>(sql`select coalesce(sum(steps), 0)::int as s from step_logs where person_id = ${part.personId} and date between ${c.startDate} and ${end}`);
+        const rows = rowsOf<{ s: number }>(res);
+        score = Math.floor((rows[0]?.s ?? 0) / 1000);
+      } else {
+        const f = await dayFlags(db, part.personId, c.startDate, end);
+        const key = ({ logging_days: "logging", water_days: "water", protein_days: "protein", veggie_days: "veggies" } as const)[metric as "logging_days"] ?? "logging";
+        score = f[key].length;
+      }
+      await db.update(challengeParticipants).set({ score, progress: { [metric]: score } }).where(eq(challengeParticipants.id, part.id));
+    }),
+  );
   return db.select().from(challengeParticipants).where(eq(challengeParticipants.challengeId, c.id)).orderBy(desc(challengeParticipants.score));
 }

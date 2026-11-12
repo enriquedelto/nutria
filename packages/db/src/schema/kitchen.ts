@@ -266,8 +266,6 @@ export const storeAccounts = pgTable(
     storeId: uuid()
       .notNull()
       .references(() => stores.id, { onDelete: "cascade" }),
-    credentialsEnc: text(),
-    postalCode: text(),
     meta: jsonb().$type<Record<string, unknown>>().notNull().default({}),
     ...timestamps(),
   },

@@ -17,9 +17,10 @@ import {
   weightLogs,
 } from "@nutria/db";
 import { todayIn } from "@nutria/nutrition";
-import { audit, latestWeight, missingProfileFields, notify, pairOpenGym, recomputeTargets, saveSportProfile, syncOpenGym, WEBHOOK_EVENTS } from "@nutria/core";
+import { audit, latestWeight, missingProfileFields, notify, pairOpenGym, saveSportProfile, syncOpenGym, WEBHOOK_EVENTS } from "@nutria/core";
 import { encrypt, newToken } from "@nutria/integrations";
 import { db } from "@/lib/db";
+import { recomputeTargetsSafe } from "@/lib/targets";
 import { enqueue } from "@/lib/jobs";
 import { assertAccess, getApiUser } from "@/lib/session";
 
@@ -76,7 +77,7 @@ export async function updateProfile(personId: string, input: z.input<typeof Prof
     const last = await latestWeight(db(), personId);
     if (!last || Math.abs(last.kg - weightKg) >= 0.05) await db().insert(weightLogs).values({ personId, date: todayIn(v.timezone), kg: weightKg, source: "manual", measuredAt: new Date() });
   }
-  await recomputeTargets(db(), personId).catch(() => undefined);
+  await recomputeTargetsSafe(personId);
   refresh();
   return { missing: await missingProfileFields(db(), personId) };
 }
@@ -97,7 +98,7 @@ export async function saveSport(personId: string, input: z.input<typeof Sport>) 
   await manage(personId);
   const { active, ...v } = Sport.parse(input);
   await saveSportProfile(db(), personId, active, { ...v, trainingDays: [...new Set(v.trainingDays)].sort(), proteinPerKg: Math.round(v.proteinPerKg * 10) / 10 });
-  await recomputeTargets(db(), personId).catch(() => undefined);
+  await recomputeTargetsSafe(personId);
   refresh();
 }
 

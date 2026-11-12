@@ -31,6 +31,7 @@ import {
 import { acceptTdeeEstimate, addSupplementPlan, applyBulkReview, setKcalAdjust, weeklyBulkReview, latestWeight, missingProfileFields, recomputeDay, recomputeTargets, takeSupplement, untakeSupplement } from "@nutria/core";
 import { detectSubstance, exerciseKcal, stepsKcal, SUPPLEMENT_BY_CODE } from "@nutria/nutrition";
 import { db } from "@/lib/db";
+import { recomputeTargetsSafe } from "@/lib/targets";
 import { emit } from "@/lib/events";
 import { enqueue } from "@/lib/jobs";
 import { assertAccess, getApiUser } from "@/lib/session";
@@ -53,7 +54,7 @@ export async function logWeight(personId: string, input: { date: string; kg: num
   await db()
     .insert(weightLogs)
     .values({ personId, date: v.date, kg: v.kg, bodyFatPct: v.bodyFatPct ?? null, note: v.note ?? null, source: "manual", measuredAt: new Date() });
-  await recomputeTargets(db(), personId).catch(() => undefined);
+  await recomputeTargetsSafe(personId);
   void emit(u.id, "weight.logged", { personId, date: v.date, kg: v.kg });
   refresh();
 }
@@ -287,7 +288,7 @@ export async function setCondition(personId: string, code: string, active: boole
     .insert(personConditions)
     .values({ personId, conditionCode: code, active, config: config ?? {}, since: new Date().toISOString().slice(0, 10) })
     .onConflictDoUpdate({ target: [personConditions.personId, personConditions.conditionCode], set: { active, ...(config ? { config } : {}) } });
-  await recomputeTargets(db(), personId).catch(() => undefined);
+  await recomputeTargetsSafe(personId);
   refresh();
 }
 

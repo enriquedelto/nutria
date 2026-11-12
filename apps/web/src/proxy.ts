@@ -7,8 +7,15 @@ import { getSessionCookie } from "better-auth/cookies";
  */
 const PUBLIC = [/^\/login/, /^\/registro/, /^\/invitacion/, /^\/api\/auth/, /^\/api\/hooks\//, /^\/api\/mcp/, /^\/api\/health/, /^\/offline/];
 
+/** Next 16 server action ids are 42 hex chars (SERVER_REFERENCE_ID_LENGTH); anything else is a probe. */
+const ACTION_ID = /^[0-9a-f]{42}$/i;
+
 export function proxy(req: NextRequest) {
   const { pathname } = req.nextUrl;
+  // Bots probing server actions ("Next-Action: x", RSC exploit scanners) never reach Next's decoder,
+  // which would log a "Server Reference ID did not match the expected format" error each time.
+  const action = req.headers.get("next-action");
+  if (action != null && !ACTION_ID.test(action)) return new NextResponse(null, { status: 404 });
   const requestId = req.headers.get("x-request-id") ?? crypto.randomUUID();
   const headers = new Headers(req.headers);
   headers.set("x-request-id", requestId);

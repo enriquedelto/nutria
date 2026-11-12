@@ -13,7 +13,7 @@ import { requireAdmin } from "@/lib/session";
 import { aiConfigured } from "@/lib/ai";
 import { InviteHousehold, RoleToggle, RunJob, ResetLink } from "./admin-client";
 
-import { BackupsCard } from "./backups";
+import { BackupsCard, DiskCard } from "./backups";
 export const metadata = { title: "Administración" };
 
 type JobRow = { name: string; state: string; n: number };
@@ -148,6 +148,7 @@ async function Content() {
         </div>
       </Card>
 
+      <DiskCard />
       <BackupsCard />
 
       <Card>

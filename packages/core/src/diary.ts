@@ -189,11 +189,12 @@ export async function undoAiAction(db: Database, userId: string, actionId: strin
     const rows = await db.delete(diaryEntries).where(inArray(diaryEntries.id, a.rowIds)).returning({ date: diaryEntries.date });
     rows.forEach((r) => dates.add(r.date));
   } else {
+    // Restore the snapshot in one go: drop whatever is there now under those ids, re-insert the old rows.
     const before = a.before as (typeof diaryEntries.$inferInsert)[];
-    for (const row of before) {
-      await db.insert(diaryEntries).values(row).onConflictDoUpdate({ target: diaryEntries.id, set: row });
-      dates.add(row.date);
-    }
+    const ids = before.map((r) => r.id).filter((x): x is string => !!x);
+    if (ids.length) await db.delete(diaryEntries).where(inArray(diaryEntries.id, ids));
+    if (before.length) await db.insert(diaryEntries).values(before);
+    for (const row of before) dates.add(row.date);
   }
   await db.update(aiActions).set({ undoneAt: new Date() }).where(eq(aiActions.id, a.id));
   if (a.estimateId) await db.update(aiEstimates).set({ status: "discarded" }).where(eq(aiEstimates.id, a.estimateId));

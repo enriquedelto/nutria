@@ -22,6 +22,7 @@ import { latestWeight } from "./targets";
 import { applyPlannedDays, plannedDaysFromWeek } from "./sport";
 import { notify } from "./notify";
 import { notifyPostWorkout } from "./timing";
+import { bestEffort } from "./util";
 
 /* ---------------------------------- foods --------------------------------- */
 
@@ -79,8 +80,12 @@ function foodRow(input: FoodInput) {
 /**
  * Upsert catalogue foods by (source, source_id). Keeps the Spanish name if the new data has none
  * (e.g. AI translations of CIQUAL) and replaces default servings.
+ *
+ * `skipUnchanged` (bulk mirrors): rows whose data did not change are left alone, so the weekly OFF
+ * mirror does not rewrite ~264k rows (WAL, dead tuples, disk). Those rows are then missing from the
+ * returned list, so callers that need every id (barcode lookup) must not use it.
  */
-export async function upsertFoods(db: Database, items: FoodInput[]) {
+export async function upsertFoods(db: Database, items: FoodInput[], opts: { skipUnchanged?: boolean } = {}) {
   const valid = items.filter((f) => f.sourceId);
   if (!valid.length) return [];
   const rows = await db
@@ -120,6 +125,11 @@ export async function upsertFoods(db: Database, items: FoodInput[]) {
         fetchedAt: sql`excluded.fetched_at`,
         updatedAt: new Date(),
       },
+      setWhere: opts.skipUnchanged
+        ? sql`(${foods.name}, ${foods.nameEs}, ${foods.brand}, ${foods.barcode}, ${foods.quantityLabel}, ${foods.imageUrl}, ${foods.kcal}, ${foods.protein}, ${foods.carbs}, ${foods.sugars}, ${foods.fat}, ${foods.satFat}, ${foods.fiber}, ${foods.salt}, ${foods.nutrients}, ${foods.nutriscore}, ${foods.nova}, ${foods.ecoscore}, ${foods.additives}, ${foods.allergens}, ${foods.traces}, ${foods.categories}, ${foods.labels}, ${foods.foodGroup}, ${foods.ingredientsText}, ${foods.countries}, ${foods.completeness})
+            is distinct from
+            (excluded.name, coalesce(excluded.name_es, ${foods.nameEs}), excluded.brand, excluded.barcode, excluded.quantity_label, coalesce(excluded.image_url, ${foods.imageUrl}), excluded.kcal, excluded.protein, excluded.carbs, excluded.sugars, excluded.fat, excluded.sat_fat, excluded.fiber, excluded.salt, excluded.nutrients, excluded.nutriscore, excluded.nova, excluded.ecoscore, excluded.additives, excluded.allergens, excluded.traces, excluded.categories, excluded.labels, excluded.food_group, excluded.ingredients_text, excluded.countries, excluded.completeness)`
+        : undefined,
     })
     .returning({ id: foods.id, sourceId: foods.sourceId });
   const bySource = new Map(rows.map((r) => [r.sourceId, r.id]));
@@ -173,13 +183,13 @@ export async function importOffDump(db: Database, input: ReadableStream<Uint8Arr
     const dedup = [...new Map(buf.map((b) => [b.sourceId, b])).values()];
     buf = [];
     try {
-      await upsertFoods(db, dedup);
+      await upsertFoods(db, dedup, { skipUnchanged: true });
       kept += dedup.length;
     } catch {
       // One bad product must not sink a 3 M-row import: retry the batch row by row and skip the bad ones.
       for (const f of dedup) {
         try {
-          await upsertFoods(db, [f]);
+          await upsertFoods(db, [f], { skipUnchanged: true });
           kept++;
         } catch {
           failed++;
@@ -208,7 +218,7 @@ export async function importCiqualRows(db: Database, rows: CiqualRow[], batch = 
   let n = 0;
   for (let i = 0; i < rows.length; i += batch) {
     const chunk = rows.slice(i, i + batch).map(normalizeCiqual);
-    await upsertFoods(db, chunk);
+    await upsertFoods(db, chunk, { skipUnchanged: true });
     n += chunk.length;
   }
   return n;
@@ -323,7 +333,7 @@ export async function syncOpenGym(db: Database, accountId: string, f?: typeof fe
         });
     }
     for (const d of dates) await recomputeDay(db, personId, d);
-    await notifyPostWorkout(db, personId, fresh, w?.kg ?? null).catch(() => undefined);
+    await bestEffort("aviso post-entreno", notifyPostWorkout(db, personId, fresh, w?.kg ?? null), { personId });
     meta.rev = rev;
     meta.plannedDays = plannedDaysFromWeek(state?.week);
     await applyPlannedDays(db, personId, meta.plannedDays as number[]);
@@ -336,14 +346,17 @@ export async function syncOpenGym(db: Database, accountId: string, f?: typeof fe
     const reauth = /caducado|401/.test(msg);
     await db.update(integrationAccounts).set({ ...set, meta, lastError: msg, status: reauth ? "reauth" : "error" }).where(eq(integrationAccounts.id, acc.id));
     if (reauth && acc.status !== "reauth" && acc.userId)
-      await notify(db, {
-        userId: acc.userId,
-        type: "integration",
-        title: "Vuelve a emparejar openGym",
-        body: "El acceso a openGym ha caducado. Genera un código nuevo en openGym y emparéjalo en Ajustes → Integraciones.",
-        url: "/ajustes/integraciones",
-        tag: `opengym:${acc.id}`,
-      }).catch(() => undefined);
+      await bestEffort(
+        "aviso de reemparejar openGym",
+        notify(db, {
+          userId: acc.userId,
+          type: "integration",
+          title: "Vuelve a emparejar openGym",
+          body: "El acceso a openGym ha caducado. Genera un código nuevo en openGym y emparéjalo en Ajustes → Integraciones.",
+          url: "/ajustes/integraciones",
+          tag: `opengym:${acc.id}`,
+        }),
+      );
     throw e;
   }
 }

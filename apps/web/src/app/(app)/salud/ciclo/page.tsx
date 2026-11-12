@@ -87,6 +87,7 @@ async function Content() {
           ) : null}
           <Card>
             <CardHeader title="Historial" />
+            {!periods.length ? <p className="text-sm text-ink-2">Aún no hay reglas anotadas. Con la primera, empiezo a estimar las fases.</p> : null}
             <ul className="divide-y divide-line text-sm">
               {periods.map((p, i) => (
                 <li key={p.id} className="flex justify-between py-1.5">

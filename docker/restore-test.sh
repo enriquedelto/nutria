@@ -32,9 +32,10 @@ done
 q postgres "drop database if exists $db" >/dev/null
 
 uploads=null
-u=$(ls -t /backups/uploads-*.tar 2>/dev/null | head -1)
+u=$(ls -t /backups/uploads-*.tar /backups/uploads-*.tar.gz 2>/dev/null | head -1)
 if [ -n "$u" ]; then
-  inTar=$(tar -tf "$u" 2>/dev/null | grep -vc '/$')
+  case "$u" in *.gz) z=z ;; *) z= ;; esac
+  inTar=$(tar -t${z}f "$u" 2>/dev/null | grep -vc '/$')
   files=$(find /uploads -type f 2>/dev/null | wc -l | tr -d ' ')
   uploads="{\"archive\":\"$(basename "$u")\",\"inArchive\":$inTar,\"files\":$files}"
   # Files may have been added since the archive was written, never fewer than 90 %.

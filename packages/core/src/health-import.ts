@@ -4,10 +4,11 @@
  * records with snake_case fields) and a simpler camelCase shape; unknown fields are ignored.
  * Re-sending the same or overlapping data never duplicates (per-day upserts and external ids).
  */
-import { and, eq, exerciseLogs, heartRateDaily, sleepLogs, sql, stepLogs, weightLogs, type Database } from "@nutria/db";
+import { and, eq, exerciseLogs, heartRateDaily, inArray, sleepLogs, sql, stepLogs, weightLogs, type Database } from "@nutria/db";
 import { stepsKcal, todayIn } from "@nutria/nutrition";
 import { recomputeDay } from "./summaries";
 import { latestWeight, recomputeTargets } from "./targets";
+import { bestEffort } from "./util";
 
 type Rec = Record<string, unknown>;
 const arr = (v: unknown): Rec[] => (Array.isArray(v) ? (v.filter((x) => x && typeof x === "object") as Rec[]) : []);
@@ -125,25 +126,31 @@ export async function importHealthData(db: Database, personId: string, data: Hea
   const w = (await latestWeight(db, personId))?.kg ?? 70;
   const dates = new Set<string>();
 
-  for (const s of data.steps) {
+  // One multi-row upsert per kind (a sync can carry weeks of days). parseHealthPayload already
+  // groups steps, sleep and heart by date; dedupe anyway, since ON CONFLICT cannot touch a row twice.
+  const byKey = <T,>(rows: T[], key: (r: T) => string) => [...new Map(rows.map((r) => [key(r), r])).values()];
+  const steps = byKey(data.steps, (s) => s.date);
+  if (steps.length) {
     // The sender repeats partial days: keep the highest count seen.
     await db
       .insert(stepLogs)
-      .values({ personId, date: s.date, steps: s.steps, kcal: stepsKcal(s.steps, w) })
+      .values(steps.map((s) => ({ personId, date: s.date, steps: s.steps, kcal: stepsKcal(s.steps, w) })))
       .onConflictDoUpdate({ target: [stepLogs.personId, stepLogs.date], set: { steps: sql`greatest(${stepLogs.steps}, excluded.steps)`, kcal: sql`greatest(coalesce(${stepLogs.kcal}, 0), excluded.kcal)`, updatedAt: new Date() } });
-    dates.add(s.date);
+    for (const s of steps) dates.add(s.date);
   }
-  for (const s of data.sleep) {
+  const sleep = byKey(data.sleep, (s) => s.date);
+  if (sleep.length) {
     // Keeps a manual note/quality; the longest session of the night wins.
     await db
       .insert(sleepLogs)
-      .values({ personId, date: s.date, bedtime: s.bedtime, wakeTime: s.wakeTime, hours: s.hours })
+      .values(sleep.map((s) => ({ personId, date: s.date, bedtime: s.bedtime, wakeTime: s.wakeTime, hours: s.hours })))
       .onConflictDoUpdate({ target: [sleepLogs.personId, sleepLogs.date], set: { bedtime: sql`excluded.bedtime`, wakeTime: sql`excluded.wake_time`, hours: sql`excluded.hours`, updatedAt: new Date() }, setWhere: sql`excluded.hours >= ${sleepLogs.hours}` });
   }
-  for (const h of data.heart) {
+  const heart = byKey(data.heart, (h) => h.date);
+  if (heart.length) {
     await db
       .insert(heartRateDaily)
-      .values({ personId, date: h.date, minBpm: h.min, avgBpm: h.avg, maxBpm: h.max, restingBpm: h.resting, samples: h.samples })
+      .values(heart.map((h) => ({ personId, date: h.date, minBpm: h.min, avgBpm: h.avg, maxBpm: h.max, restingBpm: h.resting, samples: h.samples })))
       .onConflictDoUpdate({
         target: [heartRateDaily.personId, heartRateDaily.date],
         set: {
@@ -157,26 +164,29 @@ export async function importHealthData(db: Database, personId: string, data: Hea
         },
       });
   }
-  let weights = 0;
-  for (const x of data.weights) {
-    const rows = await db.insert(weightLogs).values({ personId, date: x.date, measuredAt: x.at, kg: x.kg, bodyFatPct: x.bodyFatPct, source: "health", externalId: x.id }).onConflictDoNothing().returning({ id: weightLogs.id });
-    weights += rows.length;
-  }
-  if (weights) await recomputeTargets(db, personId).catch(() => undefined);
+  const weighIns = byKey(data.weights, (x) => x.id);
+  const weights = weighIns.length
+    ? (await db.insert(weightLogs).values(weighIns.map((x) => ({ personId, date: x.date, measuredAt: x.at, kg: x.kg, bodyFatPct: x.bodyFatPct, source: "health", externalId: x.id }))).onConflictDoNothing().returning({ id: weightLogs.id })).length
+    : 0;
+  if (weights) await bestEffort("recalcular objetivos", recomputeTargets(db, personId), { personId });
 
   let exercise = 0;
-  for (const e of data.exercise) {
+  const sessions = byKey(data.exercise, (e) => e.id);
+  if (sessions.length) {
     // openGym already brings the gym sessions of that day with their sets: do not count them twice.
-    const [gym] = await db.select({ id: exerciseLogs.id }).from(exerciseLogs).where(and(eq(exerciseLogs.personId, personId), eq(exerciseLogs.date, e.date), eq(exerciseLogs.source, "opengym"))).limit(1);
-    if (gym) continue;
-    const kcal = e.kcal ?? Math.round(5 * w * (e.minutes / 60));
-    const rows = await db
-      .insert(exerciseLogs)
-      .values({ personId, date: e.date, startedAt: e.start, name: e.name, durationMin: e.minutes, kcal, source: "health", externalId: e.id })
-      .onConflictDoUpdate({ target: [exerciseLogs.personId, exerciseLogs.source, exerciseLogs.externalId], targetWhere: sql`${exerciseLogs.externalId} is not null`, set: { durationMin: sql`excluded.duration_min`, kcal: sql`excluded.kcal`, name: sql`excluded.name`, updatedAt: new Date() } })
-      .returning({ id: exerciseLogs.id });
-    exercise += rows.length;
-    dates.add(e.date);
+    const gymDays = new Set(
+      (await db.selectDistinct({ date: exerciseLogs.date }).from(exerciseLogs).where(and(eq(exerciseLogs.personId, personId), eq(exerciseLogs.source, "opengym"), inArray(exerciseLogs.date, [...new Set(sessions.map((e) => e.date))])))).map((r) => r.date),
+    );
+    const keep = sessions.filter((e) => !gymDays.has(e.date));
+    if (keep.length) {
+      const rows = await db
+        .insert(exerciseLogs)
+        .values(keep.map((e) => ({ personId, date: e.date, startedAt: e.start, name: e.name, durationMin: e.minutes, kcal: e.kcal ?? Math.round(5 * w * (e.minutes / 60)), source: "health", externalId: e.id })))
+        .onConflictDoUpdate({ target: [exerciseLogs.personId, exerciseLogs.source, exerciseLogs.externalId], targetWhere: sql`${exerciseLogs.externalId} is not null`, set: { durationMin: sql`excluded.duration_min`, kcal: sql`excluded.kcal`, name: sql`excluded.name`, updatedAt: new Date() } })
+        .returning({ id: exerciseLogs.id });
+      exercise = rows.length;
+      for (const e of keep) dates.add(e.date);
+    }
   }
   for (const d of dates) await recomputeDay(db, personId, d);
   return { steps: data.steps.length, sleep: data.sleep.length, heartDays: data.heart.length, weights, exercise };

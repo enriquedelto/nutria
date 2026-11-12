@@ -1,8 +1,8 @@
 import { z } from "zod";
 import { weightLogs } from "@nutria/db";
-import { recomputeTargets } from "@nutria/core";
 import { todayIn } from "@nutria/nutrition";
 import { db } from "@/lib/db";
+import { recomputeTargetsSafe } from "@/lib/targets";
 import { emit } from "@/lib/events";
 import { publicRoute, tokenAuth, tokenPerson } from "@/lib/tokens";
 
@@ -29,7 +29,7 @@ export const POST = publicRoute(async (req) => {
     .onConflictDoNothing()
     .returning({ id: weightLogs.id });
   if (row) {
-    await recomputeTargets(db(), person.id).catch(() => undefined);
+    await recomputeTargetsSafe(person.id);
     void emit(auth.userId, "weight.logged", { personId: person.id, date, kg: b.kg, source });
   }
   return Response.json({ ok: true, duplicated: !row, personId: person.id, date });

@@ -13,6 +13,8 @@ import {
   eq,
   exerciseLogs,
   foods,
+  getPersonAccess,
+  getPersonAccessMany,
   imports,
   insights,
   mealSlots,
@@ -91,6 +93,18 @@ describe("profesional", () => {
     expect(days).toBeLessThan(30.1);
     // Sin persona propia ni hogar.
     expect(await db.select().from(persons).where(eq(persons.userId, "nutri"))).toHaveLength(0);
+  });
+  it("permisos en lote: mismo resultado que uno a uno", async () => {
+    const all = (await db.select({ id: persons.id }).from(persons)).map((p) => p.id);
+    for (const u of [uid, "nutri", "ana"]) {
+      const many = await getPersonAccessMany(db, u, all);
+      for (const pid of all) {
+        const one = await getPersonAccess(db, u, pid);
+        const got = many.get(pid) ?? null;
+        expect(got && { ...got, scopes: [...got.scopes].sort() }).toEqual(one && { ...one, scopes: [...one.scopes].sort() });
+      }
+    }
+    expect((await getPersonAccessMany(db, uid, [])).size).toBe(0);
   });
 });
 
@@ -351,6 +365,20 @@ describe("datos", () => {
     expect(r).toEqual({ seen: 2, kept: 1, failed: 0 });
     const [f] = await db.select().from(foods).where(eq(foods.sourceId, "8410000000001"));
     expect(f?.kcal).toBe(440);
+  });
+  it("reimportar el mismo volcado no reescribe las filas sin cambios (sí las que cambian)", async () => {
+    const head = "code\tproduct_name\tbrands\tcountries_tags\tenergy-kcal_100g\tproteins_100g";
+    const row = (kcal: number) => `8410000000011\tPan integral\tMarca\ten:spain\t${kcal}\t9`;
+    await core.importOffDump(db, Readable.from([[head, row(250)].join("\n")]));
+    const first = (await db.select().from(foods).where(eq(foods.sourceId, "8410000000011")))[0]!;
+    await new Promise((r) => setTimeout(r, 20));
+    await core.importOffDump(db, Readable.from([[head, row(250)].join("\n")]));
+    const same = (await db.select().from(foods).where(eq(foods.sourceId, "8410000000011")))[0]!;
+    expect(same.updatedAt.getTime()).toBe(first.updatedAt.getTime());
+    await core.importOffDump(db, Readable.from([[head, row(260)].join("\n")]));
+    const changed = (await db.select().from(foods).where(eq(foods.sourceId, "8410000000011")))[0]!;
+    expect(changed.kcal).toBe(260);
+    expect(changed.updatedAt.getTime()).toBeGreaterThan(first.updatedAt.getTime());
   });
   it("un corte de la descarga del volcado es un error capturable, no tumba el proceso", async () => {
     const gz = gzipSync(["code\tproduct_name\tcountries_tags\tenergy-kcal_100g", "8410000000009\tCortado\ten:spain\t100"].join("\n"));
@@ -698,5 +726,25 @@ describe("datos del móvil", () => {
     const r = await core.importHealthData(db, pid, core.parseHealthPayload({ steps: 3000, date: "2027-05-11", exercise: [{ activity: "strength_training", start: "2027-05-11T17:00:00Z", minutes: 55 }] }, "Europe/Madrid"));
     expect(r).toMatchObject({ steps: 1, exercise: 0 });
     expect(core.parseHealthPayload(null, "Europe/Madrid")).toEqual({ steps: [], sleep: [], heart: [], weights: [], exercise: [] });
+  });
+});
+
+describe("disco", () => {
+  it("niveles y aviso solo al subir de nivel", () => {
+    expect(core.diskLevel(50)).toBe("ok");
+    expect(core.diskLevel(85)).toBe("warn");
+    expect(core.diskLevel(95.2)).toBe("critical");
+    expect(core.diskShouldNotify("warn", "ok")).toBe(true);
+    expect(core.diskShouldNotify("warn", "warn")).toBe(false);
+    expect(core.diskShouldNotify("critical", "warn")).toBe(true);
+    expect(core.diskShouldNotify("ok", "critical")).toBe(false);
+  });
+  it("escribe disk.json con el uso real y el tamaño de la BD", async () => {
+    const dir = await mkdtemp(join(tmpdir(), "nutria-disk-"));
+    const s = await core.checkDisk(db, dir);
+    expect(s.totalBytes).toBeGreaterThan(0);
+    expect(s.usedPct).toBeGreaterThanOrEqual(0);
+    expect(s.usedPct).toBeLessThanOrEqual(100);
+    expect(await core.readDiskStatus(dir)).toMatchObject({ level: s.level, usedPct: s.usedPct });
   });
 });

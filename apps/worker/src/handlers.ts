@@ -50,6 +50,7 @@ import {
   type JobPayloads,
   assignFoodGroups,
   shareReceipt,
+  checkDisk,
 } from "@nutria/core";
 import { CIQUAL_ZIP_FALLBACK_URL, CIQUAL_ZIP_URL, decodeLatin1, extractVideo, parseCiqual } from "@nutria/integrations";
 import { addDays, todayIn, weekStart } from "@nutria/nutrition";
@@ -287,5 +288,10 @@ export const handlers: Handlers = {
     const n2 = await db.delete(aiEstimates).where(and(sql`${aiEstimates.status} in ('discarded','failed','pending')`, lt(aiEstimates.createdAt, ago(30)))).returning({ id: aiEstimates.id });
     const n3 = await db.delete(session).where(lt(session.expiresAt, new Date())).returning({ id: session.id });
     return { notifications: n1.length, estimates: n2.length, sessions: n3.length };
+  },
+
+  [JOBS.disk]: async (_d, { db }) => {
+    const s = await checkDisk(db);
+    return { usedPct: s.usedPct, level: s.level };
   },
 };

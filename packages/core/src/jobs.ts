@@ -24,6 +24,7 @@ export const JOBS = {
   webhookDeliver: "webhook.deliver",
   recipeFromVideo: "recipe.from-video",
   cleanup: "maintenance.cleanup",
+  disk: "maintenance.disk",
 } as const;
 
 export type JobName = (typeof JOBS)[keyof typeof JOBS];
@@ -55,6 +56,7 @@ export interface JobPayloads {
   "webhook.deliver": { webhookId: string; event: string; payload: Record<string, unknown>; attempt?: number };
   "recipe.from-video": { estimateId: string; url: string; userId: string };
   "maintenance.cleanup": Record<string, never>;
+  "maintenance.disk": Record<string, never>;
 }
 
 /** Cron schedule (Europe/Madrid). */
@@ -74,4 +76,5 @@ export const SCHEDULES: { name: JobName; cron: string }[] = [
   { name: JOBS.foodGroups, cron: "45 5 * * *" },
   { name: JOBS.storeCrawl, cron: "0 2 * * 3" },
   { name: JOBS.cleanup, cron: "0 4 * * *" },
+  { name: JOBS.disk, cron: "*/15 * * * *" },
 ];

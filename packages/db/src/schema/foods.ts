@@ -45,28 +45,7 @@ export const nutrients = pgTable("nutrients", {
   ciqualKey: text(),
 });
 
-/**
- * Dietary reference values (EFSA). One row per nutrient × sex × age band × condition.
- * Used to compute per-person micro targets.
- */
-export const nutrientReferences = pgTable(
-  "nutrient_references",
-  {
-    id: id(),
-    nutrientCode: text()
-      .notNull()
-      .references(() => nutrients.code, { onDelete: "cascade" }),
-    sex: text(), // null = both
-    ageMinYears: real().notNull(),
-    ageMaxYears: real().notNull(),
-    lifeStage: text(), // null | "pregnancy" | "lactation"
-    kind: text().notNull(), // "PRI" | "AI" | "UL" | "RI"
-    amount: real().notNull(),
-    perKgBodyWeight: boolean().notNull().default(false),
-    source: text().notNull().default("EFSA DRV 2019"),
-  },
-  (t) => [index().on(t.nutrientCode)],
-);
+// Dietary reference values (EFSA) live in code: DRV in @nutria/nutrition (drv.ts), not in a table.
 
 export const foodSourceEnum = pgEnum("food_source", ["off", "ciqual", "usda", "custom", "ai", "recipe", "store"]);
 export const foodKindEnum = pgEnum("food_kind", ["food", "drink", "supplement", "alcohol"]);

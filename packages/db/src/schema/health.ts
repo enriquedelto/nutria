@@ -209,12 +209,7 @@ export const stepLogs = pgTable(
   (t) => [uniqueIndex().on(t.personId, t.date)],
 );
 
-export const fastingProtocols = pgTable("fasting_protocols", {
-  code: text().primaryKey(), // "16:8", "18:6", "omad", "5:2", "custom"
-  nameEs: text().notNull(),
-  fastHours: real(),
-  description: text(),
-});
+// Fasting protocols live in code: FASTING_PROTOCOLS in @nutria/nutrition (activity.ts).
 
 export const fastingSessions = pgTable(
   "fasting_sessions",

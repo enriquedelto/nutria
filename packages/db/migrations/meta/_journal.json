@@ -78,6 +78,13 @@
       "when": 1794316634121,
       "tag": "0010_heart_rate_daily",
       "breakpoints": true
+    },
+    {
+      "idx": 11,
+      "version": "7",
+      "when": 1794494382948,
+      "tag": "0011_cleanup",
+      "breakpoints": true
     }
   ]
 }

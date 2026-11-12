@@ -81,6 +81,7 @@ async function Content() {
         </Card>
         <Card>
           <CardHeader title="Últimas noches" />
+          {!logs.length ? <p className="text-sm text-ink-2">Aún no hay noches anotadas. Anótalas aquí o llegarán solas desde el móvil (Ajustes › Integraciones).</p> : null}
           <ul className="divide-y divide-line text-sm">
             {[...logs].reverse().slice(0, 10).map((l) => (
               <li key={l.id} className="flex justify-between py-1.5">
