@@ -3,7 +3,7 @@ import { PgBoss } from "pg-boss";
 import type { JobName, JobPayloads } from "@nutria/core";
 
 declare global {
-  // eslint-disable-next-line no-var
+   
   var __nutriaBoss: Promise<PgBoss> | undefined;
 }
 

@@ -8,7 +8,6 @@ import {
   diaryEntries,
   eq,
   foods,
-  insights,
   integrationAccounts,
   isNull,
   lt,
@@ -20,7 +19,7 @@ import {
   weightLogs,
   type Database,
 } from "@nutria/db";
-import { createProvider, structureRecipe, translateFoodNames, weeklyReport } from "@nutria/ai";
+import { createProvider, structureRecipe, translateFoodNames } from "@nutria/ai";
 import {
   crawlStore,
   deliverWebhook,
@@ -53,8 +52,6 @@ import {
   checkDisk,
 } from "@nutria/core";
 import { CIQUAL_ZIP_FALLBACK_URL, CIQUAL_ZIP_URL, decodeLatin1, extractVideo, parseCiqual } from "@nutria/integrations";
-import { addDays, todayIn, weekStart } from "@nutria/nutrition";
-import { ACCESS_SCOPES } from "@nutria/db/schema";
 import { log } from "./log";
 
 interface Ctx {
@@ -66,7 +63,6 @@ type Handler<N extends JobName> = (data: JobPayloads[N], ctx: Ctx) => Promise<un
 type Handlers = { [N in JobName]: Handler<N> };
 
 const OFF_DUMP_URL = "https://static.openfoodfacts.org/data/en.openfoodfacts.org.products.csv.gz";
-const FULL = new Set<string>(ACCESS_SCOPES);
 
 /** Persons that have an account (self) — used for personal jobs like weekly reports. */
 async function selfPersons(db: Database) {

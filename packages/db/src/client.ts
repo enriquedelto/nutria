@@ -9,7 +9,6 @@ export type Schema = typeof schema;
 export type Database = PgDatabase<any, Schema>;
 
 declare global {
-  // eslint-disable-next-line no-var
   var __nutriaDb: { db: Database; sql: postgres.Sql } | undefined;
 }
 

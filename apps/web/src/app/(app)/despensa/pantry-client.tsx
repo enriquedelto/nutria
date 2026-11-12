@@ -22,18 +22,16 @@ export function AddPantry({ defaultLocation = "despensa" }: { defaultLocation?: 
   const [loc, setLoc] = useState<Loc>(defaultLocation);
   const [draft, setDraft] = useState<{ estimateId: string; items: { name: string; quantity: number; unit: "g" | "ml" | "ud"; location: Loc; expiresInDays: number | null }[] } | null>(null);
   const photo = useRef<HTMLInputElement>(null);
-  const form = useRef<HTMLFormElement>(null);
 
   return (
     <div className="space-y-3">
       <form
-        ref={form}
         className="grid grid-cols-2 gap-2 sm:grid-cols-[1fr_5rem_5rem_8rem_8rem_auto] sm:items-end"
-        onSubmit={submitForm((fd) =>
+        onSubmit={submitForm((fd, form) =>
           start(async () => {
             try {
               await addPantryItem({ name: String(fd.get("name")), quantity: Number(fd.get("qty") || 1), unit: String(fd.get("unit")) as "ud", location: loc, expires: String(fd.get("exp") || "") || null });
-              form.current?.reset();
+              form.reset();
             } catch (e) {
               toast.error(errorText(e, "Error"));
             }

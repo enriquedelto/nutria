@@ -21,11 +21,11 @@ export function FoodPicker({ personId, initialQuery = "", onPick, busyId }: { pe
     input.current?.select();
   }, []);
 
+  const tooShort = q.trim().length < 2;
+  const shown = tooShort ? null : items;
+
   useEffect(() => {
-    if (q.trim().length < 2) {
-      setItems(null);
-      return;
-    }
+    if (tooShort) return;
     const ac = new AbortController();
     const t = setTimeout(async () => {
       setLoading(true);
@@ -42,7 +42,7 @@ export function FoodPicker({ personId, initialQuery = "", onPick, busyId }: { pe
       clearTimeout(t);
       ac.abort();
     };
-  }, [q, personId]);
+  }, [q, tooShort, personId]);
 
   return (
     <div className="space-y-2">
@@ -51,10 +51,10 @@ export function FoodPicker({ personId, initialQuery = "", onPick, busyId }: { pe
         <Input ref={input} type="search" value={q} onChange={(e) => setQ(e.target.value)} placeholder="Buscar otro alimento…" aria-label="Buscar otro alimento" className="pl-9" />
         {loading ? <Loader2 className="absolute right-3 top-1/2 size-4 -translate-y-1/2 animate-spin text-ink-3" /> : null}
       </div>
-      {items ? (
-        items.length ? (
+      {shown ? (
+        shown.length ? (
           <ul className="max-h-72 divide-y divide-line overflow-y-auto rounded-xl border border-line">
-            {items.map((f) => (
+            {shown.map((f) => (
               <li key={f.id}>
                 <button type="button" onClick={() => onPick(f)} disabled={!!busyId} className="flex w-full items-center gap-3 px-3 py-2 text-left hover:bg-paper-2 disabled:opacity-60">
                   <span className="min-w-0 flex-1">

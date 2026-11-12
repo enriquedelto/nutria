@@ -102,7 +102,7 @@ function createAuth() {
 
 type Auth = ReturnType<typeof createAuth>;
 declare global {
-  // eslint-disable-next-line no-var
+   
   var __nutriaAuth: Auth | undefined;
 }
 

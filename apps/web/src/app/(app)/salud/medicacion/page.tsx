@@ -12,6 +12,7 @@ import { Empty, Skeleton } from "@/components/ui/empty";
 import { db } from "@/lib/db";
 import { time } from "@/lib/format";
 import { requireScope } from "@/lib/session";
+import { nowMs } from "@/lib/utils";
 
 export const metadata = { title: "Medicación" };
 
@@ -23,7 +24,7 @@ async function Content() {
   const pid = ctx.person.id;
   const tz = ctx.person.timezone;
   const today = todayIn(tz);
-  const now = Date.now();
+  const now = nowMs();
   const meds = await db().select().from(medications).where(eq(medications.personId, pid)).orderBy(desc(medications.active), asc(medications.name));
   const subs = [...new Set(meds.filter((m) => m.active && m.substanceCode).map((m) => m.substanceCode!))];
   const [doses, interactions] = await Promise.all([

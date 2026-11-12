@@ -1,6 +1,6 @@
 "use client";
 import { submitForm } from "@/lib/forms";
-import { useRef, useState } from "react";
+import { useState } from "react";
 import { useSafeTransition } from "@/lib/use-safe-transition";
 import { Loader2, Plus, Sparkles, Trash2 } from "lucide-react";
 import { toast } from "sonner";
@@ -32,7 +32,6 @@ export function MemoryClient({
   const [suggested, setSuggested] = useState<{ category: string; contentMd: string }[] | null>(null);
   const [extracting, setExtracting] = useState(false);
   const [hh, setHh] = useState(household);
-  const form = useRef<HTMLFormElement>(null);
 
   const extract = async () => {
     setExtracting(true);
@@ -49,12 +48,11 @@ export function MemoryClient({
       {canWrite ? (
         <Card>
           <form
-            ref={form}
             className="grid gap-3 sm:grid-cols-[10rem_1fr_auto] sm:items-end"
-            onSubmit={submitForm((fd) =>
+            onSubmit={submitForm((fd, form) =>
               start(async () => {
                 await addMemory(personId, String(fd.get("category")), String(fd.get("content")));
-                form.current?.reset();
+                form.reset();
               })
             )}
           >

@@ -5,7 +5,7 @@
 import { completeDerived, type NutrientMap } from "@nutria/nutrition";
 
 export function parseCsv(text: string, delimiter?: string): Record<string, string>[] {
-  const src = text.replace(/^﻿/, "");
+  const src = text.replace(/^\uFEFF/, "");
   const firstLine = src.slice(0, src.indexOf("\n") >>> 0 || src.length);
   const d = delimiter ?? (firstLine.split(";").length > firstLine.split(",").length ? ";" : firstLine.includes("\t") ? "\t" : ",");
   const rows: string[][] = [];

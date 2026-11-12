@@ -1,6 +1,6 @@
 "use client";
 import { submitForm } from "@/lib/forms";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 import { useSafeTransition } from "@/lib/use-safe-transition";
 import { Play, Plus, Square, Trash2 } from "lucide-react";
 import { toast } from "sonner";
@@ -31,17 +31,15 @@ import { cn } from "@/lib/utils";
 
 export function ExerciseForm({ personId, today, activities }: { personId: string; today: string; activities: { code: string; nameEs: string; category: string; met: number }[] }) {
   const [pending, start] = useSafeTransition();
-  const ref = useRef<HTMLFormElement>(null);
   const cats = [...new Set(activities.map((a) => a.category))];
   return (
     <form
-      ref={ref}
       className="grid gap-2 sm:grid-cols-[1fr_6rem_9rem_auto] sm:items-end"
-      onSubmit={submitForm((fd) =>
+      onSubmit={submitForm((fd, form) =>
         start(async () => {
           await logExercise(personId, { date: String(fd.get("date")), activityCode: String(fd.get("activity")), minutes: Number(fd.get("minutes")), kcal: fd.get("kcal") ? Number(fd.get("kcal")) : null });
           toast.success("Ejercicio guardado");
-          ref.current?.reset();
+          form.reset();
         })
       )}
     >

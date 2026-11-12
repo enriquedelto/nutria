@@ -6,7 +6,7 @@ import { EventEmitter } from "node:events";
  * the NUC, so this is enough; with several instances, swap for Postgres LISTEN/NOTIFY.
  */
 declare global {
-  // eslint-disable-next-line no-var
+   
   var __nutriaBus: EventEmitter | undefined;
 }
 export const bus = (globalThis.__nutriaBus ??= Object.assign(new EventEmitter(), {}).setMaxListeners(500));

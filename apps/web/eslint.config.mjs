@@ -12,6 +12,10 @@ const eslintConfig = defineConfig([
     "out/**",
     "build/**",
     "next-env.d.ts",
+    // Generated: service worker bundle (scripts/build-sw.mjs) and Playwright output.
+    "public/sw.js",
+    "playwright-report/**",
+    "test-results/**",
   ]),
 ]);
 

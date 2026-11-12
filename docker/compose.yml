@@ -97,7 +97,8 @@ services:
   # Transcripción (voz sin Web Speech API y vídeos de recetas).
   whisper:
     <<: *logging
-    image: onerahmet/openai-whisper-asr-webservice:latest
+    # Fijada por digest (la que corre desde 2026-08); para actualizar: docker pull …:latest y copiar su RepoDigest.
+    image: onerahmet/openai-whisper-asr-webservice:latest@sha256:0616c3d5fc6924e9d59aa8a7a3a944fbe8f3a5d701e5fc1fa2ce5b933dfecb73
     environment:
       ASR_ENGINE: faster_whisper
       ASR_MODEL: ${WHISPER_MODEL:-small}

@@ -1,6 +1,6 @@
 "use client";
 import { errorText } from "@/lib/errors";
-import { useEffect, useState } from "react";
+import { useState, useSyncExternalStore } from "react";
 import { useSafeTransition } from "@/lib/use-safe-transition";
 import { ArrowDown, ArrowUp, Monitor, Moon, Plus, Sun, Trash2 } from "lucide-react";
 import { toast } from "sonner";
@@ -11,18 +11,30 @@ import { cn } from "@/lib/utils";
 
 /* -------------------------------- theme -------------------------------- */
 
+const THEME_EVENT = "nutria-theme";
+const subscribeTheme = (cb: () => void) => {
+  window.addEventListener(THEME_EVENT, cb);
+  window.addEventListener("storage", cb);
+  return () => {
+    window.removeEventListener(THEME_EVENT, cb);
+    window.removeEventListener("storage", cb);
+  };
+};
+const readTheme = () => {
+  try {
+    return localStorage.getItem("theme") ?? "system";
+  } catch {
+    return "system";
+  }
+};
+
 export function ThemePicker() {
-  const [theme, setTheme] = useState<string>("system");
-  useEffect(() => {
-    try {
-      setTheme(localStorage.getItem("theme") ?? "system");
-    } catch {}
-  }, []);
+  const theme = useSyncExternalStore(subscribeTheme, readTheme, () => "system");
   const apply = (t: string) => {
-    setTheme(t);
     try {
       localStorage.setItem("theme", t);
     } catch {}
+    window.dispatchEvent(new Event(THEME_EVENT));
     const dark = t === "dark" || (t === "system" && matchMedia("(prefers-color-scheme: dark)").matches);
     document.documentElement.classList.toggle("dark", dark);
   };

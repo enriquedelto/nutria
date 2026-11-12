@@ -162,7 +162,13 @@ export function Passkeys() {
     setItems((data as Pk[] | null) ?? []);
   };
   useEffect(() => {
-    void load();
+    let alive = true;
+    void authClient.passkey.listUserPasskeys().then(({ data }) => {
+      if (alive) setItems((data as Pk[] | null) ?? []);
+    });
+    return () => {
+      alive = false;
+    };
   }, []);
   const supported = typeof window !== "undefined" && "PublicKeyCredential" in window;
   return (
@@ -216,7 +222,13 @@ export function Sessions({ currentToken }: { currentToken: string | null }) {
     setItems((data as Sess[] | null) ?? []);
   };
   useEffect(() => {
-    void load();
+    let alive = true;
+    void authClient.listSessions().then(({ data }) => {
+      if (alive) setItems((data as Sess[] | null) ?? []);
+    });
+    return () => {
+      alive = false;
+    };
   }, []);
   return (
     <div className="space-y-3">

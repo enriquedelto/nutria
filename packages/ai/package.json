@@ -11,14 +11,14 @@
     "typecheck": "tsc -p tsconfig.json"
   },
   "dependencies": {
-    "@anthropic-ai/claude-agent-sdk": "^0.3.319",
-    "@anthropic-ai/sdk": "^1.6.0",
+    "@anthropic-ai/claude-agent-sdk": "^0.3.322",
+    "@anthropic-ai/sdk": "^1.8.0",
     "@nutria/db": "workspace:*",
     "@nutria/nutrition": "workspace:*",
     "zod": "^4.6.7"
   },
   "devDependencies": {
-    "@electric-sql/pglite": "0.5.15",
+    "@electric-sql/pglite": "0.5.16",
     "@types/node": "^26.6.6",
     "typescript": "^7.0.2"
   }

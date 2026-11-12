@@ -57,7 +57,9 @@ export function NutriBadges({ nutriscore, nova }: { nutriscore: string | null; n
 
 export function AddFoodDialog({ foodId, ctx, defaultGrams, onClose, onAdded }: { foodId: string; ctx: DayContext; defaultGrams?: number; onClose: () => void; onAdded?: () => void }) {
   const [currentId, setCurrentId] = useState(foodId);
-  const [detail, setDetail] = useState<Detail | null>(null);
+  // Keyed by food id so switching to an alternative shows the spinner without resetting state in the effect.
+  const [loaded, setLoaded] = useState<{ id: string; detail: Detail } | null>(null);
+  const detail = loaded?.id === currentId ? loaded.detail : null;
   const [error, setError] = useState<string | null>(null);
   const [serving, setServing] = useState<string>("g");
   const [qty, setQty] = useState<number>(defaultGrams ?? 100);
@@ -67,12 +69,11 @@ export function AddFoodDialog({ foodId, ctx, defaultGrams, onClose, onAdded }: {
 
   useEffect(() => {
     let alive = true;
-    setDetail(null);
     fetch(`/api/foods/${currentId}?personId=${ctx.personId}`)
       .then(async (r) => (r.ok ? r.json() : Promise.reject(new Error((await r.json()).error))))
       .then((d: Detail) => {
         if (!alive) return;
-        setDetail(d);
+        setLoaded({ id: currentId, detail: d });
         const def = d.servings[0];
         if (def && !defaultGrams) {
           setServing(def.id);

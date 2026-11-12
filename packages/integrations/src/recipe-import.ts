@@ -104,6 +104,7 @@ export function extractJsonLdRecipe(html: string, sourceUrl: string): ImportedRe
       data = JSON.parse(s.trim());
     } catch {
       try {
+        // eslint-disable-next-line no-control-regex -- strip raw control chars that break JSON.parse
         data = JSON.parse(s.trim().replace(/[\u0000-\u001f]+/g, " "));
       } catch {
         continue;

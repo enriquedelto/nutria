@@ -10,6 +10,7 @@ import { Skeleton } from "@/components/ui/empty";
 import { db } from "@/lib/db";
 import { dateShort, n0, n1 } from "@/lib/format";
 import { requireAdmin } from "@/lib/session";
+import { hoursAgo } from "@/lib/utils";
 import { aiConfigured } from "@/lib/ai";
 import { InviteHousehold, RoleToggle, RunJob, ResetLink } from "./admin-client";
 
@@ -48,7 +49,7 @@ async function Content() {
       .groupBy(aiUsage.userId),
     db().select({ feature: aiUsage.feature, n: count(), tokens: sql<number>`sum(${aiUsage.inputTokens} + ${aiUsage.outputTokens})`.mapWith(Number), ms: sql<number>`avg(${aiUsage.durationMs})`.mapWith(Number) }).from(aiUsage).where(gte(aiUsage.createdAt, monthStart)).groupBy(aiUsage.feature).orderBy(desc(count())),
     db().select({ source: foods.source, n: count(), last: sql<string>`max(${foods.updatedAt})::text` }).from(foods).groupBy(foods.source),
-    db().select().from(auditLog).where(and(eq(auditLog.action, "password_reset_requested"), gte(auditLog.createdAt, new Date(Date.now() - 3_600_000)))).orderBy(desc(auditLog.createdAt)).limit(10),
+    db().select().from(auditLog).where(and(eq(auditLog.action, "password_reset_requested"), gte(auditLog.createdAt, hoursAgo(1)))).orderBy(desc(auditLog.createdAt)).limit(10),
     jobStats(),
     db().select({ a: auditLog, who: user.name }).from(auditLog).leftJoin(user, eq(user.id, auditLog.userId)).orderBy(desc(auditLog.createdAt)).limit(25),
   ]);
