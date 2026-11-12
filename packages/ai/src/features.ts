@@ -339,6 +339,8 @@ export async function weeklyReport(c: PersonFeatureCtx, weekStartDate: string, e
   const pc = await buildPersonContext(c.db, c.personId, c.scopes);
   const [target] = await c.db.select().from(targetSets).where(and(eq(targetSets.personId, c.personId), eq(targetSets.isDefault, true))).limit(1);
   const days = await c.db.select().from(dailySummaries).where(and(eq(dailySummaries.personId, c.personId), between(dailySummaries.date, weekStartDate, end))).orderBy(asc(dailySummaries.date));
+  // Nothing logged that week: no report, and no AI call (it would be thrown away).
+  if (!days.length) return null;
   const gaps = target ? microGaps(days.map((d) => d.nutrients), Object.fromEntries(Object.entries(target.micros).map(([k, v]) => [k, { min: v.min, max: v.max }]))) : [];
   const body = c.scopes.has("body")
     ? {

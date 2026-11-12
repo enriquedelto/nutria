@@ -48,7 +48,10 @@ async function Content({ searchParams }: { searchParams: PageProps<"/planes">["s
         days,
         current!.items.map((i) => {
           const r = i.recipeId ? byId.get(i.recipeId) : undefined;
-          return { date: i.date, recipeId: i.recipeId, title: i.title, servings: i.portions[k.person.id]?.servings ?? 0, kcalPerServing: r?.kcal ?? null, proteinPerServing: r?.protein ?? null };
+          const p = i.portions[k.person.id];
+          // Without a recipe, the planner's estimate stored with the portion (totals for this person).
+          const perServing = (total: number | undefined) => (total != null && p?.servings ? total / p.servings : null);
+          return { date: i.date, recipeId: i.recipeId, title: i.title, servings: p?.servings ?? 0, kcalPerServing: r?.kcal ?? (r ? null : perServing(p?.kcal)), proteinPerServing: r?.protein ?? (r ? null : perServing(p?.protein)) };
         }),
         targets,
       )

@@ -30,12 +30,11 @@ export async function sendOrQueue<T = unknown>(url: string, body: unknown, metho
   } catch (e) {
     if ((e as { http?: boolean }).http) throw e;
     await (await idb()).put("queue", { id: newClientId(), url, method, body, createdAt: Date.now(), tries: 0 } satisfies Pending);
-    try {
-      const reg = await navigator.serviceWorker?.ready;
-      await (reg as ServiceWorkerRegistration & { sync?: { register(tag: string): Promise<void> } })?.sync?.register("nutria-diary");
-    } catch {
-      /* Background Sync not supported: the online listener flushes instead. */
-    }
+    // Not awaited: `ready` never resolves while the service worker is not active yet (page just loaded,
+    // registration failed), and the save must not hang. Without Background Sync the online listener flushes.
+    void navigator.serviceWorker?.ready
+      .then((reg) => (reg as ServiceWorkerRegistration & { sync?: { register(tag: string): Promise<void> } }).sync?.register("nutria-diary"))
+      .catch(() => undefined);
     window.dispatchEvent(new Event("nutria-queue"));
     return { ok: true, queued: true };
   }

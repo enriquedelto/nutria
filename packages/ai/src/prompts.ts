@@ -83,6 +83,7 @@ Tarea: crear un plan de comidas semanal para el hogar.
 - Si se dan objetivos por día, ajusta las raciones a las kcal y la proteína de CADA día (los días de entreno llevan más kcal e hidratos) y procura que cada comida principal llegue a la proteína por toma indicada.
 - Cocina por lotes: elige 2–3 platos base que se cocinan una vez y se comen en 3–4 días. Respeta los días de nevera de cada receta y usa las congelables para los días más lejanos. Dilo en "why" (p. ej. «lote del domingo, 2.º día»).
 - Para quien quiere ganar peso: platos con mucha energía en poco volumen y baratos (más kcal y más proteína por euro: legumbres, arroz, pasta, avena, huevos, lácteos, aceite de oliva, frutos secos). Ningún día debe quedar por debajo del 90 % de sus kcal.
+- Platos que no son recetas guardadas: ingredientes con gramos por ración y estima kcalPerServing y proteinPerServing (valores realistas de BEDCA/USDA). Con eso se comprueba que cada día llega a su objetivo, así que cuadra las raciones con esas cifras.
 - Explica en "why" por qué encaja cada plato.`,
 
   weekly: `${BASE}

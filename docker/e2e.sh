@@ -21,12 +21,13 @@ free_gb="$(ssh "$HOST" 'df -BG --output=avail ~ | tail -1 | tr -dc 0-9')"
 if [ "${free_gb:-0}" -lt 10 ]; then echo "Solo quedan ${free_gb} GB libres en $HOST: la pasada E2E ocupa ~7 GB. Libera espacio antes."; exit 1; fi
 # Archivos versionados y nuevos que no están ignorados (lo mismo que verá el commit).
 git ls-files -co --exclude-standard -z | tar --null -T - -cf - | ssh "$HOST" 'rm -rf ~/nutria-e2e && mkdir -p ~/nutria-e2e && tar -x -C ~/nutria-e2e'
-AI_FILES=""
-if [ "${E2E_AI:-}" = 1 ]; then AI_FILES="--env-file ~/nutria/docker/.env -f compose.e2e.ai.yml"; fi
+ENV_FILE=""; AI_FILE=""
+# The AI override goes after the base file (later files win; the base says AI_BACKEND=mock).
+if [ "${E2E_AI:-}" = 1 ]; then ENV_FILE="--env-file ~/nutria/docker/.env"; AI_FILE="-f compose.e2e.ai.yml"; fi
 ssh "$HOST" "set -e; cd ~/nutria-e2e
-  nohup sh -c 'docker build -q -f docker/Dockerfile -t nutria-app:e2e --build-arg APP_VERSION=e2e . && cd docker &&
-    E2E_IMAGE=nutria-app:e2e docker compose $AI_FILES -f compose.e2e.yml down -v &&
-    E2E_IMAGE=nutria-app:e2e docker compose $AI_FILES -f compose.e2e.yml up -d; echo FIN \$?' > ~/nutria-e2e/e2e.log 2>&1 &"
+  nohup sh -c 'docker builder prune -f --max-used-space 6gb >/dev/null; docker build -q -f docker/Dockerfile -t nutria-app:e2e --build-arg APP_VERSION=e2e . && cd docker &&
+    E2E_IMAGE=nutria-app:e2e docker compose $ENV_FILE -f compose.e2e.yml $AI_FILE down -v &&
+    E2E_IMAGE=nutria-app:e2e docker compose $ENV_FILE -f compose.e2e.yml $AI_FILE up -d; echo FIN \$?' > ~/nutria-e2e/e2e.log 2>&1 &"
 echo "Construyendo nutria-app:e2e en $HOST (tail -f ~/nutria-e2e/e2e.log)…"
 ssh "$HOST" 'for i in $(seq 1 300); do grep -q "^FIN " ~/nutria-e2e/e2e.log 2>/dev/null && break; sleep 5; done
   grep -E "ERROR|error|^FIN " ~/nutria-e2e/e2e.log | tail -8

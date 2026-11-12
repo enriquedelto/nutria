@@ -93,14 +93,18 @@ test("planificador: cada día a ±10 % de las kcal objetivo", async () => {
 });
 
 test("informe semanal: menos de 90 s y con «Un cambio para esta semana»", async () => {
-  // Something to talk about: a meal logged with the real AI.
-  await page.goto("/registrar");
+  // Something to talk about: a meal logged with the real AI, inside the week the report covers
+  // (run on a Sunday it is this week; any other day, the one that ended last Sunday).
+  const now = new Date();
+  const sunday = new Date(now.getTime() - (now.getDay() === 0 ? 0 : now.getDay()) * 86_400_000);
+  const fecha = `${sunday.getFullYear()}-${String(sunday.getMonth() + 1).padStart(2, "0")}-${String(sunday.getDate()).padStart(2, "0")}`;
+  await page.goto(`/registrar?fecha=${fecha}`);
   await page.getByPlaceholder(/lentejas con chorizo/).fill("200 g de pechuga de pollo a la plancha con 150 g de arroz blanco");
   await page.getByRole("button", { name: "Analizar" }).click();
   await page.getByRole("button", { name: /^Registrar \d+ kcal/ }).click({ timeout: 120_000 });
   await expect(page.getByText(/registrad/i).first()).toBeVisible();
   // The report is a Sunday cron job: run its handler in the E2E worker and time it.
-  const out = execFileSync("ssh", [SSH_HOST, "cd ~/nutria-e2e/docker && E2E_IMAGE=nutria-app:e2e docker compose -f compose.e2e.yml exec -T worker pnpm -s --filter @nutria/worker job weekly.report"], { encoding: "utf8", timeout: 200_000 });
+  const out = execFileSync("ssh", [SSH_HOST, "cd ~/nutria-e2e/docker && E2E_IMAGE=nutria-app:e2e docker compose -f compose.e2e.yml exec -T worker pnpm -s --filter @nutria/worker job report.weekly"], { encoding: "utf8", timeout: 200_000 });
   const run = JSON.parse(out.trim().split("\n").at(-1)!) as { seconds: number; result: { reports: number } };
   console.log(`INFORME en ${run.seconds} s`);
   expect(run.result.reports).toBe(1);

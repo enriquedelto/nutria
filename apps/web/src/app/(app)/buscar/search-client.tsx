@@ -214,15 +214,16 @@ function QuickAdd({ ctx, onClose }: { ctx: DayContext; onClose: () => void }) {
           onSubmit={submitForm((fd) =>
             start(async () => {
               const num = (k: string) => Number(fd.get(k) || 0);
-              await sendOrQueue("/api/diary", {
+              const res = await sendOrQueue("/api/diary", {
                 personId: ctx.personId,
                 date: ctx.date,
                 mealSlot: String(fd.get("slot")),
                 origin: "quick",
                 items: [{ name: String(fd.get("name") || "Registro rápido"), grams: 0, absolute: { energy_kcal: num("kcal"), protein: num("p"), carbs: num("c"), fat: num("f") }, clientId: newClientId() }],
               });
-              toast.success("Añadido");
-              router.refresh();
+              toast.success(res.queued ? "Guardado sin conexión; se enviará luego" : "Añadido");
+              // Offline a refresh would force a full reload (and the offline page).
+              if (!res.queued) router.refresh();
               onClose();
             })
           )}

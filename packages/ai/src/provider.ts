@@ -495,7 +495,13 @@ export function defaultMockHandlers(): Record<string, MockHandler> {
       confidence: 0.9,
     }),
     pantry_photo: () => ({ items: [{ name: "Leche", quantity: 1, unit: "ud", location: "nevera", expiresInDays: 5 }] }),
-    meal_plan: () => ({ days: [], notes: "Plan simulado" }),
+    // One free-text dish (with the planner's estimate) on the first planned day.
+    meal_plan: (req) => {
+      const text = req.content.map((c) => (c.type === "text" ? c.text : "")).join(" ");
+      const from = text.match(/desde (\d{4}-\d{2}-\d{2})/)?.[1];
+      const meal = { mealSlot: "lunch", recipeId: null, title: "Lentejas con arroz (simulado)", ingredients: ["80 g de lentejas", "60 g de arroz"], kcalPerServing: 650, proteinPerServing: 32, servingsByPerson: [], prepMin: 40, why: "Plato simulado" };
+      return { days: from ? [{ date: from, meals: [meal] }] : [], notes: "Plan simulado" };
+    },
     weekly_report: () => ({ title: "Semana simulada", summaryMd: "Todo en orden (simulado).", highlights: ["Proteína cumplida 5 de 7 días"], suggestions: ["Pésate tres veces"], oneChange: "Añade un yogur con frutos secos a la merienda" }),
     substitutions: () => ({ options: [{ ingredient: "nata", substitute: "yogur griego", reason: "menos grasa", ratio: "1:1" }] }),
     what_to_eat: () => ({ options: [{ title: "Yogur con fruta", why: "Encaja con tus macros", items: [{ name: "Yogur natural", grams: 125 }] }] }),

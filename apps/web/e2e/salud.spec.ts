@@ -101,6 +101,24 @@ test.describe("casa", () => {
     await expect(page.locator("li").filter({ hasText: `Pechuga ${tag}` }).getByText("caduca en 3 días")).toBeVisible();
   });
 
+  test("planificador con IA (simulada): los platos sin receta cuentan en la cobertura del día", async () => {
+    // A week with no plan yet (flujo.spec.ts uses the current one).
+    const d = new Date();
+    d.setUTCDate(d.getUTCDate() + 14 - ((d.getUTCDay() + 6) % 7));
+    const week = d.toISOString().slice(0, 10);
+    await page.goto(`/planes?semana=${week}`);
+    await page.getByRole("button", { name: "Generar con IA" }).click();
+    const dialog = page.getByRole("dialog");
+    await dialog.getByRole("button", { name: "Proponer menú" }).click();
+    await expect(dialog.getByText("~650 kcal, 32 g P/ración")).toBeVisible();
+    await dialog.getByRole("button", { name: "Usar este menú" }).click();
+    await expect(page.getByText("1 platos añadidos al plan")).toBeVisible();
+    await expect(page.getByText("Lentejas con arroz (simulado)").first()).toBeVisible();
+    // 650 kcal and 32 g of protein (one serving), not 0 + "unknown".
+    // (Shown twice: desktop table and mobile list.)
+    await expect(page.getByText(/^650\/[\d.]+ kcal · P 32\/\d+ g$/).first()).toBeVisible();
+  });
+
   test("retos: crear uno, salir y volver, y recalcular logros", async () => {
     await page.goto("/retos");
     await page.getByRole("button", { name: "Nuevo reto" }).click();

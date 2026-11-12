@@ -609,6 +609,7 @@ function GenerateDialog({ week, personIds, slots, defaultSlots, members, recipes
                           <span className="text-xs text-ink-3">{slotLabel(m.mealSlot)} · </span>
                           <b className="font-medium">{m.title}</b> {m.recipeId && recipeIds.has(m.recipeId) ? <Badge tone="herb">receta</Badge> : null}
                           {m.prepMin ? <span className="num text-xs text-ink-3"> · {m.prepMin}′</span> : null}
+                          {!m.recipeId && m.kcalPerServing ? <span className="num text-xs text-ink-3"> · ~{Math.round(m.kcalPerServing)} kcal, {Math.round(m.proteinPerServing ?? 0)} g P/ración</span> : null}
                           <span className="block text-xs text-ink-3">
                             {m.servingsByPerson.map((s) => `${(names.get(s.personId) ?? "?").split(" ")[0]} ${s.servings}`).join(" · ")}
                             {m.why ? ` — ${m.why}` : ""}

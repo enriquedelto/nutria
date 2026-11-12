@@ -151,7 +151,7 @@ export async function applyPlanDraft(estimateId: string, weekStart: string, pers
   const { user, groupId } = await kitchenGuard();
   const [e] = await db().select().from(aiEstimates).where(and(eq(aiEstimates.id, uuid.parse(estimateId)), eq(aiEstimates.userId, user.id), eq(aiEstimates.kind, "meal_plan"))).limit(1);
   if (!e) throw new UserError("Propuesta no encontrada");
-  const draft = e.output as { days: { date: string; meals: { mealSlot: string; recipeId: string | null; title: string; ingredients: string[]; servingsByPerson: { personId: string; servings: number }[]; why: string }[] }[] };
+  const draft = e.output as { days: { date: string; meals: { mealSlot: string; recipeId: string | null; title: string; ingredients: string[]; kcalPerServing?: number | null; proteinPerServing?: number | null; servingsByPerson: { personId: string; servings: number }[]; why: string }[] }[] };
   const ps = (await plannable(user.id, groupId, z.array(uuid).parse(personIds))).map((p) => p.id);
   let [plan] = await db().select().from(mealPlans).where(and(eq(mealPlans.groupId, groupId), eq(mealPlans.weekStart, day.parse(weekStart)))).limit(1);
   if (!plan) [plan] = await db().insert(mealPlans).values({ groupId, weekStart, personIds: ps, status: "active", createdBy: user.id, aiEstimateId: e.id }).returning();
@@ -162,8 +162,10 @@ export async function applyPlanDraft(estimateId: string, weekStart: string, pers
   for (const d of draft.days)
     for (const [i, m] of d.meals.entries()) {
       if (taken.has(`${d.date}|${m.mealSlot}`)) continue;
-      const fromAi: PortionByPerson = Object.fromEntries(m.servingsByPerson.filter((s) => ps.includes(s.personId)).map((s) => [s.personId, { servings: s.servings }]));
-      const portions = m.recipeId && kcalOf.get(m.recipeId) ? await portionsFor(ps, d.date, m.mealSlot, kcalOf.get(m.recipeId)!) : Object.keys(fromAi).length ? fromAi : Object.fromEntries(ps.map((id) => [id, { servings: 1 }]));
+      // Free-text dishes keep the planner's estimate so the day's coverage can be checked against the target.
+      const est = (servings: number) => (!m.recipeId && m.kcalPerServing != null ? { kcal: Math.round(servings * m.kcalPerServing), protein: Math.round(servings * (m.proteinPerServing ?? 0)) } : {});
+      const fromAi: PortionByPerson = Object.fromEntries(m.servingsByPerson.filter((s) => ps.includes(s.personId)).map((s) => [s.personId, { servings: s.servings, ...est(s.servings) }]));
+      const portions = m.recipeId && kcalOf.get(m.recipeId) ? await portionsFor(ps, d.date, m.mealSlot, kcalOf.get(m.recipeId)!) : Object.keys(fromAi).length ? fromAi : Object.fromEntries(ps.map((id) => [id, { servings: 1, ...est(1) }]));
       const note = [m.why, ...(m.recipeId ? [] : m.ingredients.map((x) => `- ${x}`))].filter(Boolean).join("\n");
       await db().insert(mealPlanItems).values({ planId: plan!.id, date: d.date, mealSlot: m.mealSlot, recipeId: m.recipeId, title: m.title.slice(0, 200), note, portions, sortOrder: i });
       n++;

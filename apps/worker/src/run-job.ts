@@ -1,7 +1,7 @@
 /**
  * Run one job handler right now, in this process, and print its result and how long it took.
  * For checks by hand (weekly report with the real AI, the Monday check-in…):
- *   docker compose exec worker pnpm --filter @nutria/worker job weekly.report '{"personId":"<uuid>"}'
+ *   docker compose exec worker pnpm --filter @nutria/worker job report.weekly '{"personId":"<uuid>"}'
  * Anything the handler enqueues (webhooks, notifications) goes to the real queue.
  */
 import { PgBoss } from "pg-boss";

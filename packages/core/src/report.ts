@@ -87,7 +87,7 @@ export async function buildWeeklyReport(db: Database, personId: string, provider
   const end = addDays(start, 6);
   const extras = await weeklyReportExtras(db, personId, start);
   const r = await weeklyReport({ db, userId: p.userId, personId, scopes: FULL, provider }, start, extras);
-  if (!r.data.dias.length) return null;
+  if (!r) return null;
   const bodyMd = `${r.summaryMd}\n\n**Destacado**\n${r.highlights.map((h) => `- ${h}`).join("\n")}\n\n**Para la próxima semana**\n${r.suggestions.map((s) => `- ${s}`).join("\n")}`;
   await db.transaction(async (tx) => {
     await tx.delete(insights).where(and(eq(insights.personId, personId), eq(insights.kind, "weekly"), eq(insights.periodStart, start)));

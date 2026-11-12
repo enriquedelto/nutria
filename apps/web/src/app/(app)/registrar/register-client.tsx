@@ -172,6 +172,12 @@ export function RegisterClient({ ctx, aiEnabled, sharedImages, voice = false }: 
           : undefined,
         duration: 8000,
       });
+      if (res.queued) {
+        // Offline: stay here (navigating would force a full reload onto the offline page).
+        setEst(null);
+        setRows([]);
+        return;
+      }
       router.push(`/hoy`);
       router.refresh();
     });

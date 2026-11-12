@@ -114,7 +114,8 @@ export function AddFoodDialog({ foodId, ctx, defaultGrams, onClose, onAdded }: {
           items: [{ foodId: detail.food.id, grams, servingLabel: sv ? `${qty} × ${sv.label}` : null, servingQty: sv ? qty : null, clientId: newClientId() }],
         });
         toast.success(res.queued ? "Guardado sin conexión; se enviará luego" : `${detail.food.nameEs ?? detail.food.name} añadido`);
-        onAdded?.();
+        // Queued (offline): nothing changed on the server yet, and a refresh would force a full reload.
+        if (!res.queued) onAdded?.();
         onClose();
       } catch (e) {
         toast.error(errorText(e, "No se pudo añadir"));

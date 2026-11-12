@@ -611,7 +611,7 @@ describe("proteína y timing del entreno", () => {
 
 describe("informe semanal", () => {
   it("el domingo cubre la semana en curso, guarda «un cambio», avisa y prepara el webhook", async () => {
-    const { createProvider } = await import("@nutria/ai");
+    const { createProvider, MockProvider } = await import("@nutria/ai");
     const [p] = await db.select().from(persons).where(eq(persons.userId, "gym"));
     const pid = p!.id;
     expect(core.reportWeekStart("2027-03-07")).toBe("2027-03-01"); // Sunday → this week
@@ -636,8 +636,8 @@ describe("informe semanal", () => {
     expect((rows[0]!.data as { adherencia: unknown }).adherencia).toBeTruthy();
     const [n] = await db.select().from(notifications).where(eq(notifications.type, "weekly_report"));
     expect(n?.body).toMatch(/^Un cambio para esta semana: /);
-    // A week without diary days gives no report.
-    expect(await core.buildWeeklyReport(db, pid, createProvider("mock"), core.zonedTime("2028-01-02", "20:00", "Europe/Madrid"))).toBeNull();
+    // A week without diary days gives no report, without calling the AI (a provider with no answers would throw).
+    expect(await core.buildWeeklyReport(db, pid, new MockProvider({}), core.zonedTime("2028-01-02", "20:00", "Europe/Madrid"))).toBeNull();
   });
 });
 

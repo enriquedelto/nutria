@@ -134,7 +134,8 @@ export const mealPlans = pgTable(
   (t) => [index().on(t.groupId, t.weekStart)],
 );
 
-export type PortionByPerson = Record<string, { servings: number; grams?: number; kcal?: number }>;
+/** kcal/protein: totals for that person; for dishes without a recipe they are the AI planner's estimate. */
+export type PortionByPerson = Record<string, { servings: number; grams?: number; kcal?: number; protein?: number }>;
 
 export const mealPlanItems = pgTable(
   "meal_plan_items",
