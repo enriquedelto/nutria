@@ -1,7 +1,7 @@
-import zlib from "node:zlib";
-import { mkdirSync, writeFileSync } from "node:fs";
+import { mkdirSync, rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { expect, test, type Page } from "@playwright/test";
+import { ADMIN_STATE, whitePng } from "./helpers";
 
 /**
  * Recorrido principal (serial) sobre una instancia vacía con IA simulada:
@@ -18,6 +18,8 @@ let inviteLink = "";
 let adminPage: Page;
 
 test.beforeAll(async ({ browser }) => {
+  // A session left by an earlier run belongs to a database that no longer exists.
+  rmSync(ADMIN_STATE, { force: true });
   adminPage = await (await browser.newContext()).newPage();
 });
 
@@ -57,6 +59,8 @@ test("bienvenida: guardar el perfil calcula objetivos", async () => {
   await page.getByRole("link", { name: "Empezar" }).click();
   await expect(page).toHaveURL(/\/hoy/);
   await expect(page.getByText("Completa tu perfil")).toHaveCount(0);
+  // salud.spec.ts and later specs reuse this session.
+  await page.context().storageState({ path: ADMIN_STATE });
 });
 
 test("objetivos: «Recalcular» calcula con el perfil, también si estaban fijados", async () => {
@@ -190,6 +194,8 @@ test("registro por IA (simulada) llega al diario", async () => {
   await page.getByRole("button", { name: "Analizar" }).click();
   await expect(page.getByText("Tortilla de patatas").first()).toBeVisible();
   await page.getByRole("button", { name: /^Registrar \d+ kcal/ }).click();
+  // Wait for the save: navigating right away can cancel it.
+  await expect(page.getByText(/alimento\(s\) registrados/)).toBeVisible();
   await page.goto("/diario");
   await expect(page.getByText("Tortilla de patatas").first()).toBeVisible();
 });
@@ -270,25 +276,6 @@ test("explorar: filtros en la URL, ficha con su precio y a la compra", async () 
   await page.getByRole("button", { name: "A la compra" }).click();
   await expect(page.getByText("Quinoa ecológica Nutria en la lista de la compra")).toBeVisible();
 });
-
-/** Plain white RGB PNG (a real image, so the browser can decode and crop it). */
-function whitePng(w: number, h: number) {
-  const chunk = (type: string, data: Buffer) => {
-    const td = Buffer.concat([Buffer.from(type), data]);
-    const len = Buffer.alloc(4);
-    len.writeUInt32BE(data.length);
-    const crc = Buffer.alloc(4);
-    crc.writeUInt32BE(zlib.crc32(td));
-    return Buffer.concat([len, td, crc]);
-  };
-  const ihdr = Buffer.alloc(13);
-  ihdr.writeUInt32BE(w, 0);
-  ihdr.writeUInt32BE(h, 4);
-  ihdr.set([8, 2, 0, 0, 0], 8);
-  const row = Buffer.concat([Buffer.from([0]), Buffer.alloc(w * 3, 255)]);
-  const raw = Buffer.concat(Array.from({ length: h }, () => row));
-  return Buffer.concat([Buffer.from([137, 80, 78, 71, 13, 10, 26, 10]), chunk("IHDR", ihdr), chunk("IDAT", zlib.deflateSync(raw)), chunk("IEND", Buffer.alloc(0))]);
-}
 
 test("ticket: leer, revisar, guardar el precio y compartirlo en Open Prices", async () => {
   const page = adminPage;

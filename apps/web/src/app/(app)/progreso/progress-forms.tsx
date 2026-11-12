@@ -221,8 +221,13 @@ export function PhotoUpload({ personId, today }: { personId: string; today: stri
 }
 
 export function PhotoCompare({ photos }: { photos: { id: string; date: string; pose: string; kg?: number | null }[] }) {
-  const [a, setA] = useState(photos.at(-1)?.id ?? "");
-  const [b, setB] = useState(photos[0]?.id ?? "");
+  // Picked ids fall back to the oldest/newest photo: after the first upload the list arrives
+  // through router.refresh() and the initial (empty) state would otherwise stay empty.
+  const [pickedA, setA] = useState(photos.at(-1)?.id ?? "");
+  const [pickedB, setB] = useState(photos[0]?.id ?? "");
+  const has = (id: string) => photos.some((p) => p.id === id);
+  const a = has(pickedA) ? pickedA : (photos.at(-1)?.id ?? "");
+  const b = has(pickedB) ? pickedB : (photos[0]?.id ?? "");
   const router = useRouter();
   if (!photos.length) return <p className="text-sm text-ink-3">Sin fotos. Son privadas: solo tú (y quien tenga permiso de fotos) las ve.</p>;
   const opt = photos.map((p) => (

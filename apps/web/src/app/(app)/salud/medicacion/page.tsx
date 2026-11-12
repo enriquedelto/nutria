@@ -94,7 +94,7 @@ async function Content() {
                     </p>
                     <p className="text-xs text-ink-3">
                       {m.times.join(" · ") || "sin hora"}
-                      {m.daysOfWeek.length ? ` · ${m.daysOfWeek.map((d) => DAYS[d - 1]).join("")}` : " · todos los días"}
+                      {m.daysOfWeek.length && m.daysOfWeek.length < 7 ? ` · ${m.daysOfWeek.map((d) => DAYS[d - 1]).join("")}` : " · todos los días"}
                       {FOOD_ES[m.withFood ?? "any"] ? ` · ${FOOD_ES[m.withFood ?? "any"]}` : ""}
                       {m.endDate ? ` · hasta ${m.endDate.split("-").reverse().join("/")}` : ""}
                     </p>

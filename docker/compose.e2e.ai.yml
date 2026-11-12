@@ -1,0 +1,13 @@
+# E2E con la IA real (gasta la suscripción). Sin secretos: el token sale del .env de producción.
+#   E2E_AI=1 docker/e2e.sh   (añade --env-file ~/nutria/docker/.env -f compose.e2e.ai.yml)
+#   E2E_REAL_AI=1 pnpm --filter @nutria/web e2e e2e/ia-real.spec.ts
+x-ai: &ai
+  AI_BACKEND: subscription
+  CLAUDE_CODE_OAUTH_TOKEN: ${CLAUDE_CODE_OAUTH_TOKEN}
+
+services:
+  web:
+    environment: *ai
+  # The worker writes the weekly report (and the check-in) with the AI too.
+  worker:
+    environment: *ai

@@ -102,7 +102,6 @@ function createAuth() {
 
 type Auth = ReturnType<typeof createAuth>;
 declare global {
-   
   var __nutriaAuth: Auth | undefined;
 }
 

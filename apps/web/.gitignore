@@ -39,3 +39,6 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# Playwright: saved sessions (e2e/helpers.ts ADMIN_STATE) and output
+/playwright/.auth/

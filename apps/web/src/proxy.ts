@@ -5,7 +5,10 @@ import { getSessionCookie } from "better-auth/cookies";
  * Optimistic redirect only (cookie presence). Real authorization happens in the DAL
  * (`requireUser` / `requirePerson`) and in every route handler and server action.
  */
-const PUBLIC = [/^\/login/, /^\/registro/, /^\/invitacion/, /^\/api\/auth/, /^\/api\/hooks\//, /^\/api\/mcp/, /^\/api\/health/, /^\/offline/];
+const PUBLIC = [/^\/login/, /^\/registro/, /^\/invitacion/, /^\/api\/auth/, /^\/api\/hooks\//, /^\/api\/mcp/, /^\/api\/health/, /^\/offline/,
+  // Android share sheet: the route itself sends people without a session to the login (not a JSON 401).
+  /^\/api\/share-target$/,
+];
 
 /** Next 16 server action ids are 42 hex chars (SERVER_REFERENCE_ID_LENGTH); anything else is a probe. */
 const ACTION_ID = /^[0-9a-f]{42}$/i;

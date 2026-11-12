@@ -498,6 +498,8 @@ describe("deporte y suplementos", () => {
     expect(day1[0]).toMatchObject({ grams: 5, kcal: 0, servingLabel: "5 g" });
     let [st] = await core.supplementsForDate(db, personId, "2026-12-02");
     expect(st).toMatchObject({ code: "creatine", taken: true, streak: 2, doseLabel: "5 g" });
+    // time[] comes back as "HH:MM" (Postgres says "09:00:00"): the edit form re-sends it as is.
+    expect(st!.times).toEqual(["09:00"]);
     await core.untakeSupplement(db, personId, plan.id, "2026-12-02");
     [st] = await core.supplementsForDate(db, personId, "2026-12-02");
     expect(st).toMatchObject({ taken: false, streak: 1 });

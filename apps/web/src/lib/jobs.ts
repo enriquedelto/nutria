@@ -3,7 +3,6 @@ import { PgBoss } from "pg-boss";
 import type { JobName, JobPayloads } from "@nutria/core";
 
 declare global {
-   
   var __nutriaBoss: Promise<PgBoss> | undefined;
 }
 

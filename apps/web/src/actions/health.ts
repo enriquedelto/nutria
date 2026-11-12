@@ -241,7 +241,8 @@ const MedInput = z.object({
   activeIngredient: z.string().max(80).nullish(),
   dose: z.string().max(40).nullish(),
   times: z.array(z.string().regex(/^\d{2}:\d{2}$/)).max(8),
-  daysOfWeek: z.array(z.number().int().min(1).max(7)).max(7).default([]),
+  // Empty means every day (that is what the form says); stored explicitly so the dose generator sees it.
+  daysOfWeek: z.array(z.number().int().min(1).max(7)).max(7).default([]).transform((d) => (d.length ? [...new Set(d)].sort() : [1, 2, 3, 4, 5, 6, 7])),
   withFood: z.enum(["with", "without", "any"]).default("any"),
   startDate: day.nullish(),
   endDate: day.nullish(),

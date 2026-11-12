@@ -12,12 +12,11 @@ import {
   real,
   smallint,
   text,
-  time,
   timestamp,
   uniqueIndex,
   uuid,
 } from "drizzle-orm/pg-core";
-import { id, timestamps, type NutrientMap } from "./_shared";
+import { hhmm, id, timestamps, type NutrientMap } from "./_shared";
 import { user } from "./auth";
 import { groups, persons } from "./core";
 
@@ -161,7 +160,7 @@ export const mealSlots = pgTable(
       .references(() => persons.id, { onDelete: "cascade" }),
     key: text().notNull(), // "breakfast"
     label: text().notNull(),
-    defaultTime: time(),
+    defaultTime: hhmm(),
     sortOrder: integer().notNull().default(0),
     /** Share of daily kcal for plan portioning (0..1). */
     kcalShare: real(),
@@ -284,7 +283,7 @@ export const supplementSchedules = pgTable(
     dose: real().notNull().default(1),
     doseUnit: text().notNull().default("unidad"),
     gramsPerDose: real().notNull(),
-    times: time().array().notNull().default(sql`'{}'::time[]`),
+    times: hhmm().array().notNull().default(sql`'{}'::time[]`),
     daysOfWeek: smallint().array().notNull().default(sql`'{1,2,3,4,5,6,7}'::smallint[]`),
     active: boolean().notNull().default(true),
     autoLog: boolean().notNull().default(false),

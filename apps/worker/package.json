@@ -8,6 +8,7 @@
     "dev": "tsx watch src/main.ts",
     "ai:check": "tsx src/ai-check.ts",
     "ai:smoke": "tsx src/ai-smoke.ts",
+    "job": "tsx src/run-job.ts",
     "typecheck": "tsc -p tsconfig.json"
   },
   "dependencies": {

@@ -14,12 +14,11 @@ import {
   real,
   smallint,
   text,
-  time,
   timestamp,
   uniqueIndex,
   uuid,
 } from "drizzle-orm/pg-core";
-import { id, timestamps, type NutrientMap } from "./_shared";
+import { hhmm, id, timestamps, type NutrientMap } from "./_shared";
 import { persons } from "./core";
 
 /* ----------------------------- Targets & goals ---------------------------- */
@@ -373,7 +372,7 @@ export const medications = pgTable(
     /** Normalized substance code used to look up drug_food_interactions. */
     substanceCode: text(),
     dose: text(),
-    times: time().array().notNull().default(sql`'{}'::time[]`),
+    times: hhmm().array().notNull().default(sql`'{}'::time[]`),
     daysOfWeek: smallint().array().notNull().default(sql`'{1,2,3,4,5,6,7}'::smallint[]`),
     withFood: text(), // null | "fasting" | "with_food" | "after_food"
     startDate: date({ mode: "string" }),
