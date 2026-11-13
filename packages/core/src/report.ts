@@ -1,8 +1,8 @@
 /** Weekly coach report: gathers the week (adherence, bulk review, training, supplements, measurements) and stores it. */
-import { and, between, bodyMeasurements, diaryEntries, eq, exerciseLogs, gte, insights, persons, sql, type Database } from "@nutria/db";
+import { and, between, bodyMeasurements, dailySummaries, diaryEntries, eq, exerciseLogs, gte, insights, persons, sql, type Database } from "@nutria/db";
 import { weeklyReport, type AiProvider } from "@nutria/ai";
 import { ACCESS_SCOPES } from "@nutria/db";
-import { addDays, isoDow, mealProteinStatus, proteinDoseG, todayIn, weekStart, SITE_LABEL } from "@nutria/nutrition";
+import { addDays, countsForAverages, dayLogStatus, isoDow, mealProteinStatus, proteinDoseG, todayIn, weekStart, SITE_LABEL } from "@nutria/nutrition";
 import { latestBulkReview } from "./bulk";
 import { notify, webhooksFor } from "./notify";
 import { latestWeight, targetsForDate } from "./targets";
@@ -19,7 +19,7 @@ export function reportWeekStart(today: string) {
 export async function weeklyReportExtras(db: Database, personId: string, start: string) {
   const end = addDays(start, 6);
   const dates = Array.from({ length: 7 }, (_, i) => addDays(start, i));
-  const [targets, w, meals, workouts, sups, measures, bulk] = await Promise.all([
+  const [targets, w, meals, workouts, sups, measures, bulk, summaries] = await Promise.all([
     Promise.all(dates.map(async (d) => ({ date: d, t: await targetsForDate(db, personId, d) }))),
     latestWeight(db, personId),
     db
@@ -35,6 +35,10 @@ export async function weeklyReportExtras(db: Database, personId: string, start: 
       .groupBy(diaryEntries.name),
     db.select({ date: bodyMeasurements.date, site: bodyMeasurements.site, cm: bodyMeasurements.cm }).from(bodyMeasurements).where(and(eq(bodyMeasurements.personId, personId), gte(bodyMeasurements.date, addDays(start, -35)))).orderBy(bodyMeasurements.date),
     latestBulkReview(db, personId),
+    db
+      .select({ date: dailySummaries.date, kcal: dailySummaries.kcal, entries: dailySummaries.entries, complete: dailySummaries.complete, incomplete: dailySummaries.incomplete })
+      .from(dailySummaries)
+      .where(and(eq(dailySummaries.personId, personId), between(dailySummaries.date, start, end))),
   ]);
 
   const byDay = new Map<string, { kcal: number; protein: number }>();
@@ -42,11 +46,14 @@ export async function weeklyReportExtras(db: Database, personId: string, start: 
     const d = byDay.get(m.date) ?? { kcal: 0, protein: 0 };
     byDay.set(m.date, { kcal: d.kcal + m.kcal, protein: d.protein + m.protein });
   }
-  const logged = targets.filter((x) => x.t && byDay.has(x.date));
+  // Partly logged days (marked, or under half the target) would read as under-eating: leave them out.
+  const status = new Map(summaries.map((d) => [d.date, dayLogStatus(d, targets.find((x) => x.date === d.date)?.t?.kcal)]));
+  const partial = [...status].filter(([, st]) => st === "incomplete" || st === "suspect").map(([date]) => date).sort();
+  const logged = targets.filter((x) => x.t && byDay.has(x.date) && countsForAverages(status.get(x.date) ?? "normal"));
   const kcalOk = logged.filter((x) => Math.abs(byDay.get(x.date)!.kcal - x.t!.kcal) <= x.t!.kcal * 0.1).length;
   const proteinOk = logged.filter((x) => byDay.get(x.date)!.protein >= x.t!.protein * 0.9).length;
   const dose = w ? proteinDoseG(w.kg) : null;
-  const mainMeals = meals.filter((m) => ["breakfast", "lunch", "dinner"].includes(m.slot));
+  const mainMeals = meals.filter((m) => ["breakfast", "lunch", "dinner"].includes(m.slot) && !partial.includes(m.date));
 
   const sites = new Map<string, { first: number; last: number; n: number }>();
   for (const m of measures) {
@@ -58,6 +65,8 @@ export async function weeklyReportExtras(db: Database, personId: string, start: 
   return {
     adherencia: {
       diasRegistrados: byDay.size,
+      diasValidos: logged.length, // logged and trusted: the base of the two counts below
+      diasIncompletos: partial, // marked as partial or under half the target: not in averages
       diasEnKcal: kcalOk, // within ±10 % of that day's target
       diasConProteina: proteinOk, // ≥ 90 % of the target
       objetivoPorDia: targets.filter((x) => x.t).map((x) => ({ date: x.date, kcal: Math.round(x.t!.kcal), protein: Math.round(x.t!.protein), tipo: x.t!.dayKind === "training" ? "entreno" : x.t!.dayKind === "rest" ? "descanso" : null })),

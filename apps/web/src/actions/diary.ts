@@ -82,11 +82,14 @@ export async function undoAi(actionId: string) {
   return ok;
 }
 
-export async function setDayComplete(personId: string, day: string, complete: boolean) {
+/** Mark a day as fully logged, partly logged (left out of averages) or neither. */
+export async function setDayStatus(personId: string, day: string, status: "complete" | "incomplete" | null) {
   const u = await user();
   await assertAccess(u.id, personId, "diary", true);
-  await recomputeDay(db(), personId, day);
-  await db().update(dailySummaries).set({ complete }).where(and(eq(dailySummaries.personId, personId), eq(dailySummaries.date, day)));
+  const d = date.parse(day);
+  const s = z.enum(["complete", "incomplete"]).nullable().parse(status);
+  await recomputeDay(db(), personId, d);
+  await db().update(dailySummaries).set({ complete: s === "complete", incomplete: s === "incomplete" }).where(and(eq(dailySummaries.personId, personId), eq(dailySummaries.date, d)));
   refresh();
 }
 

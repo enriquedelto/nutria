@@ -1,5 +1,6 @@
 import { Suspense } from "react";
 import { and, asc, dailySummaries, eq, gte, sleepLogs } from "@nutria/db";
+import { trustedDaySql } from "@nutria/core";
 import { addDays, todayIn } from "@nutria/nutrition";
 import { SeriesChart } from "@/components/charts/weight-chart";
 import { SleepForm } from "@/components/health/forms";
@@ -23,7 +24,7 @@ async function Content() {
   const [logs, days] = await Promise.all([
     db().select().from(sleepLogs).where(and(eq(sleepLogs.personId, pid), gte(sleepLogs.date, from))).orderBy(asc(sleepLogs.date)),
     ctx.scopes.has("diary")
-      ? db().select({ date: dailySummaries.date, kcal: dailySummaries.kcal }).from(dailySummaries).where(and(eq(dailySummaries.personId, pid), gte(dailySummaries.date, from), gte(dailySummaries.entries, 1)))
+      ? db().select({ date: dailySummaries.date, kcal: dailySummaries.kcal }).from(dailySummaries).where(and(eq(dailySummaries.personId, pid), gte(dailySummaries.date, from), trustedDaySql()))
       : Promise.resolve([]),
   ]);
   const kcal = new Map(days.map((d) => [d.date, d.kcal]));

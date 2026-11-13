@@ -30,7 +30,7 @@ import {
   weightLogs,
   type Database,
 } from "@nutria/db";
-import { addDays, completeDerived, macroColumns, microGaps, missingFrom, round, scaleNutrients, type NutrientMap } from "@nutria/nutrition";
+import { addDays, completeDerived, countsForAverages, DAY_STATUS_LABEL, dayLogStatus, macroColumns, microGaps, missingFrom, round, scaleNutrients, type NutrientMap } from "@nutria/nutrition";
 import { buildPersonContext, mealSlotName, portionKey } from "./context";
 import { contextBlock, HEALTH_DISCLAIMER, PROMPTS } from "./prompts";
 import { getProvider } from "./provider";
@@ -353,7 +353,10 @@ export async function weeklyReport(c: PersonFeatureCtx, weekStartDate: string, e
   const days = await c.db.select().from(dailySummaries).where(and(eq(dailySummaries.personId, c.personId), between(dailySummaries.date, weekStartDate, end))).orderBy(asc(dailySummaries.date));
   // Nothing logged that week: no report, and no AI call (it would be thrown away).
   if (!days.length) return null;
-  const gaps = target ? microGaps(days.map((d) => d.nutrients), Object.fromEntries(Object.entries(target.micros).map(([k, v]) => [k, { min: v.min, max: v.max }]))) : [];
+  const status = new Map(days.map((d) => [d.date, dayLogStatus(d, target?.kcal)]));
+  // Partly logged days would show as gaps that are only missing entries.
+  const trusted = days.filter((d) => countsForAverages(status.get(d.date)!));
+  const gaps = target && trusted.length ? microGaps(trusted.map((d) => d.nutrients), Object.fromEntries(Object.entries(target.micros).map(([k, v]) => [k, { min: v.min, max: v.max }]))) : [];
   const body = c.scopes.has("body")
     ? {
         weights: await c.db.select({ date: weightLogs.date, kg: weightLogs.kg }).from(weightLogs).where(and(eq(weightLogs.personId, c.personId), gte(weightLogs.date, addDays(weekStartDate, -21)))).orderBy(asc(weightLogs.date)),
@@ -370,7 +373,7 @@ export async function weeklyReport(c: PersonFeatureCtx, weekStartDate: string, e
   const data = {
     semana: `${weekStartDate} – ${end}`,
     objetivo: target ? { kcal: target.kcal, protein: target.protein, carbs: target.carbs, fat: target.fat, fiber: target.fiber } : null,
-    dias: days.map((d) => ({ date: d.date, kcal: round(d.kcal, 0), protein: round(d.protein), carbs: round(d.carbs), fat: round(d.fat), fiber: round(d.fiber), entries: d.entries, upfKcalPct: d.upfKcalPct, quality: d.qualityScore })),
+    dias: days.map((d) => ({ date: d.date, estado: DAY_STATUS_LABEL[status.get(d.date)!], kcal: round(d.kcal, 0), protein: round(d.protein), carbs: round(d.carbs), fat: round(d.fat), fiber: round(d.fiber), entries: d.entries, upfKcalPct: d.upfKcalPct, quality: d.qualityScore })),
     carencias: gaps,
     cuerpo: body,
     salud: health,

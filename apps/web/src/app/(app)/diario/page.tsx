@@ -2,7 +2,7 @@ import { Suspense } from "react";
 import Link from "next/link";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import { and, dailySummaries, eq, gte, lte, mealFeelings } from "@nutria/db";
-import { addDays, dailyQualityScore, NOVA_MIN_COVERAGE, novaCoverage, NUTRIENTS, todayIn, upfKcalPct } from "@nutria/nutrition";
+import { addDays, dailyQualityScore, dayLogStatus, NOVA_MIN_COVERAGE, novaCoverage, NUTRIENTS, todayIn, upfKcalPct } from "@nutria/nutrition";
 import { MacroSummary } from "@/components/diary/macro-summary";
 import { MealCard } from "@/components/diary/meal-card";
 import { CaffeineCard } from "@/components/diary/caffeine-card";
@@ -30,7 +30,7 @@ async function Content({ searchParams }: { searchParams: Promise<Record<string, 
   const date = isDate(sp.fecha) ? sp.fecha : today;
   const [day, week, feelings, caffeine] = await Promise.all([
     getDay(ctx.person.id, date),
-    db().select({ date: dailySummaries.date, kcal: dailySummaries.kcal, complete: dailySummaries.complete }).from(dailySummaries).where(and(eq(dailySummaries.personId, ctx.person.id), gte(dailySummaries.date, addDays(date, -6)), lte(dailySummaries.date, addDays(date, 6)))),
+    db().select({ date: dailySummaries.date, kcal: dailySummaries.kcal, complete: dailySummaries.complete, incomplete: dailySummaries.incomplete }).from(dailySummaries).where(and(eq(dailySummaries.personId, ctx.person.id), gte(dailySummaries.date, addDays(date, -6)), lte(dailySummaries.date, addDays(date, 6)))),
     db().select().from(mealFeelings).where(and(eq(mealFeelings.personId, ctx.person.id), eq(mealFeelings.date, date))),
     caffeineDay(db(), ctx.person.id, date),
   ]);
@@ -46,6 +46,8 @@ async function Content({ searchParams }: { searchParams: Promise<Record<string, 
     { kcal: day.target?.kcal ?? 2000, fiber: day.target?.fiber ?? 25, salt: day.microTargets.salt?.max ?? 5, sat_fat: day.microTargets.sat_fat?.max, added_sugars: day.microTargets.added_sugars?.max },
   );
   const complete = byDate.get(date)?.complete ?? false;
+  const incomplete = byDate.get(date)?.incomplete ?? false;
+  const status = dayLogStatus({ kcal: day.totals.energy_kcal ?? 0, entries: day.entries.length, complete, incomplete }, day.target?.kcal);
 
   return (
     <>
@@ -98,6 +100,7 @@ async function Content({ searchParams }: { searchParams: Promise<Record<string, 
                 </Badge>
               ) : null}
               {complete ? <Badge tone="herb">Día completo</Badge> : null}
+              {incomplete ? <Badge tone="neutral">Día incompleto · fuera de las medias</Badge> : null}
             </div>
           </Card>
           {day.meals.map((m) => (
@@ -106,7 +109,12 @@ async function Content({ searchParams }: { searchParams: Promise<Record<string, 
               {m.entries.length && ctx.canWrite ? <FeelingButton personId={ctx.person.id} date={date} slot={m.key} current={feelings.find((f) => f.mealSlot === m.key) ?? null} /> : null}
             </div>
           ))}
-          {ctx.canWrite ? <DayActions personId={ctx.person.id} date={date} today={today} complete={complete} hasEntries={day.entries.length > 0} meals={day.meals.filter((m) => m.entries.length).map((m) => ({ key: m.key, label: m.label, items: m.entries.map((e) => ({ foodId: e.foodId ?? undefined, name: e.name, grams: e.grams, servingLabel: e.servingLabel ?? undefined })) }))} /> : null}
+          {status === "suspect" && date < today ? (
+            <p className="rounded-xl bg-paper-2 px-4 py-3 text-sm text-ink-2">
+              Este día tiene {n0(day.totals.energy_kcal ?? 0)} kcal, menos de la mitad de tu objetivo, así que no cuenta en las medias ni en el informe. Si de verdad comiste eso, márcalo como completo; si no, añade lo que falta o márcalo como incompleto.
+            </p>
+          ) : null}
+          {ctx.canWrite ? <DayActions personId={ctx.person.id} date={date} today={today} complete={complete} incomplete={incomplete} hasEntries={day.entries.length > 0} meals={day.meals.filter((m) => m.entries.length).map((m) => ({ key: m.key, label: m.label, items: m.entries.map((e) => ({ foodId: e.foodId ?? undefined, name: e.name, grams: e.grams, servingLabel: e.servingLabel ?? undefined })) }))} /> : null}
         </div>
 
         <div className="min-w-0 space-y-4">

@@ -1,9 +1,10 @@
 "use client";
 import { useEffect, useRef } from "react";
+import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { BookmarkPlus } from "lucide-react";
 import { toast } from "sonner";
-import { saveMealTemplate } from "@/actions/diary";
+import { saveMealTemplate, setDayStatus } from "@/actions/diary";
 import { Button } from "@/components/ui/button";
 import { useSafeTransition } from "@/lib/use-safe-transition";
 
@@ -55,6 +56,34 @@ export function TemplateSuggestion({ personId, slot, slotLabel, date, times, nam
       >
         <BookmarkPlus /> Guardar plantilla
       </Button>
+    </div>
+  );
+}
+
+/** Yesterday looks partly logged: ask, so averages and the report do not take it as under-eating. */
+export function YesterdayCheck({ personId, date, kcal }: { personId: string; date: string; kcal: number }) {
+  const [pending, start] = useSafeTransition();
+  const mark = (status: "complete" | "incomplete") =>
+    start(async () => {
+      await setDayStatus(personId, date, status);
+      toast.success(status === "complete" ? "Ayer, marcado como completo" : "Ayer, marcado como incompleto: no contará en las medias");
+    });
+  return (
+    <div className="rounded-card border border-dashed border-line bg-paper-2 px-4 py-3 text-sm">
+      <p>
+        Ayer registraste <strong className="num">{Math.round(kcal)} kcal</strong>, menos de la mitad de tu objetivo. ¿Fue un día completo?
+      </p>
+      <div className="mt-2 flex flex-wrap gap-2">
+        <Button size="sm" variant="outline" disabled={pending} onClick={() => mark("complete")}>
+          Sí, comí eso
+        </Button>
+        <Button size="sm" variant="outline" disabled={pending} onClick={() => mark("incomplete")}>
+          No, falta algo
+        </Button>
+        <Button size="sm" variant="ghost" asChild>
+          <Link href={`/diario?fecha=${date}`}>Añadir lo que falta</Link>
+        </Button>
+      </div>
     </div>
   );
 }

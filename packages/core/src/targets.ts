@@ -135,11 +135,12 @@ export async function adaptiveSnapshot(db: Database, personId: string, now = new
   const end = addDays(today, -1);
   const from = addDays(end, -45);
   const [days, weights] = await Promise.all([
-    db.select({ date: dailySummaries.date, kcal: dailySummaries.kcal, entries: dailySummaries.entries, complete: dailySummaries.complete }).from(dailySummaries).where(and(eq(dailySummaries.personId, personId), gte(dailySummaries.date, from))).orderBy(asc(dailySummaries.date)),
+    db.select({ date: dailySummaries.date, kcal: dailySummaries.kcal, entries: dailySummaries.entries, complete: dailySummaries.complete, incomplete: dailySummaries.incomplete }).from(dailySummaries).where(and(eq(dailySummaries.personId, personId), gte(dailySummaries.date, from))).orderBy(asc(dailySummaries.date)),
     db.select({ date: weightLogs.date, kg: weightLogs.kg }).from(weightLogs).where(and(eq(weightLogs.personId, personId), gte(weightLogs.date, from))).orderBy(asc(weightLogs.date)),
   ]);
   const byDate = new Map<string, { date: string; intakeKcal?: number | null; weightKg?: number | null; complete?: boolean }>();
-  for (const d of days) if (d.entries > 0) byDate.set(d.date, { date: d.date, intakeKcal: d.kcal, complete: d.complete });
+  // Days marked as partly logged say nothing about real intake (their weight still counts).
+  for (const d of days) if (d.entries > 0 && !d.incomplete) byDate.set(d.date, { date: d.date, intakeKcal: d.kcal, complete: d.complete });
   for (const w of weights) byDate.set(w.date, { ...(byDate.get(w.date) ?? { date: w.date }), weightKg: w.kg });
   const formula = computeMacroTargets(pp.profile);
   const r = adaptiveTdee([...byDate.values()], end, { formulaTdee: formula.tdee, bmr: bmr(pp.profile) });

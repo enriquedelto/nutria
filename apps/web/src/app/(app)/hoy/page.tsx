@@ -1,7 +1,7 @@
 import { Suspense } from "react";
 import Link from "next/link";
 import { Flame, Pill, Scale, Timer, Dumbbell, Footprints, FlaskConical } from "lucide-react";
-import { fastingStatus, todayIn } from "@nutria/nutrition";
+import { dayLogStatus, fastingStatus, todayIn } from "@nutria/nutrition";
 import { Card, CardHeader } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/empty";
 import { Badge } from "@/components/ui/badge";
@@ -12,7 +12,7 @@ import { Sparkline } from "@/components/charts/sparkline";
 import { DoseButton } from "@/components/health/dose-button";
 import { SupplementButton } from "@/components/health/supplement-button";
 import { TrainingCard } from "@/components/diary/training-card";
-import { QuickParam, TemplateSuggestion } from "@/components/diary/quick-bits";
+import { QuickParam, TemplateSuggestion, YesterdayCheck } from "@/components/diary/quick-bits";
 import { HOME_CARDS } from "@/lib/home-cards";
 import { getDay, getHomeExtras } from "@/lib/data/day";
 import { getPersonContext } from "@/lib/session";
@@ -42,6 +42,9 @@ async function Today() {
     entreno: extras.training ? <TrainingCard key="entreno" plan={extras.training} proteinLeft={day.target ? Math.round(day.target.protein - (day.totals.protein ?? 0)) : null} /> : null,
     comidas: (
       <div key="comidas" className="space-y-3 sm:col-span-2">
+        {ctx.canWrite && extras.yesterday && dayLogStatus(extras.yesterday, day.target?.kcal) === "suspect" ? (
+          <YesterdayCheck personId={ctx.person.id} date={extras.yesterday.date} kcal={extras.yesterday.kcal} />
+        ) : null}
         {ctx.canWrite && extras.templateSuggestion ? (
           <TemplateSuggestion personId={ctx.person.id} slot={extras.templateSuggestion.slot} slotLabel={slots.find((s) => s.key === extras.templateSuggestion!.slot)?.label ?? "Comida"} date={extras.templateSuggestion.date} times={extras.templateSuggestion.times} names={extras.templateSuggestion.names} />
         ) : null}

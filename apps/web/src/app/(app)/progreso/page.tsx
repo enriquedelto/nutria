@@ -1,7 +1,7 @@
 import { Suspense } from "react";
 import { AlertTriangle } from "lucide-react";
 import { and, asc, avg, bodyMeasurements, dailySummaries, desc, eq, goals, gte, persons, progressPhotos, targetSets, tdeeEstimates, weightLogs } from "@nutria/db";
-import { latestBulkReview } from "@nutria/core";
+import { latestBulkReview, trustedDaySql } from "@nutria/core";
 import { addDays, compositionSeries, continuous, daysBetween, daysToGoal, ffmiLabel, forecastWeight, MEASURE_SITES, SITE_LABEL, todayIn, trendWeights } from "@nutria/nutrition";
 import { WeightChart, type WeightPoint } from "@/components/charts/weight-chart";
 import Link from "next/link";
@@ -30,7 +30,7 @@ async function Content() {
     db().select().from(goals).where(and(eq(goals.personId, pid), eq(goals.status, "active"), eq(goals.type, "weight"))).limit(1),
     db().select().from(bodyMeasurements).where(eq(bodyMeasurements.personId, pid)).orderBy(desc(bodyMeasurements.date)).limit(400),
     ctx.scopes.has("photos") ? db().select().from(progressPhotos).where(eq(progressPhotos.personId, pid)).orderBy(desc(progressPhotos.date)) : Promise.resolve([]),
-    db().select({ kcal: avg(dailySummaries.kcal) }).from(dailySummaries).where(and(eq(dailySummaries.personId, pid), gte(dailySummaries.date, addDays(today, -14)), gte(dailySummaries.entries, 1))),
+    db().select({ kcal: avg(dailySummaries.kcal) }).from(dailySummaries).where(and(eq(dailySummaries.personId, pid), gte(dailySummaries.date, addDays(today, -14)), trustedDaySql())),
     db().select({ goal: persons.goalType, adjust: targetSets.kcalAdjust, sex: persons.sex, heightCm: persons.heightCm }).from(persons).leftJoin(targetSets, and(eq(targetSets.personId, persons.id), eq(targetSets.isDefault, true))).where(eq(persons.id, pid)).limit(1),
   ]);
   const bulk = me?.goal === "gain" ? await latestBulkReview(db(), pid) : null;

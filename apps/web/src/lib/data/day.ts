@@ -1,5 +1,5 @@
 import "server-only";
-import { and, asc, desc, diaryEntries, eq, exerciseLogs, fastingSessions, isNull, medicationDoses, medications, mealSlots, persons, sql, stepLogs, streaks, waterLogs, weightLogs } from "@nutria/db";
+import { and, asc, dailySummaries, desc, diaryEntries, eq, exerciseLogs, fastingSessions, isNull, medicationDoses, medications, mealSlots, persons, sql, stepLogs, streaks, waterLogs, weightLogs } from "@nutria/db";
 import { getSportProfile, latestWeight, supplementsForDate, targetsForDate, templateSuggestions, trainingDayPlan, waterGoalFor } from "@nutria/core";
 import { addDays, CORE_MICROS, computeMicroTargets, ageFromBirthDate, proteinDoseG, sumNutrients, todayIn, type NutrientMap } from "@nutria/nutrition";
 import { db } from "../db";
@@ -62,7 +62,7 @@ export type DayData = Awaited<ReturnType<typeof getDay>>;
 export async function getHomeExtras(personId: string, timezone: string, scopes: Set<string>) {
   const d = db();
   const today = todayIn(timezone);
-  const [weights, streak, fasting, meds, supplements, training, yesterdaySlots, suggestions] = await Promise.all([
+  const [weights, streak, fasting, meds, supplements, training, yesterdaySlots, suggestions, [yesterday]] = await Promise.all([
     scopes.has("body") ? d.select({ date: weightLogs.date, kg: weightLogs.kg }).from(weightLogs).where(eq(weightLogs.personId, personId)).orderBy(desc(weightLogs.date)).limit(14) : Promise.resolve([]),
     d.select().from(streaks).where(and(eq(streaks.personId, personId), eq(streaks.kind, "logging"))).limit(1),
     d.select().from(fastingSessions).where(and(eq(fastingSessions.personId, personId), isNull(fastingSessions.endedAt))).orderBy(desc(fastingSessions.startedAt)).limit(1),
@@ -78,6 +78,7 @@ export async function getHomeExtras(personId: string, timezone: string, scopes: 
     trainingDayPlan(d, personId),
     d.selectDistinct({ slot: diaryEntries.mealSlot }).from(diaryEntries).where(and(eq(diaryEntries.personId, personId), eq(diaryEntries.date, addDays(today, -1)), sql`${diaryEntries.origin} <> 'supplement'`)),
     templateSuggestions(d, personId, today),
+    d.select({ date: dailySummaries.date, kcal: dailySummaries.kcal, entries: dailySummaries.entries, complete: dailySummaries.complete, incomplete: dailySummaries.incomplete }).from(dailySummaries).where(and(eq(dailySummaries.personId, personId), eq(dailySummaries.date, addDays(today, -1)))).limit(1),
   ]);
-  return { today, training, yesterdaySlots: yesterdaySlots.map((y) => y.slot), templateSuggestion: suggestions[0] ?? null, weights: weights.reverse(), streak: streak[0] ?? null, fasting: fasting[0] ?? null, meds, supplements: supplements.filter((s) => s.scheduledToday || s.taken) };
+  return { today, training, yesterday: yesterday ?? null, yesterdaySlots: yesterdaySlots.map((y) => y.slot), templateSuggestion: suggestions[0] ?? null, weights: weights.reverse(), streak: streak[0] ?? null, fasting: fasting[0] ?? null, meds, supplements: supplements.filter((s) => s.scheduledToday || s.taken) };
 }

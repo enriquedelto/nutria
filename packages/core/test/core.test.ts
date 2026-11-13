@@ -8,6 +8,8 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import {
   aiEstimates,
   and,
+  gte,
+  lte,
   dailySummaries,
   diaryEntries,
   eq,
@@ -618,8 +620,13 @@ describe("informe semanal", () => {
     expect(core.reportWeekStart("2027-03-07")).toBe("2027-03-01"); // Sunday → this week
     expect(core.reportWeekStart("2027-03-08")).toBe("2027-03-01"); // Monday → last week
     await db.insert(webhooks).values({ userId: "gym", url: "https://example.com/hook", secretEnc: encrypt("s"), events: ["report.weekly"] });
+    // The only logged day has 138 kcal: well under half the target, so it does not count as eating little.
+    const partial = await core.weeklyReportExtras(db, pid, "2027-03-01");
+    expect(partial.adherencia).toMatchObject({ diasRegistrados: 1, diasValidos: 0, diasIncompletos: ["2027-03-01"], proteinaPorComida: null });
+    // Marked as complete by the person: it counts again.
+    await db.update(dailySummaries).set({ complete: true }).where(and(eq(dailySummaries.personId, pid), eq(dailySummaries.date, "2027-03-01")));
     const x = await core.weeklyReportExtras(db, pid, "2027-03-01");
-    expect(x.adherencia).toMatchObject({ diasRegistrados: 1, diasConProteina: 0 });
+    expect(x.adherencia).toMatchObject({ diasRegistrados: 1, diasValidos: 1, diasIncompletos: [], diasConProteina: 0 });
     expect(x.adherencia.objetivoPorDia).toHaveLength(7);
     expect(x.adherencia.proteinaPorComida).toMatchObject({ tomaIdealG: 29, comidasPrincipales: 1, llegan: 0 });
     expect(x.entrenos).toMatchObject({ sesiones: 1, minutos: 60 });
@@ -771,5 +778,27 @@ describe("curva de cafeína", () => {
     expect(day.trainingStart).toBeGreaterThan(17 * 60);
     await db.update(persons).set({ settings: { caffeine: { bedtime: "23:00", halfLifeH: 8 } } }).where(eq(persons.id, pid));
     expect(await core.caffeineDay(db, pid, D, at("2027-03-08", "10:00"))).toMatchObject({ bedtime: 1380, bedtimeSource: "manual", halfLifeH: 8 });
+  });
+});
+
+describe("días a medias", () => {
+  it("el filtro SQL coincide con la regla: fuera los marcados incompletos y los de menos de la mitad del objetivo", async () => {
+    const [p] = await db.select().from(persons).where(eq(persons.userId, "gym"));
+    const pid = p!.id;
+    const [t] = await db.select({ kcal: targetSets.kcal }).from(targetSets).where(and(eq(targetSets.personId, pid), eq(targetSets.isDefault, true)));
+    expect(t?.kcal).toBeGreaterThan(1000);
+    await db.insert(dailySummaries).values([
+      { personId: pid, date: "2027-09-01", kcal: t!.kcal, entries: 8 },
+      { personId: pid, date: "2027-09-02", kcal: 400, entries: 3 },
+      { personId: pid, date: "2027-09-03", kcal: t!.kcal, entries: 9, incomplete: true },
+      { personId: pid, date: "2027-09-04", kcal: 400, entries: 2, complete: true },
+      { personId: pid, date: "2027-09-05", kcal: 0, entries: 0 },
+    ]);
+    const rows = await db
+      .select({ date: dailySummaries.date })
+      .from(dailySummaries)
+      .where(and(eq(dailySummaries.personId, pid), gte(dailySummaries.date, "2027-09-01"), lte(dailySummaries.date, "2027-09-05"), core.trustedDaySql()))
+      .orderBy(dailySummaries.date);
+    expect(rows.map((r) => r.date)).toEqual(["2027-09-01", "2027-09-04"]);
   });
 });

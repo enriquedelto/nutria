@@ -13,6 +13,8 @@ import {
   novaCoverage,
   dailyQualityScore,
   upfKcalPct,
+  countsForAverages,
+  dayLogStatus,
 } from "../src";
 
 describe("cafeína en el cuerpo", () => {
@@ -78,5 +80,17 @@ describe("cobertura NOVA", () => {
     const withPartial = dailyQualityScore(partial, totals, { kcal: 2000 })!;
     const full = dailyQualityScore(partial.map((e) => ({ ...e, nova: e.nova ?? 4 })), totals, { kcal: 2000 })!;
     expect(withPartial).toBeGreaterThan(full);
+  });
+});
+
+describe("estado del día", () => {
+  it("vacío, marcado, dudoso y normal", () => {
+    expect(dayLogStatus({ kcal: 0, entries: 0 }, 2400)).toBe("empty");
+    expect(dayLogStatus({ kcal: 430, entries: 3 }, 2400)).toBe("suspect");
+    expect(dayLogStatus({ kcal: 430, entries: 3, complete: true }, 2400)).toBe("complete");
+    expect(dayLogStatus({ kcal: 2300, entries: 9, incomplete: true }, 2400)).toBe("incomplete");
+    expect(dayLogStatus({ kcal: 1600, entries: 9 }, 2400)).toBe("normal");
+    expect(dayLogStatus({ kcal: 430, entries: 3 }, null)).toBe("normal");
+    expect(["complete", "normal", "incomplete", "suspect", "empty"].map((s) => countsForAverages(s as never))).toEqual([true, true, false, false, false]);
   });
 });

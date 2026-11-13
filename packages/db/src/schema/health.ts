@@ -497,6 +497,8 @@ export const dailySummaries = pgTable(
     waterMl: integer().notNull().default(0),
     exerciseKcal: real().notNull().default(0),
     complete: boolean().notNull().default(false), // user marked day as fully logged
+    /** User marked the day as partly logged: left out of averages, adherence and the adaptive TDEE. */
+    incomplete: boolean().notNull().default(false),
     updatedAt: timestamp({ withTimezone: true }).notNull().defaultNow(),
   },
   (t) => [uniqueIndex("daily_summaries_pk").on(t.personId, t.date)],

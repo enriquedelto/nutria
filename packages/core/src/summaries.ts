@@ -1,6 +1,6 @@
 /** Daily aggregates (daily_summaries) — recomputed whenever the diary of a day changes. */
-import { and, dailySummaries, diaryEntries, eq, exerciseLogs, targetSets, waterLogs, sql, type Database } from "@nutria/db";
-import { dailyQualityScore, macroColumns, NOVA_MIN_COVERAGE, novaCoverage, roundMap, sumNutrients, upfKcalPct } from "@nutria/nutrition";
+import { and, dailySummaries, diaryEntries, eq, exerciseLogs, targetSets, waterLogs, sql, type SQL, type Database } from "@nutria/db";
+import { dailyQualityScore, macroColumns, NOVA_MIN_COVERAGE, SUSPECT_DAY_SHARE, novaCoverage, roundMap, sumNutrients, upfKcalPct } from "@nutria/nutrition";
 
 export async function recomputeDay(db: Database, personId: string, date: string) {
   const entries = await db
@@ -32,4 +32,12 @@ export async function recomputeDay(db: Database, personId: string, date: string)
     .values(row)
     .onConflictDoUpdate({ target: [dailySummaries.personId, dailySummaries.date], set: { ...row, updatedAt: new Date() } });
   return row;
+}
+
+/**
+ * SQL filter for daily summaries whose intake can be trusted (same rule as `dayLogStatus`): logged,
+ * not marked as partial, and either marked complete or at least half the default kcal target.
+ */
+export function trustedDaySql(): SQL {
+  return sql`(${dailySummaries.entries} > 0 and not ${dailySummaries.incomplete} and (${dailySummaries.complete} or ${dailySummaries.kcal} >= ${sql.raw(String(SUSPECT_DAY_SHARE))} * coalesce((select t.kcal from ${targetSets} t where t.person_id = ${dailySummaries.personId} and t.is_default limit 1), 0)))`;
 }

@@ -19,3 +19,4 @@ export * from "./bulk";
 export * from "./timing";
 export * from "./body";
 export * from "./caffeine";
+export * from "./day-status";

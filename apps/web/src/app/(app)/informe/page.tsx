@@ -2,7 +2,7 @@ import { Suspense } from "react";
 import Link from "next/link";
 import { and, asc, dailySummaries, desc, eq, gte, lte, professionalNotes, symptomLogs, user, weightLogs } from "@nutria/db";
 import { targetsForDate } from "@nutria/core";
-import { todayIn } from "@nutria/nutrition";
+import { countsForAverages, dayLogStatus, todayIn, type DayLogStatus } from "@nutria/nutrition";
 import { Button } from "@/components/ui/button";
 import { Empty, Skeleton } from "@/components/ui/empty";
 import { db } from "@/lib/db";
@@ -17,6 +17,7 @@ const shift = (d: string, n: number) => {
   x.setUTCDate(x.getUTCDate() + n);
   return x.toISOString().slice(0, 10);
 };
+const STATUS_MARK: Record<DayLogStatus, string> = { complete: "✓", incomplete: "½", suspect: "?", normal: "", empty: "" };
 const avg = (xs: number[]) => (xs.length ? xs.reduce((a, b) => a + b, 0) / xs.length : 0);
 
 async function Content({ searchParams }: { searchParams: PageProps<"/informe">["searchParams"] }) {
@@ -33,7 +34,10 @@ async function Content({ searchParams }: { searchParams: PageProps<"/informe">["
     ctx.scopes.has("health") ? db().select().from(symptomLogs).where(and(eq(symptomLogs.personId, id), gte(symptomLogs.date, from), lte(symptomLogs.date, to))).orderBy(asc(symptomLogs.date)) : [],
     db().select({ body: professionalNotes.bodyMd, date: professionalNotes.createdAt, author: user.name }).from(professionalNotes).innerJoin(user, eq(user.id, professionalNotes.authorId)).where(eq(professionalNotes.personId, id)).orderBy(desc(professionalNotes.createdAt)).limit(5),
   ]);
-  const logged = days.filter((d) => d.entries > 0);
+  const status = new Map(days.map((d) => [d.date, dayLogStatus(d, target?.kcal)]));
+  // Averages only with trusted days: partly logged ones (marked, or under half the target) would read as under-eating.
+  const logged = days.filter((d) => countsForAverages(status.get(d.date)!));
+  const partial = days.filter((d) => ["incomplete", "suspect"].includes(status.get(d.date)!));
   const macro = { kcal: avg(logged.map((d) => d.kcal)), protein: avg(logged.map((d) => d.protein)), carbs: avg(logged.map((d) => d.carbs)), fat: avg(logged.map((d) => d.fat)), fiber: avg(logged.map((d) => d.fiber)) };
   const micros = Object.entries(target?.micros ?? {})
     .filter(([, t]) => t.min || t.max)
@@ -66,14 +70,21 @@ async function Content({ searchParams }: { searchParams: PageProps<"/informe">["
       <header className="border-b border-line pb-3">
         <h1 className="font-display text-2xl font-semibold">Informe de alimentación · {ctx.person.name}</h1>
         <p className="text-ink-2">
-          Del {dateLong(from)} al {dateLong(to)} · {logged.length} de {days.length || Math.round((Date.parse(to) - Date.parse(from)) / 86_400_000) + 1} días con registro
+          Del {dateLong(from)} al {dateLong(to)} · {days.filter((d) => d.entries > 0).length} de {Math.round((Date.parse(to) - Date.parse(from)) / 86_400_000) + 1} días con registro
+          {partial.length ? ` · ${partial.length} a medias, fuera de las medias` : ""}
         </p>
       </header>
 
       {!logged.length ? (
-        <Empty title="No hay comidas registradas en estas fechas" className="no-print">
-          <p>Elige otro rango arriba o registra unos días en el diario: las medias salen solo de los días con registro.</p>
-        </Empty>
+        partial.length ? (
+          <Empty title="Ningún día registrado entero en estas fechas" className="no-print">
+            <p>Los días a medias no cuentan en las medias. Márcalos como completos en el diario si de verdad comiste eso, o elige otro rango.</p>
+          </Empty>
+        ) : (
+          <Empty title="No hay comidas registradas en estas fechas" className="no-print">
+            <p>Elige otro rango arriba o registra unos días en el diario: las medias salen solo de los días con registro.</p>
+          </Empty>
+        )
       ) : null}
 
       <section>
@@ -156,7 +167,7 @@ async function Content({ searchParams }: { searchParams: PageProps<"/informe">["
             {days.map((d) => (
               <tr key={d.date} className="border-b border-line/60">
                 <td className="py-1">
-                  {dateShort(d.date)} {d.complete ? "✓" : ""}
+                  {dateShort(d.date)} {STATUS_MARK[status.get(d.date)!]}
                 </td>
                 <td className="text-right">{n0(d.kcal)}</td>
                 <td className="text-right">{n0(d.protein)}</td>
@@ -168,7 +179,7 @@ async function Content({ searchParams }: { searchParams: PageProps<"/informe">["
             ))}
           </tbody>
         </table>
-        <p className="mt-1 text-xs text-ink-3">✓ = día marcado como registrado por completo.</p>
+        <p className="mt-1 text-xs text-ink-3">✓ = marcado como completo · ½ = marcado como incompleto · ? = menos de la mitad del objetivo sin marcar. Los días ½ y ? no cuentan en las medias.</p>
       </section>
 
       {weights.length ? (

@@ -2,9 +2,9 @@
 import { submitForm } from "@/lib/forms";
 import { useState } from "react";
 import { useSafeTransition } from "@/lib/use-safe-transition";
-import { CheckCircle2, Copy, Save, Smile } from "lucide-react";
+import { CheckCircle2, CircleDashed, Copy, Save, Smile } from "lucide-react";
 import { toast } from "sonner";
-import { copyMealTo, saveTemplate, setDayComplete } from "@/actions/diary";
+import { copyMealTo, saveTemplate, setDayStatus } from "@/actions/diary";
 import { logFeeling } from "@/actions/health";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent } from "@/components/ui/dialog";
@@ -14,7 +14,7 @@ import { plural } from "@/lib/format";
 
 type TemplateItem = { foodId?: string; name: string; grams: number; servingLabel?: string };
 
-export function DayActions({ personId, date, today, complete, hasEntries, meals }: { personId: string; date: string; today: string; complete: boolean; hasEntries: boolean; meals: { key: string; label: string; items: TemplateItem[] }[] }) {
+export function DayActions({ personId, date, today, complete, incomplete, hasEntries, meals }: { personId: string; date: string; today: string; complete: boolean; incomplete: boolean; hasEntries: boolean; meals: { key: string; label: string; items: TemplateItem[] }[] }) {
   const [pending, start] = useSafeTransition();
   const [tpl, setTpl] = useState(false);
   return (
@@ -24,9 +24,14 @@ export function DayActions({ personId, date, today, complete, hasEntries, meals 
           <Copy /> Copiar día a hoy
         </Button>
       ) : null}
-      <Button variant={complete ? "soft" : "outline"} disabled={pending} onClick={() => start(() => setDayComplete(personId, date, !complete))} title="Ayuda a estimar tu gasto real: los días marcados como completos pesan más">
+      <Button variant={complete ? "soft" : "outline"} disabled={pending} aria-pressed={complete} onClick={() => start(() => setDayStatus(personId, date, complete ? null : "complete"))} title="Ayuda a estimar tu gasto real: los días marcados como completos pesan más">
         <CheckCircle2 /> {complete ? "Día completo" : "Marcar día completo"}
       </Button>
+      {hasEntries ? (
+        <Button variant={incomplete ? "soft" : "ghost"} disabled={pending} aria-pressed={incomplete} onClick={() => start(() => setDayStatus(personId, date, incomplete ? null : "incomplete"))} title="No registraste todo: el día no cuenta en medias, informe ni gasto estimado">
+          <CircleDashed /> {incomplete ? "Día incompleto" : "Marcar incompleto"}
+        </Button>
+      ) : null}
       {meals.length ? (
         <Button variant="ghost" onClick={() => setTpl(true)}>
           <Save /> Guardar como plantilla

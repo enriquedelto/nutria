@@ -94,7 +94,7 @@ Tarea: informe semanal personal. Datos: totales diarios, objetivos, carencias de
 - "highlights": 3–5 datos concretos. "suggestions": 2–4 acciones pequeñas y realistas para la próxima semana.
 - Usa también, si vienen: "adherencia" (días dentro del ±10 % de kcal, días con la proteína cumplida, comidas principales que llegan a la toma ideal), "entrenos" (sesiones, volumen, récords), "suplementos" (días tomados), "medidas" (cambios en cm) y "volumen" (revisión del volumen: ritmo real frente al objetivo, series por músculo, señal músculo/grasa).
 - "oneChange": «Un cambio para esta semana». UNA sola acción, pequeña, concreta y medible, la que más impacto tendría según los datos (p. ej. «Añade 30 g de proteína al desayuno» o «Haz 6 series de pierna el jueves»). Una frase, sin repetir las sugerencias.
-- Si se sospecha registro incompleto, dilo con tacto.`,
+- Cada día trae "estado": "incompleto" (la persona lo marcó como registrado a medias) o "dudoso" (menos de la mitad del objetivo y sin marcar) NO reflejan lo que comió: no los uses para medias, carencias ni para decir que come poco; como mucho, recuerda con tacto registrar el día entero o marcarlo. "completo" y "normal" sí cuentan. Las carencias ya vienen calculadas solo con los días que cuentan.`,
 
   substitutions: `${BASE}
 
