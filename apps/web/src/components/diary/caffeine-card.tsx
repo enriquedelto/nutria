@@ -1,5 +1,6 @@
 "use client";
 import { useMemo, useState } from "react";
+import Link from "next/link";
 import { Coffee } from "lucide-react";
 import { toast } from "sonner";
 import {
@@ -90,7 +91,10 @@ export function CaffeineCard({ personId, day, canEdit }: { personId: string; day
             <span className="text-ink-2">
               {" "}
               Con {plan.suggestedMg} mg (3 mg/kg) a esa hora te quedaría demasiada al acostarte: para tomar esa dosis sin afectar al sueño, el entreno tendría que empezar antes de las{" "}
-              <span className="num font-medium">{minutesToClock(Math.floor(trainBy / 5) * 5)}</span>.
+              <span className="num font-medium">{minutesToClock(Math.floor(trainBy / 5) * 5)}</span>.{" "}
+              <Link href="/salud/ejercicio#hora-entreno" className="text-herb underline">
+                Mejor hora para entrenar
+              </Link>
             </span>
           ) : null}
         </p>

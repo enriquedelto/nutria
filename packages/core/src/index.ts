@@ -25,3 +25,4 @@ export * from "./templates";
 export * from "./health-import";
 export * from "./disk";
 export * from "./meal-timing";
+export * from "./training-time";

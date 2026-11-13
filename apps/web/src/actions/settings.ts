@@ -16,7 +16,7 @@ import {
   webhooks,
   weightLogs,
 } from "@nutria/db";
-import { todayIn } from "@nutria/nutrition";
+import { todayIn, parseGymHours } from "@nutria/nutrition";
 import { audit, latestWeight, missingProfileFields, notify, pairOpenGym, saveSportProfile, syncOpenGym, WEBHOOK_EVENTS } from "@nutria/core";
 import { encrypt, newToken } from "@nutria/integrations";
 import { db } from "@/lib/db";
@@ -91,13 +91,17 @@ const Sport = z.object({
   trainingDaysSource: z.enum(["manual", "opengym"]),
   cycleCarbs: z.boolean(),
   waterAuto: z.boolean(),
+  gymHours: z
+    .array(z.object({ from: z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/), to: z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/) }).refine((w) => w.from < w.to, "El tramo debe acabar después de empezar"))
+    .max(4)
+    .default([]),
 });
 
 /** Sport profile = config of the "athlete" condition; recalculates the targets. */
 export async function saveSport(personId: string, input: z.input<typeof Sport>) {
   await manage(personId);
   const { active, ...v } = Sport.parse(input);
-  await saveSportProfile(db(), personId, active, { ...v, trainingDays: [...new Set(v.trainingDays)].sort(), proteinPerKg: Math.round(v.proteinPerKg * 10) / 10 });
+  await saveSportProfile(db(), personId, active, { ...v, trainingDays: [...new Set(v.trainingDays)].sort(), proteinPerKg: Math.round(v.proteinPerKg * 10) / 10, gymHours: parseGymHours(v.gymHours) });
   await recomputeTargetsSafe(personId);
   refresh();
 }

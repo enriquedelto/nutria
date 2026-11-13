@@ -21,3 +21,4 @@ export * from "./body";
 export * from "./caffeine";
 export * from "./day-status";
 export * from "./meal-timing";
+export * from "./training-time";

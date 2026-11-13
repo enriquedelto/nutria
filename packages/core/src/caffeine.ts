@@ -1,5 +1,5 @@
 /** Data for the caffeine curve of a day: doses with their time, training start and bedtime. */
-import { and, diaryEntries, eq, exerciseLogs, gte, inArray, isNotNull, lte, mealSlots, persons, sleepLogs, type Database } from "@nutria/db";
+import { and, diaryEntries, eq, exerciseLogs, gte, inArray, isNotNull, lte, mealSlots, persons, sleepLogs, type Database, type PersonSettings } from "@nutria/db";
 import {
   addDays,
   CAFFEINE_DEFAULT_HALF_LIFE_H,
@@ -54,6 +54,27 @@ export async function usualBedtime(db: Database, personId: string, timeZone: str
   const shifted = rows.map((r) => minutesToClock(bedMinutes(local(r.bedtime!, timeZone).time) - 720));
   const med = medianTime(shifted);
   return med ? minutesToClock(clockToMinutes(med) + 720) : null;
+}
+
+/** Bedtime and half-life for caffeine maths: the person's own setting, else data, else defaults. */
+export function caffeinePrefs(p: { settings: PersonSettings | null; pregnancy: string | null } | null, usualBed: string | null) {
+  const manualBed = p?.settings?.caffeine?.bedtime;
+  const manualHalf = p?.settings?.caffeine?.halfLifeH;
+  return {
+    bedtime: bedMinutes(manualBed ?? usualBed ?? "23:30"),
+    bedtimeSource: (manualBed ? "manual" : usualBed ? "sleep" : "default") as CaffeineDay["bedtimeSource"],
+    halfLifeH: manualHalf ?? (p?.pregnancy ? CAFFEINE_PREGNANCY_HALF_LIFE_H : CAFFEINE_DEFAULT_HALF_LIFE_H),
+    halfLifeSource: (manualHalf ? "manual" : p?.pregnancy ? "pregnancy" : "default") as CaffeineDay["halfLifeSource"],
+  };
+}
+
+/** Usual wake-up time (median of the last 30 nights). */
+export async function usualWakeTime(db: Database, personId: string, timeZone: string, today: string): Promise<string | null> {
+  const rows = await db
+    .select({ wake: sleepLogs.wakeTime })
+    .from(sleepLogs)
+    .where(and(eq(sleepLogs.personId, personId), gte(sleepLogs.date, addDays(today, -30)), lte(sleepLogs.date, today), isNotNull(sleepLogs.wakeTime)));
+  return medianTime(rows.map((r) => local(r.wake!, timeZone).time));
 }
 
 export interface CaffeineDoseRow extends CaffeineDose {
@@ -120,17 +141,5 @@ export async function caffeineDay(db: Database, personId: string, date: string, 
     trainingSource = usual ? "usual" : "default";
   }
 
-  const manualBed = p?.settings?.caffeine?.bedtime;
-  const manualHalf = p?.settings?.caffeine?.halfLifeH;
-  return {
-    date,
-    doses,
-    trainingStart,
-    trainingSource,
-    bedtime: bedMinutes(manualBed ?? bedUsual ?? "23:30"),
-    bedtimeSource: manualBed ? "manual" : bedUsual ? "sleep" : "default",
-    halfLifeH: manualHalf ?? (p?.pregnancy ? CAFFEINE_PREGNANCY_HALF_LIFE_H : CAFFEINE_DEFAULT_HALF_LIFE_H),
-    halfLifeSource: manualHalf ? "manual" : p?.pregnancy ? "pregnancy" : "default",
-    weightKg: weight?.kg ?? null,
-  };
+  return { date, doses, trainingStart, trainingSource, ...caffeinePrefs(p ?? null, bedUsual), weightKg: weight?.kg ?? null };
 }

@@ -3,11 +3,11 @@ import { errorText } from "@/lib/errors";
 import Link from "next/link";
 import { useState } from "react";
 import { useSafeTransition } from "@/lib/use-safe-transition";
-import { Dumbbell } from "lucide-react";
+import { Dumbbell, Plus, X } from "lucide-react";
 import { toast } from "sonner";
 import { saveSport } from "@/actions/settings";
 import { Button } from "@/components/ui/button";
-import { Field, Select } from "@/components/ui/input";
+import { Field, Input, Select } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
 
 export type SportValues = {
@@ -19,6 +19,7 @@ export type SportValues = {
   trainingDaysSource: "manual" | "opengym";
   cycleCarbs: boolean;
   waterAuto: boolean;
+  gymHours: { from: string; to: string }[];
 };
 
 const DAYS = ["L", "M", "X", "J", "V", "S", "D"];
@@ -115,6 +116,26 @@ export function SportForm({ personId, initial, openGymDays, weightKg }: { person
               {openGymDays.length && !sameAsOpenGym ? (
                 <Button type="button" size="sm" variant="ghost" onClick={() => setV((x) => ({ ...x, trainingDays: openGymDays, trainingDaysSource: "opengym" }))}>
                   Usar los de openGym ({openGymDays.map((d) => DAYS[d - 1]).join(" ")})
+                </Button>
+              ) : null}
+            </div>
+          </Field>
+
+          <Field label="Horario del gimnasio" hint="Con él te digo a qué hora te conviene entrenar (cafeína sin afectar al sueño y comida previa a tiempo). Lo ves en Salud › Ejercicio.">
+            <div className="space-y-2">
+              {v.gymHours.map((w, i) => (
+                <div key={i} className="flex items-center gap-2">
+                  <Input type="time" aria-label={`Abre (tramo ${i + 1})`} value={w.from} onChange={(e) => set("gymHours", v.gymHours.map((x, j) => (j === i ? { ...x, from: e.target.value } : x)))} className="w-32" />
+                  <span className="text-ink-3">a</span>
+                  <Input type="time" aria-label={`Cierra (tramo ${i + 1})`} value={w.to} onChange={(e) => set("gymHours", v.gymHours.map((x, j) => (j === i ? { ...x, to: e.target.value } : x)))} className="w-32" />
+                  <Button type="button" size="icon-sm" variant="ghost" aria-label={`Quitar tramo ${i + 1}`} onClick={() => set("gymHours", v.gymHours.filter((_, j) => j !== i))}>
+                    <X />
+                  </Button>
+                </div>
+              ))}
+              {v.gymHours.length < 4 ? (
+                <Button type="button" size="sm" variant="outline" onClick={() => set("gymHours", [...v.gymHours, v.gymHours.length ? { from: "17:00", to: "22:00" } : { from: "09:00", to: "14:00" }])}>
+                  <Plus /> Añadir tramo
                 </Button>
               ) : null}
             </div>

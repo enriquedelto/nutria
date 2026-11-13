@@ -846,3 +846,18 @@ describe("comida y entreno", () => {
     expect(h.meals.some((m) => m.carbs === 70 && m.protein === 38)).toBe(true);
   });
 });
+
+describe("mejor hora para entrenar", () => {
+  it("usa el horario del gimnasio, el peso y el sueño; sin horario no hay plan", async () => {
+    const [p] = await db.select().from(persons).where(eq(persons.userId, "gym"));
+    const pid = p!.id;
+    const now = core.zonedTime("2027-11-10", "10:00", p!.timezone);
+    expect((await core.trainingTimeContext(db, pid, now)).plan).toBeNull();
+    await core.saveSportProfile(db, pid, true, { gymHours: [{ from: "17:00", to: "22:00" }, { from: "09:30", to: "13:30" }] });
+    const c = await core.trainingTimeContext(db, pid, now);
+    expect(c.gymHours[0]).toEqual({ from: "09:30", to: "13:30" }); // sorted
+    expect(c.plan?.perWindow).toHaveLength(2);
+    expect(c.plan!.best!.start).toBeLessThan(13 * 60 + 30);
+    expect(c.plan!.perWindow[1]!.caffeine.fits).toBe(false);
+  });
+});

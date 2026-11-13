@@ -68,6 +68,7 @@ async function Content() {
             trainingDaysSource: sp.trainingDaysSource ?? (ogDays.length ? "opengym" : "manual"),
             cycleCarbs: sport.exists ? !!sp.cycleCarbs : true,
             waterAuto: sport.exists ? !!sp.waterAuto : true,
+            gymHours: sp.gymHours ?? [],
           }}
         />
       </Card>

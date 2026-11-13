@@ -26,6 +26,20 @@ export interface SportProfile {
   cycleCarbs?: boolean;
   /** Water goal from body weight + training time instead of the fixed setting. */
   waterAuto?: boolean;
+  /** Gym opening hours ("HH:MM"), same every day: used to suggest the best time to train. */
+  gymHours?: { from: string; to: string }[];
+}
+
+const HHMM = /^([01]\d|2[0-3]):[0-5]\d$/;
+/** Valid, ordered, non-empty ranges (at most 4). */
+export function parseGymHours(v: unknown): { from: string; to: string }[] | undefined {
+  if (!Array.isArray(v)) return undefined;
+  const out = v
+    .filter((w): w is { from: string; to: string } => !!w && HHMM.test(String(w.from)) && HHMM.test(String(w.to)) && String(w.from) < String(w.to))
+    .map((w) => ({ from: w.from, to: w.to }))
+    .sort((a, b) => a.from.localeCompare(b.from))
+    .slice(0, 4);
+  return out.length ? out : undefined;
 }
 
 const clamp = (v: number, lo: number, hi: number) => Math.min(hi, Math.max(lo, v));
@@ -42,6 +56,7 @@ export function sportProfile(config: Record<string, unknown> | null | undefined)
     trainingDaysSource: c.trainingDaysSource === "opengym" ? "opengym" : days?.length ? "manual" : undefined,
     cycleCarbs: c.cycleCarbs === true,
     waterAuto: c.waterAuto === true,
+    gymHours: parseGymHours(c.gymHours),
   };
 }
 
