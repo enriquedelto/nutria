@@ -20,6 +20,7 @@ import { staleOpenDraft } from "@/lib/meal-drafts";
 import { db } from "@/lib/db";
 import { trainingDayMeals } from "@nutria/core";
 import { TrainingMeals } from "@/components/diary/training-meals";
+import { minuteOfDay } from "@/lib/slots";
 import { dateLong, kg, n0, n1, time } from "@/lib/format";
 
 export const metadata = { title: "Hoy" };
@@ -46,7 +47,7 @@ async function Today() {
     ),
     entreno: extras.training ? (
       <TrainingCard key="entreno" plan={extras.training} proteinLeft={day.target ? Math.round(day.target.protein - (day.totals.protein ?? 0)) : null}>
-        {mealsAround?.session && mealsAround.weightKg ? <TrainingMeals session={mealsAround.session} meals={mealsAround.meals} weightKg={mealsAround.weightKg} isToday /> : null}
+        {mealsAround?.session && mealsAround.weightKg ? <TrainingMeals session={mealsAround.session} meals={mealsAround.meals} weightKg={mealsAround.weightKg} nowMin={minuteOfDay(ctx.person.timezone)} /> : null}
       </TrainingCard>
     ) : null,
     comidas: (

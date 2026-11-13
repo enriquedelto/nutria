@@ -8,6 +8,7 @@ import { MealCard } from "@/components/diary/meal-card";
 import { CaffeineCard } from "@/components/diary/caffeine-card";
 import { caffeineDay, trainingDayMeals } from "@nutria/core";
 import { TrainingMeals } from "@/components/diary/training-meals";
+import { minuteOfDay } from "@/lib/slots";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardHeader } from "@/components/ui/card";
@@ -123,7 +124,7 @@ async function Content({ searchParams }: { searchParams: Promise<Record<string, 
         {mealsAround.session && mealsAround.weightKg ? (
           <Card>
             <CardHeader title="Comida y entreno" subtitle={`${mealsAround.session.name ?? "Entreno"} · ${mealsAround.session.source === "logged" ? "registrado" : "hora habitual"}`} action={<Link href="/salud/ejercicio#comida-entreno" className="text-xs text-herb underline">Tu mejor momento</Link>} />
-            <TrainingMeals session={mealsAround.session} meals={mealsAround.meals} weightKg={mealsAround.weightKg} isToday={date === today} />
+            <TrainingMeals session={mealsAround.session} meals={mealsAround.meals} weightKg={mealsAround.weightKg} nowMin={date === today ? minuteOfDay(ctx.person.timezone) : null} />
           </Card>
         ) : null}
         {caffeine.doses.length || caffeine.trainingStart != null ? (

@@ -1,7 +1,6 @@
 "use client";
 import { minutesToClock, trainingMealTiming, type GroupedMeal } from "@nutria/nutrition";
 import { MealTimingChart } from "@/components/charts/weight-chart";
-import { clockNow } from "@/lib/slots";
 import { cn } from "@/lib/utils";
 
 const dur = (min: number) => {
@@ -16,9 +15,9 @@ const dur = (min: number) => {
  * The day's meals around the session: a time line and how the pre-workout meal (1–3 h before,
  * ~1 g/kg carbs) and post-workout protein (0.3–0.4 g/kg within 2 h) landed.
  */
-export function TrainingMeals({ session, meals, weightKg, isToday }: { session: { start: number; end: number }; meals: GroupedMeal[]; weightKg: number; isToday: boolean }) {
+export function TrainingMeals({ session, meals, weightKg, nowMin }: { session: { start: number; end: number }; meals: GroupedMeal[]; weightKg: number; /** Current minute of the day in the person's zone (from the server, so SSR and hydration agree); null for past days. */ nowMin: number | null }) {
   const t = trainingMealTiming(meals, session, weightKg);
-  const now = isToday ? Number(clockNow().slice(0, 2)) * 60 + Number(clockNow().slice(3, 5)) : 24 * 60;
+  const now = nowMin ?? 24 * 60;
   const pre: [number, number] = [session.start - 180, session.start - 60];
   const post: [number, number] = [session.end, session.end + 120];
   const approx = (a: boolean) => (a ? " (hora aprox.)" : "");

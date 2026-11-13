@@ -18,6 +18,12 @@ export function slotForTime(slots: { key: string; time?: string | null }[], hhmm
 /** Current local time "HH:MM" in a time zone (the browser's when omitted). */
 export const clockNow = (tz?: string) => new Intl.DateTimeFormat("en-GB", { hour: "2-digit", minute: "2-digit", hourCycle: "h23", timeZone: tz }).format(new Date());
 
+/** Current minute of the day (0–1439) in a time zone. */
+export function minuteOfDay(tz: string) {
+  const [h, m] = clockNow(tz).split(":").map(Number);
+  return h! * 60 + m!;
+}
+
 /** Default meal slot: the one whose usual time is closest to now (local time). */
 export function closestSlot(slots: { key: string; time: string | null }[], tz: string) {
   return slotForTime(slots, clockNow(tz));
@@ -36,6 +42,6 @@ export const fromLocal = (date: string, time: string) => new Date(`${date}T${tim
  * Default time for a new entry: now when logging today, otherwise the meal's usual time
  * (or noon). `today` is the person's local date.
  */
-export function defaultEntryTime(date: string, today: string, slotTime?: string | null) {
-  return date === today ? clockNow() : (slotTime?.slice(0, 5) ?? "12:00");
+export function defaultEntryTime(date: string, today: string, slotTime?: string | null, now?: string) {
+  return date === today ? (now ?? clockNow()) : (slotTime?.slice(0, 5) ?? "12:00");
 }

@@ -65,7 +65,7 @@ export function RegisterClient({ ctx, aiEnabled, sharedImages, drafts, voice = f
   const [slot, setSlot] = useState(ctx.slot);
   // When it was eaten: today → now; another day → that meal's usual time. Photos can override it (EXIF).
   const [date, setDate] = useState(ctx.date);
-  const [time, setTime] = useState(() => defaultEntryTime(ctx.date, ctx.today, ctx.slots.find((s) => s.key === ctx.slot)?.time));
+  const [time, setTime] = useState(() => defaultEntryTime(ctx.date, ctx.today, ctx.slots.find((s) => s.key === ctx.slot)?.time, ctx.nowTime));
   const [est, setEst] = useState<Estimate | null>(null);
   const [rows, setRows] = useState<Row[]>([]);
   const [busy, setBusy] = useState(false);

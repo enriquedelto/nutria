@@ -23,6 +23,8 @@ export type DayContext = {
   date: string;
   /** The person's local date (an entry logged today defaults to "now"). */
   today: string;
+  /** "HH:MM" in the person's zone when the page was rendered on the server (SSR and hydration agree). */
+  nowTime?: string;
   slot: string;
   /** `time` = the meal's usual time ("HH:MM[:SS]"). */
   slots: { key: string; label: string; time?: string | null }[];

@@ -6,7 +6,7 @@ import { aiConfigured } from "@/lib/ai";
 import { getDay } from "@/lib/data/day";
 import { dateLong, isDate } from "@/lib/format";
 import { requireScope } from "@/lib/session";
-import { closestSlot } from "@/lib/slots";
+import { clockNow, closestSlot } from "@/lib/slots";
 import { readShareMeta } from "@/lib/uploads";
 import { listDrafts } from "@/lib/meal-drafts";
 import { RegisterClient } from "./register-client";
@@ -38,6 +38,7 @@ async function Content({ searchParams }: { searchParams: Promise<Record<string, 
           personId: ctx.person.id,
           date,
           today: todayIn(ctx.person.timezone),
+          nowTime: clockNow(ctx.person.timezone),
           slot,
           slots,
           totals: { kcal: day.totals.energy_kcal ?? 0, protein: day.totals.protein ?? 0, carbs: day.totals.carbs ?? 0, fat: day.totals.fat ?? 0 },
