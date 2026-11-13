@@ -6,7 +6,8 @@ import { addDays, dailyQualityScore, dayLogStatus, NOVA_MIN_COVERAGE, novaCovera
 import { MacroSummary } from "@/components/diary/macro-summary";
 import { MealCard } from "@/components/diary/meal-card";
 import { CaffeineCard } from "@/components/diary/caffeine-card";
-import { caffeineDay } from "@nutria/core";
+import { caffeineDay, trainingDayMeals } from "@nutria/core";
+import { TrainingMeals } from "@/components/diary/training-meals";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardHeader } from "@/components/ui/card";
@@ -28,11 +29,12 @@ async function Content({ searchParams }: { searchParams: Promise<Record<string, 
   const ctx = await requireScope("diary");
   const today = todayIn(ctx.person.timezone);
   const date = isDate(sp.fecha) ? sp.fecha : today;
-  const [day, week, feelings, caffeine] = await Promise.all([
+  const [day, week, feelings, caffeine, mealsAround] = await Promise.all([
     getDay(ctx.person.id, date),
     db().select({ date: dailySummaries.date, kcal: dailySummaries.kcal, complete: dailySummaries.complete, incomplete: dailySummaries.incomplete }).from(dailySummaries).where(and(eq(dailySummaries.personId, ctx.person.id), gte(dailySummaries.date, addDays(date, -6)), lte(dailySummaries.date, addDays(date, 6)))),
     db().select().from(mealFeelings).where(and(eq(mealFeelings.personId, ctx.person.id), eq(mealFeelings.date, date))),
     caffeineDay(db(), ctx.person.id, date),
+    trainingDayMeals(db(), ctx.person.id, date),
   ]);
   const byDate = new Map(week.map((w) => [w.date, w]));
   const strip = Array.from({ length: 7 }, (_, i) => addDays(date, i - 3));
@@ -118,6 +120,12 @@ async function Content({ searchParams }: { searchParams: Promise<Record<string, 
         </div>
 
         <div className="min-w-0 space-y-4">
+        {mealsAround.session && mealsAround.weightKg ? (
+          <Card>
+            <CardHeader title="Comida y entreno" subtitle={`${mealsAround.session.name ?? "Entreno"} · ${mealsAround.session.source === "logged" ? "registrado" : "hora habitual"}`} action={<Link href="/salud/ejercicio#comida-entreno" className="text-xs text-herb underline">Tu mejor momento</Link>} />
+            <TrainingMeals session={mealsAround.session} meals={mealsAround.meals} weightKg={mealsAround.weightKg} isToday={date === today} />
+          </Card>
+        ) : null}
         {caffeine.doses.length || caffeine.trainingStart != null ? (
           <CaffeineCard key={`${caffeine.bedtime}-${caffeine.halfLifeH}`} personId={ctx.person.id} day={caffeine} canEdit={ctx.canWrite} />
         ) : null}

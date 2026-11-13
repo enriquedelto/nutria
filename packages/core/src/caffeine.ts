@@ -27,6 +27,22 @@ const bedMinutes = (hhmm: string) => {
   return m < 12 * 60 ? m + 1440 : m;
 };
 
+export type EntryTimeSource = "eaten" | "slot" | "created";
+
+/**
+ * When an entry was eaten, in minutes from 00:00 of `day` (the day before → negative): its own time,
+ * else the meal's usual time, else when it was logged (if logged that same day; noon otherwise).
+ */
+export function entryMinute(e: { date: string; eatenAt: Date | null; createdAt: Date }, slotTime: string | null | undefined, tz: string, day: string): { at: number; source: EntryTimeSource } {
+  if (e.eatenAt) {
+    const l = local(e.eatenAt, tz);
+    return { at: daysBetween(day, l.date) * 1440 + clockToMinutes(l.time), source: "eaten" };
+  }
+  if (slotTime) return { at: daysBetween(day, e.date) * 1440 + clockToMinutes(slotTime), source: "slot" };
+  const l = local(e.createdAt, tz);
+  return { at: daysBetween(day, e.date) * 1440 + clockToMinutes(l.date === e.date ? l.time : "12:00"), source: "created" };
+}
+
 /** Usual bedtime (median of the last 30 nights), handling times after midnight. */
 export async function usualBedtime(db: Database, personId: string, timeZone: string, today: string): Promise<string | null> {
   const rows = await db
@@ -45,7 +61,7 @@ export interface CaffeineDoseRow extends CaffeineDose {
   name: string;
   date: string;
   /** Where the time comes from: logged time, meal's usual time or when it was registered. */
-  timeSource: "eaten" | "slot" | "created";
+  timeSource: EntryTimeSource;
 }
 
 export interface CaffeineDay {
@@ -84,21 +100,7 @@ export async function caffeineDay(db: Database, personId: string, date: string, 
   for (const e of entries) {
     const mg = e.nutrients.caffeine ?? 0;
     if (mg <= 0) continue;
-    let at: number;
-    let timeSource: CaffeineDoseRow["timeSource"];
-    const slot = slotTime.get(e.mealSlot);
-    if (e.eatenAt) {
-      const l = local(e.eatenAt, tz);
-      at = daysBetween(date, l.date) * 1440 + clockToMinutes(l.time);
-      timeSource = "eaten";
-    } else if (slot) {
-      at = daysBetween(date, e.date) * 1440 + clockToMinutes(slot);
-      timeSource = "slot";
-    } else {
-      const l = local(e.createdAt, tz);
-      at = daysBetween(date, e.date) * 1440 + clockToMinutes(l.date === e.date ? l.time : "12:00");
-      timeSource = "created";
-    }
+    const { at, source: timeSource } = entryMinute(e, slotTime.get(e.mealSlot), tz, date);
     // From the day before only the afternoon/evening still matters.
     if (at < -12 * 60) continue;
     doses.push({ id: e.id, name: e.name, date: e.date, at, mg: Math.round(mg), timeSource });

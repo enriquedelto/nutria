@@ -14,7 +14,7 @@ const PHASE_TEXT: Record<TrainingDayPlan["phase"], string> = {
 };
 
 /** Training day: what to eat before and after, at the usual (or real) training time. */
-export function TrainingCard({ plan, proteinLeft }: { plan: TrainingDayPlan; proteinLeft: number | null }) {
+export function TrainingCard({ plan, proteinLeft, children }: { plan: TrainingDayPlan; proteinLeft: number | null; children?: React.ReactNode }) {
   const t = plan.timing;
   const before = plan.phase === "early" || plan.phase === "pre" || plan.phase === "soon";
   const after = plan.phase === "post" || plan.phase === "during";
@@ -68,6 +68,7 @@ export function TrainingCard({ plan, proteinLeft }: { plan: TrainingDayPlan; pro
           Te quedan <span className="num font-medium text-ink-2">{proteinLeft} g</span> de proteína hoy, unas {Math.max(1, Math.round(proteinLeft / plan.proteinDoseG))} tomas de {plan.proteinDoseG} g.
         </p>
       ) : null}
+      {children ? <div className="mt-3 border-t border-line pt-3">{children}</div> : null}
     </Card>
   );
 }

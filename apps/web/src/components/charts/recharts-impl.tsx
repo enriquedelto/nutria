@@ -1,5 +1,5 @@
 "use client";
-import { Area, Bar, CartesianGrid, ComposedChart, Line, ReferenceLine, ResponsiveContainer, Scatter, Tooltip, XAxis, YAxis } from "recharts";
+import { Area, Bar, CartesianGrid, Cell, ComposedChart, Legend, Line, ReferenceArea, ReferenceLine, ResponsiveContainer, Scatter, Tooltip, XAxis, YAxis } from "recharts";
 
 export type WeightPoint = { date: string; kg?: number | null; trend?: number | null; forecast?: number | null };
 
@@ -83,6 +83,41 @@ export function CaffeineChart({ data, training, bedtime, threshold }: { data: Ca
           <ReferenceLine x={bedtime} stroke="var(--ink-3)" label={{ value: "Dormir", fill: "var(--ink-3)", fontSize: 11, position: "top" }} />
           <Area dataKey="logged" stroke="var(--kcal)" fill="var(--kcal)" fillOpacity={0.18} strokeWidth={2} isAnimationActive={false} />
           {hasPlan ? <Line dataKey="plan" stroke="var(--kcal)" strokeWidth={2} strokeDasharray="5 5" dot={false} isAnimationActive={false} /> : null}
+        </ComposedChart>
+      </ResponsiveContainer>
+    </div>
+  );
+}
+
+export type MealTimingPoint = { t: number; carbs: number; protein: number; approx: boolean; label: string };
+
+/** Meals of a training day as carb/protein bars on a time axis, with the session and the before/after windows. */
+export function MealTimingChart({ data, session, pre, post }: { data: MealTimingPoint[]; session: { start: number; end: number }; pre: [number, number]; post: [number, number] }) {
+  const lo = Math.floor((Math.min(pre[0], ...data.map((d) => d.t)) - 30) / 60) * 60;
+  const hi = Math.ceil((Math.max(post[1], ...data.map((d) => d.t)) + 30) / 60) * 60;
+  const ticks = Array.from({ length: Math.floor((hi - lo) / 120) + 1 }, (_, i) => lo + i * 120);
+  return (
+    <div className="h-48 w-full" role="img" aria-label="Comidas alrededor del entreno">
+      <ResponsiveContainer>
+        <ComposedChart data={data} margin={{ top: 16, right: 8, bottom: 0, left: -16 }} barGap={1}>
+          <CartesianGrid stroke="var(--line)" strokeDasharray="3 3" vertical={false} />
+          <XAxis dataKey="t" type="number" domain={[lo, hi]} ticks={ticks} tickFormatter={fmtClock} tick={{ fontSize: 11, fill: "var(--ink-3)" }} axisLine={false} tickLine={false} />
+          <YAxis tick={{ fontSize: 11, fill: "var(--ink-3)" }} axisLine={false} tickLine={false} width={44} allowDecimals={false} unit=" g" />
+          <ReferenceArea x1={pre[0]} x2={pre[1]} fill="var(--carbs)" fillOpacity={0.12} label={{ value: "Antes", fill: "var(--ink-3)", fontSize: 11, position: "insideTop" }} />
+          <ReferenceArea x1={session.start} x2={session.end} fill="var(--persimmon)" fillOpacity={0.18} label={{ value: "Entreno", fill: "var(--persimmon)", fontSize: 11, position: "insideTop" }} />
+          <ReferenceArea x1={post[0]} x2={post[1]} fill="var(--protein)" fillOpacity={0.12} label={{ value: "Después", fill: "var(--ink-3)", fontSize: 11, position: "insideTop" }} />
+          <Tooltip
+            contentStyle={{ background: "var(--card)", border: "1px solid var(--line)", borderRadius: 12, fontSize: 12 }}
+            labelFormatter={(t, p) => `${fmtClock(Number(t))}${p?.[0]?.payload?.approx ? " (hora aprox.)" : ""} · ${p?.[0]?.payload?.label ?? ""}`}
+            formatter={(v, name) => [`${Math.round(Number(v))} g`, name === "carbs" ? "Hidratos" : "Proteína"]}
+          />
+          <Legend formatter={(v) => (v === "carbs" ? "Hidratos" : "Proteína")} wrapperStyle={{ fontSize: 11 }} />
+          <Bar dataKey="carbs" fill="var(--carbs)" barSize={10} isAnimationActive={false}>
+            {data.map((d) => <Cell key={`c${d.t}`} fillOpacity={d.approx ? 0.45 : 1} />)}
+          </Bar>
+          <Bar dataKey="protein" fill="var(--protein)" barSize={10} isAnimationActive={false}>
+            {data.map((d) => <Cell key={`p${d.t}`} fillOpacity={d.approx ? 0.45 : 1} />)}
+          </Bar>
         </ComposedChart>
       </ResponsiveContainer>
     </div>

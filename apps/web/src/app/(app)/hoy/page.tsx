@@ -17,6 +17,9 @@ import { HOME_CARDS } from "@/lib/home-cards";
 import { getDay, getHomeExtras } from "@/lib/data/day";
 import { getPersonContext } from "@/lib/session";
 import { staleOpenDraft } from "@/lib/meal-drafts";
+import { db } from "@/lib/db";
+import { trainingDayMeals } from "@nutria/core";
+import { TrainingMeals } from "@/components/diary/training-meals";
 import { dateLong, kg, n0, n1, time } from "@/lib/format";
 
 export const metadata = { title: "Hoy" };
@@ -26,6 +29,7 @@ async function Today() {
   const ctx = await getPersonContext();
   const date = todayIn(ctx.person.timezone);
   const [day, extras, eating] = await Promise.all([getDay(ctx.person.id, date), getHomeExtras(ctx.person.id, ctx.person.timezone, ctx.scopes), ctx.canWrite ? staleOpenDraft(ctx.person.id) : Promise.resolve(null)]);
+  const mealsAround = extras.training ? await trainingDayMeals(db(), ctx.person.id, date) : null;
   const cards = (day.person.settings.homeCards?.length ? day.person.settings.homeCards : HOME_CARDS) as string[];
   const slots = day.meals.map((m) => ({ key: m.key, label: m.label }));
 
@@ -40,7 +44,11 @@ async function Today() {
         ) : null}
       </Card>
     ),
-    entreno: extras.training ? <TrainingCard key="entreno" plan={extras.training} proteinLeft={day.target ? Math.round(day.target.protein - (day.totals.protein ?? 0)) : null} /> : null,
+    entreno: extras.training ? (
+      <TrainingCard key="entreno" plan={extras.training} proteinLeft={day.target ? Math.round(day.target.protein - (day.totals.protein ?? 0)) : null}>
+        {mealsAround?.session && mealsAround.weightKg ? <TrainingMeals session={mealsAround.session} meals={mealsAround.meals} weightKg={mealsAround.weightKg} isToday /> : null}
+      </TrainingCard>
+    ) : null,
     comidas: (
       <div key="comidas" className="space-y-3 sm:col-span-2">
         {eating ? (

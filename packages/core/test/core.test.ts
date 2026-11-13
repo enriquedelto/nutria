@@ -817,3 +817,32 @@ describe("hora al registrar", () => {
     expect((await add("2027-10-04", "manual", mine))[0]!.eatenAt).toEqual(mine);
   });
 });
+
+describe("comida y entreno", () => {
+  it("día: sesión registrada, comidas agrupadas con su hora; historial con horas reales", async () => {
+    const [p] = await db.select().from(persons).where(eq(persons.userId, "gym"));
+    const pid = p!.id;
+    const tz = p!.timezone;
+    const D = "2027-11-08";
+    const at = (t: string) => core.zonedTime(D, t, tz);
+    const add = (slot: string, name: string, carbs: number, protein: number, eatenAt?: Date) =>
+      core.addEntries(db, { personId: pid, userId: "gym", date: D, mealSlot: slot, origin: "manual", items: [{ name, grams: 100, absolute: { energy_kcal: carbs * 4 + protein * 4, carbs, protein }, eatenAt }] }, at("23:00"));
+    await add("lunch", "Arroz", 70, 8, at("15:40"));
+    await add("lunch", "Pollo", 0, 30, at("15:50"));
+    await add("dinner", "Batido", 10, 30, at("19:45"));
+    // Logged the next day without a time: the meal's usual time stands in (approximate).
+    await core.addEntries(db, { personId: pid, userId: "gym", date: D, mealSlot: "breakfast", origin: "manual", items: [{ name: "Avena", grams: 80, absolute: { energy_kcal: 300, carbs: 50, protein: 10 } }] }, core.zonedTime("2027-11-09", "09:00", tz));
+    await db.insert(exerciseLogs).values({ personId: pid, date: D, startedAt: at("17:45"), name: "Pierna", durationMin: 70, kcal: 400, details: { exercises: [{ id: "sq", name: "Sentadilla", sets: [{ kg: 100, reps: 5 }] }] } });
+
+    const day = await core.trainingDayMeals(db, pid, D, at("23:00"));
+    expect(day.session).toMatchObject({ start: 17 * 60 + 45, end: 18 * 60 + 55, source: "logged", name: "Pierna" });
+    const lunch = day.meals.find((m) => m.slot === "lunch")!;
+    expect(lunch).toMatchObject({ at: 15 * 60 + 40, carbs: 70, protein: 38, approx: false, names: ["Arroz", "Pollo"] });
+    expect(day.meals.find((m) => m.slot === "breakfast")?.approx).toBe(true);
+
+    const h = await core.trainingMealHistory(db, pid, 12, at("23:00"));
+    expect(h.sessions.some((s) => s.exercises[0]?.id === "sq")).toBe(true);
+    expect(h.meals.every((m) => !m.approx)).toBe(true);
+    expect(h.meals.some((m) => m.carbs === 70 && m.protein === 38)).toBe(true);
+  });
+});

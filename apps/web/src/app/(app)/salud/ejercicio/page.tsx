@@ -1,7 +1,9 @@
 import { Suspense } from "react";
 import Link from "next/link";
 import { activities, and, asc, desc, eq, exerciseLogs, gte, stepLogs } from "@nutria/db";
-import { addDays, todayIn } from "@nutria/nutrition";
+import { addDays, prePostAnalysis, todayIn } from "@nutria/nutrition";
+import { trainingMealHistory } from "@nutria/core";
+import { PrePostCard } from "@/components/health/pre-post-card";
 import { SeriesChart } from "@/components/charts/weight-chart";
 import { DeleteExercise, ExerciseForm, StepsForm } from "@/components/health/forms";
 import { PageHeader } from "@/components/page-header";
@@ -15,6 +17,8 @@ import { Sparkline } from "@/components/charts/sparkline";
 import { requireScope } from "@/lib/session";
 
 export const metadata = { title: "Ejercicio y pasos" };
+
+const PRE_POST_WEEKS = 12;
 
 type WorkoutSet = TrainingSet;
 
@@ -56,6 +60,9 @@ async function Content() {
       .orderBy(asc(exerciseLogs.date)),
   ]);
   const progress = trainingProgress(history, today);
+  // Pre/post-workout meals need the diary too.
+  const mealHistory = ctx.scopes.has("diary") ? await trainingMealHistory(db(), pid, PRE_POST_WEEKS) : null;
+  const prePost = mealHistory?.weightKg ? prePostAnalysis(mealHistory.sessions, mealHistory.meals, mealHistory.weightKg) : null;
   const recentWeeks = progress.weekly.filter((w) => w.sessions > 0);
   const hasVolume = progress.weekly.some((w) => w.volumeKg > 0);
   const days = Array.from({ length: 28 }, (_, i) => addDays(from, i));
@@ -78,6 +85,7 @@ async function Content() {
             </div>
           ) : null}
         </Card>
+        {prePost ? <PrePostCard a={prePost} weeks={PRE_POST_WEEKS} /> : null}
         <Card>
           <CardHeader title="Sesiones" action={<Link href="/ajustes/integraciones" className="text-sm text-herb hover:underline">Conectar openGym</Link>} />
           {logs.length ? (
