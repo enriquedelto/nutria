@@ -1,7 +1,7 @@
 import { Suspense } from "react";
 import Link from "next/link";
 import { Flame, Pill, Scale, Timer, Dumbbell, Footprints, FlaskConical } from "lucide-react";
-import { dayLogStatus, fastingStatus, todayIn } from "@nutria/nutrition";
+import { dayLogStatus, fastingStatus, photoStatus, todayIn } from "@nutria/nutrition";
 import { Card, CardHeader } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/empty";
 import { Badge } from "@/components/ui/badge";
@@ -18,7 +18,8 @@ import { getDay, getHomeExtras } from "@/lib/data/day";
 import { getPersonContext } from "@/lib/session";
 import { staleOpenDraft } from "@/lib/meal-drafts";
 import { db } from "@/lib/db";
-import { trainingDayMeals } from "@nutria/core";
+import { leanMassStatus, trainingDayMeals } from "@nutria/core";
+import { eq, progressPhotos } from "@nutria/db";
 import { TrainingMeals } from "@/components/diary/training-meals";
 import { minuteOfDay } from "@/lib/slots";
 import { dateLong, kg, n0, n1, time } from "@/lib/format";
@@ -30,7 +31,14 @@ async function Today() {
   const ctx = await getPersonContext();
   const date = todayIn(ctx.person.timezone);
   const [day, extras, eating] = await Promise.all([getDay(ctx.person.id, date), getHomeExtras(ctx.person.id, ctx.person.timezone, ctx.scopes), ctx.canWrite ? staleOpenDraft(ctx.person.id) : Promise.resolve(null)]);
-  const mealsAround = extras.training ? await trainingDayMeals(db(), ctx.person.id, date) : null;
+  const [mealsAround, lean, photoRows] = await Promise.all([
+    extras.training ? trainingDayMeals(db(), ctx.person.id, date) : Promise.resolve(null),
+    ctx.scopes.has("body") ? leanMassStatus(db(), ctx.person.id) : Promise.resolve(null),
+    ctx.scopes.has("photos") ? db().select({ date: progressPhotos.date, pose: progressPhotos.pose }).from(progressPhotos).where(eq(progressPhotos.personId, ctx.person.id)) : Promise.resolve([]),
+  ]);
+  const photos = photoStatus(photoRows, date);
+  // First photos only nudged for people who train (planned days); after that, every 4 weeks.
+  const photoDue = ctx.canWrite && ctx.scopes.has("photos") && photos.due && (photoRows.length > 0 || lean?.plannedPerWeek != null);
   const cards = (day.person.settings.homeCards?.length ? day.person.settings.homeCards : HOME_CARDS) as string[];
   const slots = day.meals.map((m) => ({ key: m.key, label: m.label }));
 
@@ -52,6 +60,17 @@ async function Today() {
     ) : null,
     comidas: (
       <div key="comidas" className="space-y-3 sm:col-span-2">
+        {lean?.check.level === "alert" ? (
+          <Link href="/progreso#masa-magra" className="block rounded-card border border-danger/40 bg-danger/5 px-4 py-3 text-sm">
+            <span className="font-medium">Posible pérdida de masa magra.</span> <span className="text-ink-2">{lean.check.reasons[0]}</span> <span className="font-medium text-herb">Ver →</span>
+          </Link>
+        ) : null}
+        {photoDue ? (
+          <Link href="/progreso#fotos" className="flex items-center justify-between gap-3 rounded-card border border-dashed border-line bg-paper-2 px-4 py-3 text-sm">
+            <span>{photos.last ? `Toca foto de progreso: han pasado ${photos.daysSince} días.` : "Empieza tus fotos de progreso: frente, perfil y espalda, una vez al mes."}</span>
+            <span className="shrink-0 font-medium text-herb">Hacer →</span>
+          </Link>
+        ) : null}
         {eating ? (
           <Link href="/registrar" className="flex items-center justify-between gap-3 rounded-card border border-herb/50 bg-herb-soft/40 px-4 py-3 text-sm">
             <span>

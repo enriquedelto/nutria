@@ -4,6 +4,7 @@ import { weeklyReport, type AiProvider } from "@nutria/ai";
 import { ACCESS_SCOPES } from "@nutria/db";
 import { addDays, countsForAverages, dayLogStatus, isoDow, mealProteinStatus, proteinDoseG, todayIn, weekStart, SITE_LABEL } from "@nutria/nutrition";
 import { latestBulkReview } from "./bulk";
+import { leanMassStatus } from "./lean-mass";
 import { notify, webhooksFor } from "./notify";
 import { latestWeight, targetsForDate } from "./targets";
 
@@ -19,7 +20,7 @@ export function reportWeekStart(today: string) {
 export async function weeklyReportExtras(db: Database, personId: string, start: string) {
   const end = addDays(start, 6);
   const dates = Array.from({ length: 7 }, (_, i) => addDays(start, i));
-  const [targets, w, meals, workouts, sups, measures, bulk, summaries] = await Promise.all([
+  const [targets, w, meals, workouts, sups, measures, bulk, summaries, lean] = await Promise.all([
     Promise.all(dates.map(async (d) => ({ date: d, t: await targetsForDate(db, personId, d) }))),
     latestWeight(db, personId),
     db
@@ -39,6 +40,7 @@ export async function weeklyReportExtras(db: Database, personId: string, start: 
       .select({ date: dailySummaries.date, kcal: dailySummaries.kcal, entries: dailySummaries.entries, complete: dailySummaries.complete, incomplete: dailySummaries.incomplete })
       .from(dailySummaries)
       .where(and(eq(dailySummaries.personId, personId), between(dailySummaries.date, start, end))),
+    leanMassStatus(db, personId, new Date(`${end}T20:00:00Z`)),
   ]);
 
   const byDay = new Map<string, { kcal: number; protein: number }>();
@@ -81,6 +83,7 @@ export async function weeklyReportExtras(db: Database, personId: string, start: 
     },
     suplementos: sups.map((s) => ({ nombre: s.name, diasTomado: s.days })),
     medidas: [...sites].filter(([, v]) => v.n >= 2).map(([site, v]) => ({ zona: SITE_LABEL[site] ?? site, cm: v.last, cambioCm5Semanas: r1(v.last - v.first) })),
+    masaMagra: lean && lean.check.level !== "unknown" ? { nivel: lean.check.level, motivos: lean.check.reasons, entrenosHechos4Sem: lean.sessionsLast28, planificadosPorSemana: lean.plannedPerWeek, fuerzaPct: lean.strengthPct, pesoCambio4SemKg: lean.weightChangeKg, cinturaCambioCm: lean.waistChangeCm } : null,
     volumen: b ? { veredicto: b.verdict, ritmoObjetivoKgSem: b.targetRateKgWeek, ritmoRealKgSem: b.observedRateKgWeek, propuestaKcal: b.kcalDelta, señal: b.signal.text, seriesPorMusculo4Sem: Object.fromEntries(b.sets.map((s) => [s.muscle, s.avg4])), cambioFuerzaPct: b.strengthChangePct } : null,
   };
 }

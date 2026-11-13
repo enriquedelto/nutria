@@ -1,8 +1,21 @@
 import { Suspense } from "react";
 import { AlertTriangle } from "lucide-react";
 import { and, asc, avg, bodyMeasurements, dailySummaries, desc, eq, goals, gte, persons, progressPhotos, targetSets, tdeeEstimates, weightLogs, skinfolds } from "@nutria/db";
-import { latestBulkReview, trustedDaySql } from "@nutria/core";
-import { addDays, compositionSeries, continuous, daysBetween, daysToGoal, ffmiLabel, forecastWeight, MEASURE_SITES, SITE_LABEL, SKINFOLD_SITES, skinfoldBodyFatPct, todayIn, trendWeights } from "@nutria/nutrition";
+import { latestBulkReview, leanMassStatus, trustedDaySql } from "@nutria/core";
+import { addDays, compositionSeries, continuous, daysBetween, daysToGoal, ffmiLabel, forecastWeight, MEASURE_SITES, SITE_LABEL, photoStatus, SKINFOLD_SITES, skinfoldBodyFatPct, todayIn, trendWeights } from "@nutria/nutrition";
+
+const LEAN_LABEL = { ok: "Sin señales", watch: "Vigilar", alert: "Alerta", unknown: "Sin datos" } as const;
+const LEAN_TONE = { ok: "ok", watch: "warn", alert: "danger", unknown: "neutral" } as const;
+const POSE_LABEL = { front: "frente", side: "perfil", back: "espalda" } as const;
+
+function Stat({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="rounded-xl bg-paper-2 p-2">
+      <dt className="text-xs text-ink-3">{label}</dt>
+      <dd className="num font-semibold">{value}</dd>
+    </div>
+  );
+}
 
 const COMP_SOURCE = { navy: "Estimada con la cinta (cuello y cintura)", skinfolds: "Con tus pliegues (Jackson-Pollock)", measured: "Con tu % de grasa medido" } as const;
 import { WeightChart, type WeightPoint } from "@/components/charts/weight-chart";
@@ -38,7 +51,8 @@ async function Content() {
     // Composition pairs each measurement with a weigh-in, also for measurements older than the chart window.
     db().select({ date: weightLogs.date, kg: weightLogs.kg, bodyFatPct: weightLogs.bodyFatPct }).from(weightLogs).where(eq(weightLogs.personId, pid)).orderBy(asc(weightLogs.date)),
   ]);
-  const bulk = me?.goal === "gain" ? await latestBulkReview(db(), pid) : null;
+  const [bulk, lean] = await Promise.all([me?.goal === "gain" ? latestBulkReview(db(), pid) : Promise.resolve(null), leanMassStatus(db(), pid)]);
+  const photoState = photoStatus(photos.map((p) => ({ date: p.date, pose: p.pose })), today);
 
   // Daily series (one weight per day, last value wins), smoothed trend, forecast.
   const perDay = new Map<string, number>();
@@ -217,6 +231,31 @@ async function Content() {
           ) : null}
         </Card>
 
+        {lean && lean.check.level !== "unknown" ? (
+          <Card id="masa-magra">
+            <CardHeader
+              title="Masa magra y entreno"
+              subtitle="Entrenos, fuerza, peso y cintura de las últimas semanas"
+              action={<Badge tone={LEAN_TONE[lean.check.level]}>{LEAN_LABEL[lean.check.level]}</Badge>}
+            />
+            <p className="text-sm">{lean.check.text}</p>
+            {lean.check.reasons.length ? (
+              <ul className="mt-2 list-disc space-y-0.5 pl-5 text-sm text-ink-2">
+                {lean.check.reasons.map((r) => (
+                  <li key={r}>{r}</li>
+                ))}
+              </ul>
+            ) : null}
+            <dl className="mt-3 grid grid-cols-2 gap-2 text-center text-sm sm:grid-cols-4">
+              <Stat label="Entrenos (4 sem.)" value={lean.plannedPerWeek ? `${lean.sessionsLast28} / ${lean.plannedPerWeek * 4}` : String(lean.sessionsLast28)} />
+              <Stat label="Fuerza" value={lean.strengthPct != null ? `${lean.strengthPct > 0 ? "+" : ""}${n1(lean.strengthPct)} %` : "—"} />
+              <Stat label="Peso (4 sem.)" value={lean.weightChangeKg != null ? signed(lean.weightChangeKg, "kg") : "—"} />
+              <Stat label="Cintura" value={lean.waistChangeCm != null ? signed(lean.waistChangeCm, "cm") : "—"} />
+            </dl>
+            <p className="mt-2 text-xs text-ink-3">Fuerza: mejor 1RM estimado de las últimas 3 semanas frente a las 9 anteriores. Es una señal, no una medida: lo confirman los pliegues y los perímetros con el tiempo.</p>
+          </Card>
+        ) : null}
+
         <Card id="composicion">
           <CardHeader title="Composición corporal" subtitle={lastComp ? `${COMP_SOURCE[lastComp.source]} · ${dateShort(lastComp.date)}` : undefined} />
           {lastComp ? (
@@ -261,9 +300,48 @@ async function Content() {
           )}
         </Card>
 
+        {lean?.lifts.length ? (
+          <Card id="fuerza">
+            <CardHeader title="Fuerza" subtitle="1RM estimado de tus ejercicios más entrenados (6 meses)" />
+            <ul className="space-y-1 text-sm">
+              {lean.lifts.map((l) => {
+                const lastP = l.points.at(-1)!;
+                const ref = [...l.points].reverse().find((p) => daysBetween(p.date, lastP.date) >= 56);
+                return (
+                  <li key={l.key} className="flex justify-between gap-2">
+                    <span className="min-w-0 truncate">{l.name}</span>
+                    <span className="num shrink-0 text-ink-2">
+                      {n1(lastP.value)} kg
+                      {ref ? <span className={lastP.value >= ref.value ? "text-ok" : "text-persimmon"}> {signed(lastP.value - ref.value, "kg")}</span> : null}
+                      <span className="text-xs text-ink-3"> · {dateShort(lastP.date)}</span>
+                    </span>
+                  </li>
+                );
+              })}
+            </ul>
+            <MeasureChart label="Ejercicio que se muestra" series={lean.lifts.map((l) => ({ key: l.key, label: l.name, unit: "kg", points: l.points }))} />
+            <p className="mt-2 text-xs text-ink-3">Entre mediciones de pliegues, la fuerza es el indicador más rápido de si ganas o pierdes músculo. La diferencia es frente a hace ≥ 8 semanas.</p>
+          </Card>
+        ) : null}
+
         {ctx.scopes.has("photos") ? (
-          <Card>
-            <CardHeader title="Fotos" action={ctx.canWrite ? <PhotoUpload personId={pid} today={today} /> : null} />
+          <Card id="fotos">
+            <CardHeader
+              title="Fotos"
+              subtitle={photoState.last ? `Última: ${dateShort(photoState.last)}${photoState.due ? " · toca otra" : ` · próxima en ${28 - photoState.daysSince!} días`}` : "Una sesión al mes: frente, perfil y espalda"}
+              action={ctx.canWrite ? <PhotoUpload personId={pid} today={today} defaultPose={photoState.due || !photoState.missing.length ? "front" : photoState.missing[0]} /> : null}
+            />
+            {photoState.due || (photoState.last === today && photoState.missing.length) ? (
+              <div className="mb-3 rounded-xl bg-paper-2 p-3 text-sm">
+                <p className="font-medium">{photoState.last === today ? `Te faltan: ${photoState.missing.map((p) => POSE_LABEL[p]).join(", ")}.` : photoState.last ? `Han pasado ${photoState.daysSince} días: toca sesión de fotos.` : "Empieza tus fotos de progreso: una sesión al mes."}</p>
+                <ul className="mt-1 list-disc space-y-0.5 pl-5 text-ink-2">
+                  <li>Por la mañana, en ayunas, antes de entrenar: siempre a la misma hora.</li>
+                  <li>Misma luz (mejor de frente, sin contraluz), mismo sitio y misma ropa.</li>
+                  <li>Móvil fijo a la altura del ombligo, a ~2 m, con temporizador; cuerpo entero en el encuadre.</li>
+                  <li>Relajado, sin contraer ni meter tripa: frente, perfil y espalda.</li>
+                </ul>
+              </div>
+            ) : null}
             <PhotoCompare photos={photos.map((p) => ({ id: p.id, date: p.date, pose: p.pose, kg: nearKg(p.date) }))} />
           </Card>
         ) : null}

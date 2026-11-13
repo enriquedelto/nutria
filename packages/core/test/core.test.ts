@@ -861,3 +861,18 @@ describe("mejor hora para entrenar", () => {
     expect(c.plan!.perWindow[1]!.caffeine.fits).toBe(false);
   });
 });
+
+describe("masa magra", () => {
+  it("entrenos frente a plan, fuerza y peso; alerta tras semanas sin entrenar", async () => {
+    const [p] = await db.select().from(persons).where(eq(persons.userId, "gym"));
+    const pid = p!.id;
+    const tz = p!.timezone;
+    const s = await core.leanMassStatus(db, pid, core.zonedTime("2027-11-10", "12:00", tz));
+    expect(s).not.toBeNull();
+    expect(s!.plannedPerWeek).toBeGreaterThan(0);
+    expect(typeof s!.sessionsLast28).toBe("number");
+    // A month later with nothing logged: alert.
+    const later = await core.leanMassStatus(db, pid, core.zonedTime("2028-01-20", "12:00", tz));
+    expect(later!.check.level).toBe("alert");
+  });
+});

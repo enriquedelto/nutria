@@ -196,9 +196,9 @@ export function MeasurementsForm({ personId, today }: { personId: string; today:
   );
 }
 
-export function PhotoUpload({ personId, today }: { personId: string; today: string }) {
+export function PhotoUpload({ personId, today, defaultPose = "front" }: { personId: string; today: string; /** First pose the current session still lacks. */ defaultPose?: string }) {
   const [busy, setBusy] = useState(false);
-  const [pose, setPose] = useState("front");
+  const [pose, setPose] = useState(defaultPose);
   const input = useRef<HTMLInputElement>(null);
   const router = useRouter();
   const upload = async (f: File | undefined) => {
