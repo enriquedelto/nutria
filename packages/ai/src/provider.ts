@@ -439,8 +439,8 @@ export function defaultMockHandlers(): Record<string, MockHandler> {
   return {
     meal_text: () => ({
       items: [
-        { name: "Tortilla de patatas", searchQuery: "tortilla de patatas", grams: 150, servingLabel: "1 porción", confidence: 0.8, per100: [{ code: "energy_kcal", amount: 190 }, { code: "protein", amount: 6.5 }, { code: "carbs", amount: 13 }, { code: "fat", amount: 12 }, { code: "fiber", amount: 1.2 }] },
-        { name: "Pan blanco", searchQuery: "pan blanco", grams: 40, servingLabel: "1 rebanada", confidence: 0.7, per100: [{ code: "energy_kcal", amount: 265 }, { code: "protein", amount: 9 }, { code: "carbs", amount: 49 }, { code: "fat", amount: 3.2 }, { code: "fiber", amount: 2.7 }] },
+        { name: "Tortilla de patatas", searchQuery: "tortilla de patatas", grams: 150, servingLabel: "1 porción", confidence: 0.8, nova: 3, per100: [{ code: "energy_kcal", amount: 190 }, { code: "protein", amount: 6.5 }, { code: "carbs", amount: 13 }, { code: "fat", amount: 12 }, { code: "fiber", amount: 1.2 }] },
+        { name: "Pan blanco", searchQuery: "pan blanco", grams: 40, servingLabel: "1 rebanada", confidence: 0.7, nova: 4, per100: [{ code: "energy_kcal", amount: 265 }, { code: "protein", amount: 9 }, { code: "carbs", amount: 49 }, { code: "fat", amount: 3.2 }, { code: "fiber", amount: 2.7 }] },
       ],
       mealSlot: "lunch",
       notes: "Estimación simulada",

@@ -119,6 +119,26 @@ describe("registro por IA (simulado)", () => {
     expect(e?.status).toBe("pending");
     const usage = await db.select().from(aiUsage).where(eq(aiUsage.userId, userId));
     expect(usage.some((u) => u.feature === "meal_text")).toBe(true);
+    expect(r.items.map((i) => i.nova)).toEqual([3, 4]);
+  });
+  it("descarta fichas con energía implausible y conserva la cafeína estimada", async () => {
+    await db.insert(foods).values([
+      { source: "off", sourceId: "cafe-malo", name: "Café solo", nameEs: "Café solo", kcal: 42, protein: 0.1, carbs: 10, fat: 0, salt: 3, nutrients: { energy_kcal: 42, protein: 0.1, carbs: 10, sugars: 10, fat: 0, salt: 3 }, popularity: 50 },
+      { source: "off", sourceId: "cafe-bueno", name: "Café solo Kaiku", nameEs: "Café solo Kaiku", kcal: 3, protein: 0.2, carbs: 0.3, fat: 0, nutrients: { energy_kcal: 3, protein: 0.2, carbs: 0.3, fat: 0, salt: 0.01 } },
+    ]);
+    const provider = new MockProvider({
+      meal_text: () => ({
+        items: [{ name: "Café de cafetera, solo", searchQuery: "café solo", grams: 150, confidence: 0.6, nova: 1, per100: [{ code: "energy_kcal", amount: 2 }, { code: "protein", amount: 0.1 }, { code: "caffeine", amount: 100 }, { code: "salt", amount: 0.01 }] }],
+        questions: [],
+      }),
+    });
+    const r = await estimateMeal({ db, userId, personId, scopes: ALL, provider }, { text: "un café", mode: "text" });
+    const [cafe] = r.items;
+    expect(cafe!.match?.name).toBe("Café solo Kaiku");
+    expect(cafe!.gaps).toEqual({ caffeine: 100 });
+    expect(cafe!.nutrients.caffeine).toBeCloseTo(150);
+    expect(cafe!.nutrients.salt).toBeLessThan(0.1);
+    expect(cafe!.nova).toBe(1);
   });
 });
 

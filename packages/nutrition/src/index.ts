@@ -18,3 +18,4 @@ export * from "./training";
 export * from "./bulk";
 export * from "./timing";
 export * from "./body";
+export * from "./caffeine";

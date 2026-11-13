@@ -30,7 +30,7 @@ import {
   weightLogs,
   type Database,
 } from "@nutria/db";
-import { addDays, completeDerived, macroColumns, microGaps, round, scaleNutrients, type NutrientMap } from "@nutria/nutrition";
+import { addDays, completeDerived, macroColumns, microGaps, missingFrom, round, scaleNutrients, type NutrientMap } from "@nutria/nutrition";
 import { buildPersonContext, mealSlotName, portionKey } from "./context";
 import { contextBlock, HEALTH_DISCLAIMER, PROMPTS } from "./prompts";
 import { getProvider } from "./provider";
@@ -83,6 +83,8 @@ export interface MatchedItem extends S.MealItem {
   /** Best catalogue match (null → use the AI per100 estimate as a custom/AI food). */
   match: { foodId: string; name: string; brand: string | null; source: string } | null;
   candidates: { foodId: string; name: string; brand: string | null; kcal: number | null }[];
+  /** Per-100 g AI values for nutrients the matched food lacks (kept when the entry is saved). */
+  gaps: NutrientMap;
   /** Nutrients for the estimated grams (from the match if any, else from the AI estimate). */
   nutrients: NutrientMap;
   macros: ReturnType<typeof macroColumns>;
@@ -138,17 +140,27 @@ export async function estimateMeal(
   return { estimateId, mealSlot: input.mealSlot ?? data.mealSlot ?? null, items, notes: data.notes ?? null, questions: data.questions, totals };
 }
 
+/** Catalogue kcal/100 g within max(20 kcal, 35 %) of the AI estimate (any value if there is no estimate). */
+export function plausibleKcal(catalogKcal: number, aiKcal: number | undefined): boolean {
+  if (aiKcal == null) return true;
+  return Math.abs(catalogKcal - aiKcal) <= Math.max(20, aiKcal * 0.35);
+}
+
 async function matchItem(db: Database, groupId: string | null, it: S.MealItem): Promise<MatchedItem> {
   const hits = await searchFoods(db, it.brand ? `${it.searchQuery} ${it.brand}` : it.searchQuery, { groupId, limit: 5 });
-  const best = hits.find((h) => h.kcal != null) ?? null;
   const aiPer100 = completeDerived(S.per100ToMap(it.per100));
-  // Accept a match only if its energy density is plausible vs. the AI estimate (guards bad matches).
-  const plausible = best && (aiPer100.energy_kcal == null || best.kcal == null || Math.abs(best.kcal - aiPer100.energy_kcal) <= Math.max(60, aiPer100.energy_kcal * 0.6));
-  const per100 = plausible && best ? { ...best.nutrients, energy_kcal: best.kcal ?? best.nutrients.energy_kcal ?? 0 } : aiPer100;
+  // First candidate whose energy density is plausible vs. the AI estimate (guards bad matches such
+  // as a "café solo" with 42 kcal/100 g against a 2 kcal estimate).
+  const best = hits.find((h) => h.kcal != null && plausibleKcal(h.kcal, aiPer100.energy_kcal)) ?? null;
+  // Nutrients the catalogue food lacks but the AI estimated (typically caffeine) are kept.
+  const gaps: NutrientMap = best ? missingFrom(best.nutrients, S.per100ToMap(it.per100)) : {};
+  const per100 = best ? { ...gaps, ...best.nutrients, energy_kcal: best.kcal ?? best.nutrients.energy_kcal ?? 0 } : aiPer100;
   const nutrients = scaleNutrients(per100, it.grams);
   return {
     ...it,
-    match: plausible && best ? { foodId: best.id, name: best.nameEs ?? best.name, brand: best.brand, source: best.source } : null,
+    nova: it.nova != null && it.nova >= 1 && it.nova <= 4 ? Math.round(it.nova) : null,
+    gaps,
+    match: best ? { foodId: best.id, name: best.nameEs ?? best.name, brand: best.brand, source: best.source } : null,
     candidates: hits.map((h) => ({ foodId: h.id, name: h.nameEs ?? h.name, brand: h.brand, kcal: h.kcal })),
     nutrients,
     macros: macroColumns(nutrients),

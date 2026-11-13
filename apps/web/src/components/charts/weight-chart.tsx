@@ -5,7 +5,7 @@
  */
 import dynamic from "next/dynamic";
 
-export type { WeightPoint } from "./recharts-impl";
+export type { CaffeinePoint, WeightPoint } from "./recharts-impl";
 
 const placeholder = (h: string) =>
   function ChartPlaceholder() {
@@ -14,3 +14,4 @@ const placeholder = (h: string) =>
 
 export const WeightChart = dynamic(() => import("./recharts-impl").then((m) => m.WeightChart), { ssr: false, loading: placeholder("h-64") });
 export const SeriesChart = dynamic(() => import("./recharts-impl").then((m) => m.SeriesChart), { ssr: false, loading: placeholder("h-48") });
+export const CaffeineChart = dynamic(() => import("./recharts-impl").then((m) => m.CaffeineChart), { ssr: false, loading: placeholder("h-56") });

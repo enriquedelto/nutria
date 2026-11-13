@@ -12,9 +12,10 @@ import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent } from "@/components/ui/dialog";
 import { FoodPicker } from "@/components/food/food-picker";
+import { NutriBadges } from "@/components/food/add-food-dialog";
 import { Field, Input, Select } from "@/components/ui/input";
-import { mealProteinStatus } from "@nutria/nutrition";
-import { n0 } from "@/lib/format";
+import { mealProteinStatus, NUTRIENTS, type NutrientMap } from "@nutria/nutrition";
+import { n0, nutrient } from "@/lib/format";
 import { cn } from "@/lib/utils";
 
 export type MealEntry = {
@@ -31,7 +32,13 @@ export type MealEntry = {
   quick: boolean;
   note: string | null;
   mealSlot: string;
+  nutrients?: NutrientMap;
+  nova?: number | null;
+  nutriscore?: string | null;
+  eatenAt?: Date | string | null;
 };
+
+type MicroTargets = Record<string, { min?: number; max?: number }>;
 
 const ORIGIN_ICON: Record<string, string> = { ai_text: "IA", ai_photo: "IA", ai_voice: "IA", label: "Etiqueta", scan: "Escaneo", plan: "Plan", import: "Import.", supplement: "Supl." };
 
@@ -45,6 +52,9 @@ export function MealCard({
   canWrite,
   proteinDose,
   yesterday,
+  microTargets,
+  slotTime,
+  timeZone,
 }: {
   personId: string;
   date: string;
@@ -57,6 +67,11 @@ export function MealCard({
   proteinDose?: number | null;
   /** Yesterday had this meal logged: an empty meal offers «Como ayer». */
   yesterday?: boolean;
+  /** Daily references for the micronutrients shown in the entry dialog. */
+  microTargets?: MicroTargets;
+  /** Usual time of this meal ("HH:MM[:SS]"), default for the entry's time. */
+  slotTime?: string | null;
+  timeZone?: string;
 }) {
   const [pending, start] = useSafeTransition();
   const [editing, setEditing] = useState<MealEntry | null>(null);
@@ -221,12 +236,30 @@ export function MealCard({
           ))}
         </ul>
       ) : null}
-      {editing ? <EditEntryDialog personId={personId} entry={editing} slots={slots} onClose={() => setEditing(null)} /> : null}
+      {editing ? <EditEntryDialog personId={personId} entry={editing} slots={slots} microTargets={microTargets ?? {}} defaultTime={slotTime?.slice(0, 5) ?? null} timeZone={timeZone} onClose={() => setEditing(null)} /> : null}
     </section>
   );
 }
 
-function EditEntryDialog({ personId, entry, slots, onClose }: { personId: string; entry: MealEntry; slots: { key: string; label: string }[]; onClose: () => void }) {
+const clockIn = (d: Date | string, timeZone?: string) => new Intl.DateTimeFormat("en-GB", { timeZone, hour: "2-digit", minute: "2-digit", hourCycle: "h23" }).format(new Date(d));
+
+function EditEntryDialog({
+  personId,
+  entry,
+  slots,
+  microTargets,
+  defaultTime,
+  timeZone,
+  onClose,
+}: {
+  personId: string;
+  entry: MealEntry;
+  slots: { key: string; label: string }[];
+  microTargets: MicroTargets;
+  defaultTime: string | null;
+  timeZone?: string;
+  onClose: () => void;
+}) {
   const [pending, start] = useSafeTransition();
   const [grams, setGrams] = useState(entry.grams);
   const [swapping, setSwapping] = useState(false);
@@ -234,9 +267,15 @@ function EditEntryDialog({ personId, entry, slots, onClose }: { personId: string
   // Deleting has no undo: on a phone it is easy to tap by mistake, so it takes a second tap.
   const [confirmDelete, setConfirmDelete] = useState(false);
   const ratio = entry.grams > 0 ? grams / entry.grams : 1;
+  const savedTime = entry.eatenAt ? clockIn(entry.eatenAt, timeZone) : null;
   return (
     <Dialog open onOpenChange={(o) => !o && onClose()}>
       <DialogContent title={entry.name} description={entry.brand ?? undefined}>
+        {entry.nova || entry.nutriscore ? (
+          <div className="-mt-2 mb-3">
+            <NutriBadges nutriscore={entry.nutriscore ?? null} nova={entry.nova ?? null} />
+          </div>
+        ) : null}
         <div className="mb-4">
           {swapping ? (
             <div className="space-y-2">
@@ -275,16 +314,19 @@ function EditEntryDialog({ personId, entry, slots, onClose }: { personId: string
           className="space-y-4"
           onSubmit={submitForm((fd) =>
             start(async () => {
+              const time = String(fd.get("time") || "");
               await editEntry(personId, entry.id, {
                 grams: entry.quick ? undefined : Number(fd.get("grams")),
                 mealSlot: String(fd.get("slot")),
                 note: String(fd.get("note") || "") || null,
+                // Only store a time the person set or changed; the meal's usual time stays implicit.
+                ...(time && time !== (savedTime ?? defaultTime) ? { eatenTime: time } : !time && savedTime ? { eatenTime: null } : {}),
               });
               onClose();
             })
           )}
         >
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
             {!entry.quick ? (
               <Field label="Cantidad (g)">
                 <Input name="grams" type="number" inputMode="decimal" min={0} step="any" value={grams} onChange={(e) => setGrams(Number(e.target.value))} />
@@ -299,6 +341,9 @@ function EditEntryDialog({ personId, entry, slots, onClose }: { personId: string
                 ))}
               </Select>
             </Field>
+            <Field label="Hora">
+              <Input name="time" type="time" defaultValue={savedTime ?? defaultTime ?? ""} />
+            </Field>
           </div>
           <div className="num grid grid-cols-4 gap-2 rounded-xl bg-paper-2 p-3 text-center text-sm">
             <Stat label="kcal" v={entry.kcal * ratio} />
@@ -306,6 +351,7 @@ function EditEntryDialog({ personId, entry, slots, onClose }: { personId: string
             <Stat label="Hidr." v={entry.carbs * ratio} />
             <Stat label="Grasa" v={entry.fat * ratio} />
           </div>
+          <EntryNutrients nutrients={entry.nutrients ?? {}} ratio={ratio} targets={microTargets} />
           <Field label="Nota">
             <Input name="note" defaultValue={entry.note ?? ""} maxLength={500} />
           </Field>
@@ -342,3 +388,46 @@ const Stat = ({ label, v }: { label: string; v: number }) => (
     <p className="text-[11px] text-ink-3">{label}</p>
   </div>
 );
+
+const ENTRY_GROUPS: { title: string; cats: string[]; extra?: string[] }[] = [
+  { title: "Azúcares, grasas y fibra", cats: ["carb_detail", "fat_detail"], extra: ["fiber"] },
+  { title: "Vitaminas", cats: ["vitamin"] },
+  { title: "Minerales", cats: ["mineral"] },
+  { title: "Otros", cats: ["other"] },
+];
+
+/** Micronutrients of the entry (scaled to the grams being edited) as a share of the daily reference. */
+function EntryNutrients({ nutrients, ratio, targets }: { nutrients: NutrientMap; ratio: number; targets: MicroTargets }) {
+  const groups = ENTRY_GROUPS.map((g) => ({
+    title: g.title,
+    rows: NUTRIENTS.filter((n) => g.cats.includes(n.category) || g.extra?.includes(n.code))
+      .map((n) => ({ n, v: (nutrients[n.code] ?? 0) * ratio, t: targets[n.code] }))
+      .filter((r) => r.v > 0),
+  })).filter((g) => g.rows.length);
+  if (!groups.length) return <p className="text-xs text-ink-3">Este alimento no trae micronutrientes.</p>;
+  return (
+    <div className="rounded-xl border border-line px-3">
+      {groups.map((g) => (
+        <details key={g.title} open={groups.length === 1 || !g.title.startsWith("Azúcares")} className="border-t border-line py-2 first:border-t-0">
+          <summary className="cursor-pointer py-1 text-sm font-semibold">{g.title}</summary>
+          <ul className="mt-1 space-y-1.5">
+            {g.rows.map(({ n, v, t }) => {
+              const ref = t?.min ?? t?.max;
+              const over = t?.max != null && v > t.max;
+              return (
+                <li key={n.code} className="flex justify-between gap-2 text-sm">
+                  <span className="min-w-0 truncate">{n.nameEs}</span>
+                  <span className={cn("num shrink-0", over ? "text-danger" : "text-ink-2")}>
+                    {nutrient(n.code, v)}
+                    {ref ? <span className="text-ink-3"> · {n0((v / ref) * 100)} %{t?.min == null ? " del máx." : ""}</span> : null}
+                  </span>
+                </li>
+              );
+            })}
+          </ul>
+        </details>
+      ))}
+      <p className="pb-2 text-[11px] text-ink-3">% de tu referencia diaria. Los nutrientes sin dato no aparecen.</p>
+    </div>
+  );
+}

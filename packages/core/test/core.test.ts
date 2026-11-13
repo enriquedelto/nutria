@@ -32,6 +32,7 @@ import {
   webhooks,
   tdeeEstimates,
   weightLogs,
+  sleepLogs,
   type Database,
 } from "@nutria/db";
 import { createTestDb } from "@nutria/db/testing";
@@ -748,5 +749,27 @@ describe("disco", () => {
     expect(s.usedPct).toBeGreaterThanOrEqual(0);
     expect(s.usedPct).toBeLessThanOrEqual(100);
     expect(await core.readDiskStatus(dir)).toMatchObject({ level: s.level, usedPct: s.usedPct });
+  });
+});
+
+describe("curva de cafeína", () => {
+  const at = (d: string, t: string) => core.zonedTime(d, t, "Europe/Madrid");
+  it("tomas con su hora, entreno habitual y hora de dormir pasada la medianoche", async () => {
+    const [p] = await db.select().from(persons).where(eq(persons.userId, "gym"));
+    const pid = p!.id;
+    const D = "2027-03-08"; // Monday (training day since the timing test)
+    await db.insert(sleepLogs).values([
+      { personId: pid, date: "2027-03-05", bedtime: at("2027-03-04", "23:50"), wakeTime: at("2027-03-05", "07:30"), hours: 7.6 },
+      { personId: pid, date: "2027-03-06", bedtime: at("2027-03-06", "00:40"), wakeTime: at("2027-03-06", "08:00"), hours: 7.3 },
+    ]);
+    const coffee = { energy_kcal: 3, caffeine: 150 };
+    await core.addEntries(db, { personId: pid, userId: "gym", date: D, mealSlot: "breakfast", origin: "manual", items: [{ name: "Café", grams: 150, absolute: coffee, eatenAt: at(D, "08:15") }] });
+    await core.addEntries(db, { personId: pid, userId: "gym", date: "2027-03-07", mealSlot: "dinner", origin: "manual", items: [{ name: "Café tarde", grams: 60, absolute: { caffeine: 60 }, eatenAt: at("2027-03-07", "22:00") }, { name: "Café mañana", grams: 60, absolute: { caffeine: 60 }, eatenAt: at("2027-03-07", "09:00") }] });
+    const day = await core.caffeineDay(db, pid, D, at("2027-03-08", "10:00"));
+    expect(day.doses.map((d) => [d.name, d.at, d.mg])).toEqual([["Café tarde", -120, 60], ["Café", 495, 150]]);
+    expect(day).toMatchObject({ trainingSource: "usual", bedtime: 1455, bedtimeSource: "sleep", halfLifeH: 5, halfLifeSource: "default" });
+    expect(day.trainingStart).toBeGreaterThan(17 * 60);
+    await db.update(persons).set({ settings: { caffeine: { bedtime: "23:00", halfLifeH: 8 } } }).where(eq(persons.id, pid));
+    expect(await core.caffeineDay(db, pid, D, at("2027-03-08", "10:00"))).toMatchObject({ bedtime: 1380, bedtimeSource: "manual", halfLifeH: 8 });
   });
 });

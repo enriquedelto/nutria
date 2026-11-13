@@ -18,6 +18,7 @@ export const MealItem = z.object({
   servingLabel: z.string().nullable().optional().describe("Medida casera: '1 plato', '2 cucharadas'"),
   confidence: z.number().describe("0 a 1"),
   per100: Per100.describe("Estimación por 100 g, por si no se encuentra el alimento"),
+  nova: z.number().nullable().optional().describe("Grupo NOVA 1–4 del alimento tal como se come"),
 });
 export type MealItem = z.infer<typeof MealItem>;
 

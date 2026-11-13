@@ -19,6 +19,7 @@ export * from "./receipts";
 export * from "./openprices";
 export * from "./bulk";
 export * from "./timing";
+export * from "./caffeine";
 export * from "./report";
 export * from "./templates";
 export * from "./health-import";

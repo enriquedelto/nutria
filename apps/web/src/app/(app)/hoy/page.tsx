@@ -46,7 +46,7 @@ async function Today() {
           <TemplateSuggestion personId={ctx.person.id} slot={extras.templateSuggestion.slot} slotLabel={slots.find((s) => s.key === extras.templateSuggestion!.slot)?.label ?? "Comida"} date={extras.templateSuggestion.date} times={extras.templateSuggestion.times} names={extras.templateSuggestion.names} />
         ) : null}
         {day.meals.map((m) => (
-          <MealCard key={m.key} personId={ctx.person.id} date={date} slot={m.key} label={m.label} entries={m.entries} slots={slots} canWrite={ctx.canWrite} proteinDose={m.main ? day.proteinDose : null} yesterday={extras.yesterdaySlots.includes(m.key)} />
+          <MealCard key={m.key} personId={ctx.person.id} date={date} slot={m.key} label={m.label} entries={m.entries} slots={slots} canWrite={ctx.canWrite} proteinDose={m.main ? day.proteinDose : null} yesterday={extras.yesterdaySlots.includes(m.key)} microTargets={day.microTargets} slotTime={m.time} timeZone={ctx.person.timezone} />
         ))}
       </div>
     ),

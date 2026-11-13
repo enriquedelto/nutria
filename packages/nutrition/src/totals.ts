@@ -62,6 +62,18 @@ export function completeDerived(m: NutrientMap): NutrientMap {
   return out;
 }
 
+const PAIRED: Record<string, string> = { salt: "sodium", sodium: "salt" };
+
+/**
+ * Nutrients of an estimate (e.g. the AI's per 100 g) that a catalogue food lacks — typically
+ * caffeine. Energy and salt/sodium (derived from each other) always come from the food.
+ */
+export function missingFrom(food: NutrientMap, estimate: NutrientMap): NutrientMap {
+  return Object.fromEntries(
+    Object.entries(estimate).filter(([k, v]) => v > 0 && k !== "energy_kcal" && food[k] == null && !(PAIRED[k] && food[PAIRED[k]] != null)),
+  );
+}
+
 /** Household unit → grams resolution. */
 export interface Serving {
   label: string;

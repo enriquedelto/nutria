@@ -4,7 +4,7 @@
  * Every write originating from AI is recorded in ai_actions so it can be undone.
  */
 import { aiActions, aiEstimates, and, batches, diaryEntries, eq, foods, inArray, isNull, sql, type Database } from "@nutria/db";
-import { applyLocked, completeDerived, macroColumns, scaleNutrients, type NutrientMap } from "@nutria/nutrition";
+import { applyLocked, completeDerived, macroColumns, missingFrom, scaleNutrients, type NutrientMap } from "@nutria/nutrition";
 import { z } from "zod";
 import { recomputeDay } from "./summaries";
 
@@ -22,6 +22,10 @@ export const DiaryItemInput = z.object({
   /** Absolute nutrients for quick add (no grams scaling). */
   absolute: z.record(z.string(), z.number()).optional(),
   lockedValues: z.record(z.string(), z.number()).optional(),
+  /** Per-100 g values for nutrients the food lacks (AI estimate, e.g. caffeine); never override the food. */
+  fillPer100: z.record(z.string(), z.number()).optional(),
+  /** NOVA group when the food has none (AI estimate). */
+  nova: z.number().int().min(1).max(4).nullish(),
   eatenAt: z.coerce.date().nullish(),
   note: z.string().max(500).nullish(),
   clientId: z.string().max(80).nullish(),
@@ -51,7 +55,7 @@ export async function addEntries(db: Database, input: AddEntriesInput) {
     let nutrients: NutrientMap;
     if (it.absolute) nutrients = completeDerived(it.absolute);
     else {
-      const per100 = f ? { ...f.nutrients, ...(f.kcal != null ? { energy_kcal: f.kcal } : {}) } : completeDerived(it.per100 ?? {});
+      const per100 = f ? { ...(it.fillPer100 ? missingFrom(f.nutrients, it.fillPer100) : {}), ...f.nutrients, ...(f.kcal != null ? { energy_kcal: f.kcal } : {}) } : completeDerived(it.per100 ?? {});
       nutrients = scaleNutrients(per100, it.grams, it.lockedValues);
     }
     const m = macroColumns(nutrients);
@@ -71,7 +75,7 @@ export async function addEntries(db: Database, input: AddEntriesInput) {
       ...m,
       nutrients,
       lockedValues: it.lockedValues ?? {},
-      nova: f?.nova ?? null,
+      nova: f?.nova ?? it.nova ?? null,
       nutriscore: f?.nutriscore ?? null,
       origin: input.origin,
       aiEstimateId: input.estimateId ?? null,
@@ -100,7 +104,7 @@ export async function addEntries(db: Database, input: AddEntriesInput) {
  * With `foodId` the entry is swapped to another food (same grams unless given): name, brand and
  * nutrients come from the new food and earlier corrections are dropped.
  */
-export async function updateEntry(db: Database, personId: string, id: string, patch: { grams?: number; mealSlot?: string; date?: string; lockedValues?: NutrientMap; note?: string | null; foodId?: string }) {
+export async function updateEntry(db: Database, personId: string, id: string, patch: { grams?: number; mealSlot?: string; date?: string; lockedValues?: NutrientMap; note?: string | null; foodId?: string; eatenAt?: Date | null }) {
   const [e] = await db.select().from(diaryEntries).where(and(eq(diaryEntries.id, id), eq(diaryEntries.personId, personId))).limit(1);
   if (!e) return null;
   if (patch.foodId && patch.foodId !== e.foodId) {
@@ -128,6 +132,7 @@ export async function updateEntry(db: Database, personId: string, id: string, pa
         mealSlot: patch.mealSlot ?? e.mealSlot,
         date: patch.date ?? e.date,
         note: patch.note === undefined ? e.note : patch.note,
+        eatenAt: patch.eatenAt === undefined ? e.eatenAt : patch.eatenAt,
       })
       .where(eq(diaryEntries.id, id))
       .returning();
@@ -148,7 +153,7 @@ export async function updateEntry(db: Database, personId: string, id: string, pa
   const serving = patch.grams != null && patch.grams !== e.grams ? { servingLabel: null, servingQty: null } : {};
   const [u] = await db
     .update(diaryEntries)
-    .set({ grams, nutrients, ...macroColumns(nutrients), ...serving, mealSlot: patch.mealSlot ?? e.mealSlot, date: patch.date ?? e.date, lockedValues: { ...e.lockedValues, ...(patch.lockedValues ?? {}) }, note: patch.note === undefined ? e.note : patch.note })
+    .set({ grams, nutrients, ...macroColumns(nutrients), ...serving, mealSlot: patch.mealSlot ?? e.mealSlot, date: patch.date ?? e.date, lockedValues: { ...e.lockedValues, ...(patch.lockedValues ?? {}) }, note: patch.note === undefined ? e.note : patch.note, eatenAt: patch.eatenAt === undefined ? e.eatenAt : patch.eatenAt })
     .where(eq(diaryEntries.id, id))
     .returning();
   await recomputeDay(db, personId, e.date);

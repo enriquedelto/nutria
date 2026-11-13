@@ -110,6 +110,13 @@ const Settings = z.object({
   waterGoalMl: z.number().int().min(500).max(8000).optional(),
   enabledModules: z.array(z.string().max(30)).max(30).optional(),
   mealReminders: z.boolean().optional(),
+  caffeine: z
+    .object({
+      halfLifeH: z.number().min(2).max(12).optional(),
+      /** "HH:MM"; omitted = usual bedtime from the sleep log. */
+      bedtime: z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/).optional(),
+    })
+    .optional(),
 });
 
 export async function updatePersonSettings(personId: string, patch: z.input<typeof Settings>) {

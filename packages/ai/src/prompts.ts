@@ -25,7 +25,8 @@ Tarea: convertir la descripción de una comida (texto, voz transcrita o fotos co
 - Separa cada alimento o ingrediente relevante (aceite, salsas y bebidas incluidos si se mencionan o se ven).
 - Estima gramos tal como se comen (cocinado si está cocinado). Usa raciones españolas típicas y las porciones habituales de la persona si se indican.
 - "searchQuery" debe ser corta y genérica para buscar en la base de datos ("lentejas cocidas", "pan de barra"); incluye la marca solo si aparece.
-- "per100" es tu mejor estimación por 100 g (energy_kcal, protein, carbs, fat, fiber y, si procede, sugars, sat_fat, salt).
+- "per100" es tu mejor estimación por 100 g (energy_kcal, protein, carbs, fat, fiber y, si procede, sugars, sat_fat, salt; en café, té, refrescos de cola y bebidas energéticas incluye siempre caffeine en mg; en bebidas alcohólicas, alcohol en g).
+- "nova": grupo NOVA del alimento tal como se come. 1 = sin procesar o mínimamente (fruta, verdura, leche, huevos, carne o pescado frescos, arroz, legumbres, avena, café, infusiones). 2 = ingrediente culinario (aceite, mantequilla, azúcar, sal). 3 = procesado (pan de panadería, queso, conservas de verdura o pescado, jamón curado). 4 = ultraprocesado (pan de molde industrial, embutido con aditivos, nuggets, mayonesa y salsas envasadas, bollería, refrescos, cereales azucarados, platos preparados). En platos caseros, el grupo del ingrediente principal.
 - Si hay ambigüedad importante, añade como mucho dos preguntas breves en "questions".
 - En fotos, usa el tamaño del plato, cubiertos y manos como referencia. Si hay varias fotos, son la misma comida.
 Códigos de nutrientes válidos: ${NUTRIENT_CODES}.`,

@@ -1,6 +1,6 @@
 /** Daily aggregates (daily_summaries) — recomputed whenever the diary of a day changes. */
 import { and, dailySummaries, diaryEntries, eq, exerciseLogs, targetSets, waterLogs, sql, type Database } from "@nutria/db";
-import { dailyQualityScore, macroColumns, roundMap, sumNutrients, upfKcalPct } from "@nutria/nutrition";
+import { dailyQualityScore, macroColumns, NOVA_MIN_COVERAGE, novaCoverage, roundMap, sumNutrients, upfKcalPct } from "@nutria/nutrition";
 
 export async function recomputeDay(db: Database, personId: string, date: string) {
   const entries = await db
@@ -19,7 +19,8 @@ export async function recomputeDay(db: Database, personId: string, date: string)
     ...m,
     nutrients: roundMap(totals, 3),
     entries: entries.length,
-    upfKcalPct: upfKcalPct(entries),
+    // With little NOVA data the share describes a couple of foods, not the day: leave it out of averages.
+    upfKcalPct: (novaCoverage(entries) ?? 0) >= NOVA_MIN_COVERAGE ? upfKcalPct(entries) : null,
     qualityScore: target
       ? dailyQualityScore(entries, totals, { kcal: target.kcal, fiber: target.fiber ?? undefined, salt: target.micros.salt?.max, sat_fat: target.micros.sat_fat?.max, added_sugars: target.micros.added_sugars?.max })
       : dailyQualityScore(entries, totals, { kcal: 2000 }),

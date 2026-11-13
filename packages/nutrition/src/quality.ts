@@ -17,6 +17,17 @@ export function upfKcalPct(entries: QualityEntry[]): number | null {
   return Math.round((upf / total) * 1000) / 10;
 }
 
+/** % of the day's kcal whose NOVA group is known (how much `upfKcalPct` can be trusted). */
+export function novaCoverage(entries: QualityEntry[]): number | null {
+  const total = entries.reduce((s, e) => s + Math.max(0, e.kcal), 0);
+  if (total === 0) return null;
+  const known = entries.filter((e) => e.nova != null && e.kcal > 0).reduce((s, e) => s + e.kcal, 0);
+  return Math.round((known / total) * 1000) / 10;
+}
+
+/** Below this NOVA coverage the UPF share describes a few foods, not the day. */
+export const NOVA_MIN_COVERAGE = 50;
+
 const NS_POINTS: Record<string, number> = { a: 100, b: 80, c: 55, d: 30, e: 10 };
 
 /**
@@ -34,7 +45,8 @@ export function dailyQualityScore(
   const gradedKcal = graded.reduce((s, e) => s + e.kcal, 0);
   let score = gradedKcal > 0 ? graded.reduce((s, e) => s + NS_POINTS[e.nutriscore!]! * e.kcal, 0) / gradedKcal : 60;
   const upf = upfKcalPct(entries);
-  if (upf != null) score -= Math.max(0, upf - 15) * 0.4;
+  // Only penalise UPF when NOVA covers enough of the day; otherwise one known food decides it.
+  if (upf != null && (novaCoverage(entries) ?? 0) >= NOVA_MIN_COVERAGE) score -= Math.max(0, upf - 15) * 0.4;
   const fiberDensity = ((totals.fiber ?? 0) / kcalTotal) * 1000; // g/1000 kcal
   score += Math.min(10, Math.max(-10, (fiberDensity - 12) * 1.2));
   const over = (v: number | undefined, max: number | undefined) => (v != null && max ? Math.max(0, v / max - 1) : 0);

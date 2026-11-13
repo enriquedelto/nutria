@@ -2,9 +2,11 @@ import { Suspense } from "react";
 import Link from "next/link";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import { and, dailySummaries, eq, gte, lte, mealFeelings } from "@nutria/db";
-import { addDays, dailyQualityScore, NUTRIENTS, todayIn, upfKcalPct } from "@nutria/nutrition";
+import { addDays, dailyQualityScore, NOVA_MIN_COVERAGE, novaCoverage, NUTRIENTS, todayIn, upfKcalPct } from "@nutria/nutrition";
 import { MacroSummary } from "@/components/diary/macro-summary";
 import { MealCard } from "@/components/diary/meal-card";
+import { CaffeineCard } from "@/components/diary/caffeine-card";
+import { caffeineDay } from "@nutria/core";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardHeader } from "@/components/ui/card";
@@ -26,15 +28,18 @@ async function Content({ searchParams }: { searchParams: Promise<Record<string, 
   const ctx = await requireScope("diary");
   const today = todayIn(ctx.person.timezone);
   const date = isDate(sp.fecha) ? sp.fecha : today;
-  const [day, week, feelings] = await Promise.all([
+  const [day, week, feelings, caffeine] = await Promise.all([
     getDay(ctx.person.id, date),
     db().select({ date: dailySummaries.date, kcal: dailySummaries.kcal, complete: dailySummaries.complete }).from(dailySummaries).where(and(eq(dailySummaries.personId, ctx.person.id), gte(dailySummaries.date, addDays(date, -6)), lte(dailySummaries.date, addDays(date, 6)))),
     db().select().from(mealFeelings).where(and(eq(mealFeelings.personId, ctx.person.id), eq(mealFeelings.date, date))),
+    caffeineDay(db(), ctx.person.id, date),
   ]);
   const byDate = new Map(week.map((w) => [w.date, w]));
   const strip = Array.from({ length: 7 }, (_, i) => addDays(date, i - 3));
   const slots = day.meals.map((m) => ({ key: m.key, label: m.label }));
   const upf = upfKcalPct(day.entries.map((e) => ({ kcal: e.kcal, nova: e.nova })));
+  const novaPct = novaCoverage(day.entries.map((e) => ({ kcal: e.kcal, nova: e.nova })));
+  const upfPartial = novaPct != null && novaPct < NOVA_MIN_COVERAGE;
   const quality = dailyQualityScore(
     day.entries.map((e) => ({ kcal: e.kcal, nova: e.nova, nutriscore: e.nutriscore })),
     day.totals,
@@ -87,19 +92,27 @@ async function Content({ searchParams }: { searchParams: Promise<Record<string, 
             <MacroSummary totals={day.totals} target={day.target} exerciseKcal={day.exerciseKcal} unit={day.energyUnit} />
             <div className="mt-4 flex flex-wrap items-center gap-2 border-t border-line pt-3 text-sm">
               {quality != null ? <Badge tone={quality >= 70 ? "ok" : quality >= 45 ? "warn" : "danger"}>Calidad {quality}/100</Badge> : null}
-              {upf != null ? <Badge tone={upf > 30 ? "accent" : "neutral"}>{n0(upf)} % kcal ultraprocesadas</Badge> : null}
+              {upf != null ? (
+                <Badge tone={upf > 30 && !upfPartial ? "accent" : "neutral"}>
+                  {n0(upf)} % kcal ultraprocesadas{upfPartial ? ` · dato en ${n0(novaPct!)} % de las kcal` : ""}
+                </Badge>
+              ) : null}
               {complete ? <Badge tone="herb">Día completo</Badge> : null}
             </div>
           </Card>
           {day.meals.map((m) => (
             <div key={m.key} className="space-y-1">
-              <MealCard personId={ctx.person.id} date={date} slot={m.key} label={m.label} entries={m.entries} slots={slots} canWrite={ctx.canWrite} proteinDose={m.main ? day.proteinDose : null} />
+              <MealCard personId={ctx.person.id} date={date} slot={m.key} label={m.label} entries={m.entries} slots={slots} canWrite={ctx.canWrite} proteinDose={m.main ? day.proteinDose : null} microTargets={day.microTargets} slotTime={m.time} timeZone={ctx.person.timezone} />
               {m.entries.length && ctx.canWrite ? <FeelingButton personId={ctx.person.id} date={date} slot={m.key} current={feelings.find((f) => f.mealSlot === m.key) ?? null} /> : null}
             </div>
           ))}
           {ctx.canWrite ? <DayActions personId={ctx.person.id} date={date} today={today} complete={complete} hasEntries={day.entries.length > 0} meals={day.meals.filter((m) => m.entries.length).map((m) => ({ key: m.key, label: m.label, items: m.entries.map((e) => ({ foodId: e.foodId ?? undefined, name: e.name, grams: e.grams, servingLabel: e.servingLabel ?? undefined })) }))} /> : null}
         </div>
 
+        <div className="min-w-0 space-y-4">
+        {caffeine.doses.length || caffeine.trainingStart != null ? (
+          <CaffeineCard key={`${caffeine.bedtime}-${caffeine.halfLifeH}`} personId={ctx.person.id} day={caffeine} canEdit={ctx.canWrite} />
+        ) : null}
         <Card id="nutrientes" className="h-fit lg:sticky lg:top-20">
           <CardHeader title="Nutrientes" subtitle="Total del día frente a tus objetivos" action={<Link href="/informe" className="text-xs text-herb underline">Informe</Link>} />
           {Object.entries(CATEGORY_TITLES).map(([cat, title]) => {
@@ -132,6 +145,7 @@ async function Content({ searchParams }: { searchParams: Promise<Record<string, 
           })}
           <p className="mt-2 text-xs text-ink-3">Referencias EFSA según edad y sexo. Los alimentos sin datos de un nutriente cuentan como 0.</p>
         </Card>
+        </div>
       </div>
     </>
   );

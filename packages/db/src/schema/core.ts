@@ -69,6 +69,8 @@ export type PersonSettings = {
   waterGoalMl?: number;
   enabledModules?: string[];
   mealReminders?: boolean;
+  /** Caffeine curve: own half-life and fixed bedtime ("HH:MM"); defaults come from data. */
+  caffeine?: { halfLifeH?: number; bedtime?: string };
 };
 
 /**

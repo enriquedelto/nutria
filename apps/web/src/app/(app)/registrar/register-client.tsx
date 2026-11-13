@@ -6,7 +6,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { Camera, HelpCircle, ImagePlus, Loader2, ScanText, Search, Sparkles, Trash2, X } from "lucide-react";
 import { toast } from "sonner";
-import { scaleNutrients, type NutrientMap } from "@nutria/nutrition";
+import { missingFrom, scaleNutrients, type NutrientMap } from "@nutria/nutrition";
 import { learnPortions } from "@/actions/ai";
 import { WhatIf, type DayContext } from "@/components/food/add-food-dialog";
 import { FoodPicker } from "@/components/food/food-picker";
@@ -29,6 +29,8 @@ type Estimate = {
     grams: number;
     servingLabel?: string | null;
     confidence: number;
+    nova?: number | null;
+    per100: { code: string; amount: number }[];
     nutrients: NutrientMap;
     match: { foodId: string; name: string; brand: string | null; source: string } | null;
     candidates: { foodId: string; name: string; brand: string | null; kcal: number | null }[];
@@ -46,6 +48,9 @@ type Row = {
   matchName: string | null;
   candidates: Estimate["items"][number]["candidates"];
   confidence: number;
+  nova: number | null;
+  /** The AI's own per 100 g: fills nutrients the chosen food lacks (e.g. caffeine). */
+  aiPer100: NutrientMap;
 };
 
 export function RegisterClient({ ctx, aiEnabled, sharedImages, voice = false }: { ctx: DayContext; aiEnabled: boolean; sharedImages: string[]; voice?: boolean }) {
@@ -105,6 +110,8 @@ export function RegisterClient({ ctx, aiEnabled, sharedImages, voice = false }: 
           matchName: it.match ? [it.match.name, it.match.brand].filter(Boolean).join(" · ") : null,
           candidates: it.candidates,
           confidence: it.confidence,
+          nova: it.nova ?? null,
+          aiPer100: Object.fromEntries(it.per100.map((x) => [x.code, x.amount])),
         })),
       );
     } catch (e) {
@@ -131,7 +138,7 @@ export function RegisterClient({ ctx, aiEnabled, sharedImages, voice = false }: 
               matchName: [name, f.brand].filter(Boolean).join(" · "),
               // Keep the picked food in the dropdown so it can be chosen again after switching away.
               candidates: r.candidates.some((c) => c.foodId === foodId) ? r.candidates : [{ foodId, name, brand: f.brand, kcal: f.kcal }, ...r.candidates],
-              per100: { ...f.nutrients, energy_kcal: f.kcal ?? 0, protein: f.protein ?? 0, carbs: f.carbs ?? 0, fat: f.fat ?? 0, fiber: f.fiber ?? 0 },
+              per100: { ...missingFrom(f.nutrients, r.aiPer100), ...f.nutrients, energy_kcal: f.kcal ?? 0, protein: f.protein ?? 0, carbs: f.carbs ?? 0, fat: f.fat ?? 0, fiber: f.fiber ?? 0 },
             }
           : r,
       ),
@@ -154,7 +161,7 @@ export function RegisterClient({ ctx, aiEnabled, sharedImages, voice = false }: 
         mealSlot: slot,
         origin,
         estimateId: est.estimateId,
-        items: rows.map((r) => (r.foodId ? { foodId: r.foodId, grams: r.grams, servingLabel: r.servingLabel, clientId: newClientId() } : { name: r.name, grams: r.grams, per100: r.per100, servingLabel: r.servingLabel, clientId: newClientId() })),
+        items: rows.map((r) => (r.foodId ? { foodId: r.foodId, grams: r.grams, servingLabel: r.servingLabel, fillPer100: r.aiPer100, nova: r.nova, clientId: newClientId() } : { name: r.name, grams: r.grams, per100: r.per100, servingLabel: r.servingLabel, nova: r.nova, clientId: newClientId() })),
       });
       const corrections = rows.filter((r) => r.servingLabel && Math.abs(r.grams - r.aiGrams) / Math.max(1, r.aiGrams) > 0.15).map((r) => ({ phrase: `${r.servingLabel} ${r.name}`, grams: r.grams, foodId: r.foodId }));
       if (corrections.length) void learnPortions(ctx.personId, corrections).catch(() => undefined);
