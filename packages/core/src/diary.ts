@@ -3,8 +3,8 @@
  * `lockedValues` are per-100 g user corrections that scale with grams.
  * Every write originating from AI is recorded in ai_actions so it can be undone.
  */
-import { aiActions, aiEstimates, and, batches, diaryEntries, eq, foods, inArray, isNull, sql, type Database } from "@nutria/db";
-import { applyLocked, completeDerived, macroColumns, missingFrom, scaleNutrients, type NutrientMap } from "@nutria/nutrition";
+import { aiActions, aiEstimates, and, batches, diaryEntries, eq, foods, inArray, isNull, persons, sql, type Database } from "@nutria/db";
+import { applyLocked, completeDerived, macroColumns, missingFrom, scaleNutrients, todayIn, type NutrientMap } from "@nutria/nutrition";
 import { z } from "zod";
 import { recomputeDay } from "./summaries";
 
@@ -35,6 +35,9 @@ export type DiaryItemInput = z.infer<typeof DiaryItemInput>;
 export const DIARY_ORIGINS = ["manual", "scan", "ai_text", "ai_photo", "ai_voice", "label", "plan", "import", "quick", "mcp", "batch", "recipe", "supplement"] as const;
 export type DiaryOrigin = (typeof DIARY_ORIGINS)[number];
 
+/** Planned or imported entries are not eaten "now". */
+const NO_DEFAULT_TIME = new Set<DiaryOrigin>(["plan", "import"]);
+
 export interface AddEntriesInput {
   personId: string;
   userId: string;
@@ -46,7 +49,14 @@ export interface AddEntriesInput {
 }
 
 /** Insert diary entries (idempotent by clientId) and refresh the day summary. */
-export async function addEntries(db: Database, input: AddEntriesInput) {
+export async function addEntries(db: Database, input: AddEntriesInput, now = new Date()) {
+  // Logged today without a time: it is being eaten about now. Clients that can queue offline send
+  // their own time; this covers the rest (templates, MCP, shortcuts).
+  let defaultEatenAt: Date | null = null;
+  if (!NO_DEFAULT_TIME.has(input.origin) && input.items.some((i) => !i.eatenAt)) {
+    const [p] = await db.select({ tz: persons.timezone }).from(persons).where(eq(persons.id, input.personId)).limit(1);
+    if (p && input.date === todayIn(p.tz, now)) defaultEatenAt = now;
+  }
   const foodIds = input.items.map((i) => i.foodId).filter((x): x is string => !!x);
   const foodRows = foodIds.length ? await db.select().from(foods).where(inArray(foods.id, foodIds)) : [];
   const byId = new Map(foodRows.map((f) => [f.id, f]));
@@ -63,7 +73,7 @@ export async function addEntries(db: Database, input: AddEntriesInput) {
       personId: input.personId,
       date: input.date,
       mealSlot: input.mealSlot,
-      eatenAt: it.eatenAt ?? null,
+      eatenAt: it.eatenAt ?? defaultEatenAt,
       foodId: f?.id ?? null,
       recipeId: it.recipeId ?? null,
       batchId: it.batchId ?? null,

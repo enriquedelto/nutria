@@ -17,7 +17,7 @@ async function Content({ searchParams }: { searchParams: Promise<Record<string, 
   const ctx = await requireScope("diary", { write: true });
   const date = isDate(sp.fecha) ? sp.fecha : todayIn(ctx.person.timezone);
   const day = await getDay(ctx.person.id, date);
-  const slots = day.meals.filter((m) => m.key !== "other").map((m) => ({ key: m.key, label: m.label }));
+  const slots = day.meals.filter((m) => m.key !== "other").map((m) => ({ key: m.key, label: m.label, time: m.time }));
   const wanted = sp.comida ?? closestSlot(day.meals, ctx.person.timezone);
   const slot = slots.some((s) => s.key === wanted) ? wanted : (slots[0]?.key ?? "lunch");
   let shared: string[] = [];
@@ -35,6 +35,7 @@ async function Content({ searchParams }: { searchParams: Promise<Record<string, 
         ctx={{
           personId: ctx.person.id,
           date,
+          today: todayIn(ctx.person.timezone),
           slot,
           slots,
           totals: { kcal: day.totals.energy_kcal ?? 0, protein: day.totals.protein ?? 0, carbs: day.totals.carbs ?? 0, fat: day.totals.fat ?? 0 },

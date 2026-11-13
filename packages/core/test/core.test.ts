@@ -802,3 +802,18 @@ describe("días a medias", () => {
     expect(rows.map((r) => r.date)).toEqual(["2027-09-01", "2027-09-04"]);
   });
 });
+
+describe("hora al registrar", () => {
+  it("hoy sin hora → ahora; otro día, plan o con hora propia → no se toca", async () => {
+    const [p] = await db.select().from(persons).where(eq(persons.userId, "gym"));
+    const pid = p!.id;
+    const now = core.zonedTime("2027-10-04", "13:47", p!.timezone);
+    const add = (date: string, origin: "manual" | "plan", eatenAt?: Date) =>
+      core.addEntries(db, { personId: pid, userId: "gym", date, mealSlot: "lunch", origin, items: [{ name: "Arroz", grams: 100, absolute: { energy_kcal: 130 }, eatenAt }] }, now);
+    expect((await add("2027-10-04", "manual"))[0]!.eatenAt).toEqual(now);
+    expect((await add("2027-10-03", "manual"))[0]!.eatenAt).toBeNull();
+    expect((await add("2027-10-04", "plan"))[0]!.eatenAt).toBeNull();
+    const mine = core.zonedTime("2027-10-04", "09:10", p!.timezone);
+    expect((await add("2027-10-04", "manual", mine))[0]!.eatenAt).toEqual(mine);
+  });
+});

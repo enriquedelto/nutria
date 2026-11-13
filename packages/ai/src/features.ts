@@ -30,7 +30,7 @@ import {
   weightLogs,
   type Database,
 } from "@nutria/db";
-import { addDays, completeDerived, countsForAverages, DAY_STATUS_LABEL, dayLogStatus, macroColumns, microGaps, missingFrom, round, scaleNutrients, type NutrientMap } from "@nutria/nutrition";
+import { addDays, completeDerived, countsForAverages, DAY_STATUS_LABEL, dayLogStatus, formatDateEs, macroColumns, microGaps, missingFrom, round, scaleNutrients, type NutrientMap } from "@nutria/nutrition";
 import { buildPersonContext, mealSlotName, portionKey } from "./context";
 import { contextBlock, HEALTH_DISCLAIMER, PROMPTS } from "./prompts";
 import { getProvider } from "./provider";
@@ -105,7 +105,7 @@ export interface MealEstimateResult {
  */
 export async function estimateMeal(
   c: PersonFeatureCtx,
-  input: { text?: string; images?: Images; mode: "text" | "voice" | "photo"; mealSlot?: string; date?: string },
+  input: { text?: string; images?: Images; mode: "text" | "voice" | "photo"; mealSlot?: string; date?: string; /** "HH:MM" when it was eaten. */ time?: string },
 ): Promise<MealEstimateResult> {
   const pc = await buildPersonContext(c.db, c.personId, c.scopes);
   const content: AiContent[] = [
@@ -115,6 +115,7 @@ export async function estimateMeal(
       text: [
         contextBlock(pc.lines),
         input.mealSlot ? `Comida: ${mealSlotName(input.mealSlot)}.` : null,
+        input.date && (input.date !== pc.today || input.time) ? `Se comió el ${formatDateEs(input.date)}${input.time ? ` a las ${input.time}` : ""}.` : null,
         input.images?.length ? `${input.images.length} foto(s) de la misma comida.` : null,
         input.text ? `Descripción${input.mode === "voice" ? " (dictada por voz)" : ""}: ${input.text}` : "Estima la comida de las fotos.",
       ]
@@ -132,7 +133,7 @@ export async function estimateMeal(
   const estimateId = await saveEstimate(c, {
     personId: c.personId,
     kind: "meal",
-    input: { mode: input.mode, text: input.text ?? null, photos: input.images?.length ?? 0, mealSlot: input.mealSlot ?? null, date: input.date ?? pc.today },
+    input: { mode: input.mode, text: input.text ?? null, photos: input.images?.length ?? 0, mealSlot: input.mealSlot ?? null, date: input.date ?? pc.today, time: input.time ?? null },
     output: { ...data, items },
     confidence: items.length ? items.reduce((s, i) => s + i.confidence, 0) / items.length : 0,
     model,

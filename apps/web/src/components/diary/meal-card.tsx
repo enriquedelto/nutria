@@ -221,6 +221,7 @@ export function MealCard({
                     {ORIGIN_ICON[e.origin] ? <span className="ml-2 rounded bg-herb-soft px-1 text-[10px] font-semibold uppercase text-herb">{ORIGIN_ICON[e.origin]}</span> : null}
                   </p>
                   <p className="truncate text-xs text-ink-3">
+                    {e.eatenAt ? <span className="num">{clockIn(e.eatenAt, timeZone)} · </span> : null}
                     {e.quick ? "Registro rápido" : e.servingLabel ? `${e.servingLabel} · ${n0(e.grams)} g` : `${n0(e.grams)} g`}
                     {e.brand ? ` · ${e.brand}` : ""}
                   </p>

@@ -18,6 +18,8 @@ import { fileToJpeg, type B64Image } from "@/lib/image";
 import { n0 } from "@/lib/format";
 import { newClientId, sendOrQueue } from "@/lib/offline-queue";
 import { cn } from "@/lib/utils";
+import { photoTakenAt } from "@/lib/exif";
+import { defaultEntryTime, fromLocal, slotForTime } from "@/lib/slots";
 
 type Estimate = {
   estimateId: string;
@@ -60,6 +62,9 @@ export function RegisterClient({ ctx, aiEnabled, sharedImages, voice = false }: 
   const [mode, setMode] = useState<"text" | "voice" | "photo">("text");
   const [images, setImages] = useState<B64Image[]>([]);
   const [slot, setSlot] = useState(ctx.slot);
+  // When it was eaten: today → now; another day → that meal's usual time. Photos can override it (EXIF).
+  const [date, setDate] = useState(ctx.date);
+  const [time, setTime] = useState(() => defaultEntryTime(ctx.date, ctx.today, ctx.slots.find((s) => s.key === ctx.slot)?.time));
   const [est, setEst] = useState<Estimate | null>(null);
   const [rows, setRows] = useState<Row[]>([]);
   const [busy, setBusy] = useState(false);
@@ -72,14 +77,35 @@ export function RegisterClient({ ctx, aiEnabled, sharedImages, voice = false }: 
   useEffect(() => {
     if (!sharedImages.length) return;
     void (async () => {
-      const imgs = await Promise.all(sharedImages.map(async (u) => fileToJpeg(await (await fetch(u)).blob())));
-      setImages(imgs);
+      const blobs = await Promise.all(sharedImages.map(async (u) => (await fetch(u)).blob()));
+      // Shared from the gallery, often hours later: the photo's own time is the meal's.
+      const at = blobs[0] ? await photoTakenAt(blobs[0]) : null;
+      if (at?.source === "exif" && Math.abs(fromLocal(at.date, at.time).getTime() - Date.now()) >= 30 * 60_000) {
+        setDate(at.date);
+        setTime(at.time);
+        setSlot(slotForTime(ctx.slots, at.time));
+        toast(`Hora tomada de la foto: ${dayLabel(at.date, ctx.today)}, ${at.time}`);
+      }
+      setImages(await Promise.all(blobs.map((b) => fileToJpeg(b))));
       setMode("photo");
     })();
-  }, [sharedImages]);
+  }, [sharedImages, ctx.slots, ctx.today]);
+
+  /** Photo taken at another time than the form says (e.g. eaten out, logged later): use its time. */
+  const adoptPhotoTime = async (file: File) => {
+    const at = await photoTakenAt(file);
+    if (!at) return;
+    const delta = Math.abs(fromLocal(at.date, at.time).getTime() - fromLocal(date, time).getTime());
+    if (delta < 30 * 60_000) return;
+    setDate(at.date);
+    setTime(at.time);
+    setSlot(slotForTime(ctx.slots, at.time));
+    toast(`Hora tomada de la foto: ${dayLabel(at.date, ctx.today)}, ${at.time}`, { description: "Cámbiala abajo si no es la de la comida." });
+  };
 
   const addFiles = async (files: FileList | null) => {
     if (!files) return;
+    if (!images.length && files[0]) await adoptPhotoTime(files[0]);
     const next = await Promise.all([...files].slice(0, 6 - images.length).map((f) => fileToJpeg(f)));
     setImages((xs) => [...xs, ...next].slice(0, 6));
     setMode("photo");
@@ -91,7 +117,7 @@ export function RegisterClient({ ctx, aiEnabled, sharedImages, voice = false }: 
       const res = await fetch("/api/ai/meal", {
         method: "POST",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify({ personId: ctx.personId, text: text.trim() || undefined, images: images.length ? images.map(({ mediaType, data }) => ({ mediaType, data })) : undefined, mode: images.length ? "photo" : mode, mealSlot: slot, date: ctx.date }),
+        body: JSON.stringify({ personId: ctx.personId, text: text.trim() || undefined, images: images.length ? images.map(({ mediaType, data }) => ({ mediaType, data })) : undefined, mode: images.length ? "photo" : mode, mealSlot: slot, date, time }),
       });
       const d = await res.json();
       if (!res.ok) throw new Error(d.error ?? "Error de la IA");
@@ -155,13 +181,14 @@ export function RegisterClient({ ctx, aiEnabled, sharedImages, voice = false }: 
     start(async () => {
       if (!est || !rows.length) return;
       const origin = images.length ? "ai_photo" : mode === "voice" ? "ai_voice" : "ai_text";
+      const eatenAt = fromLocal(date, time).toISOString();
       const res = await sendOrQueue<{ actionId?: string | null }>("/api/diary", {
         personId: ctx.personId,
-        date: ctx.date,
+        date,
         mealSlot: slot,
         origin,
         estimateId: est.estimateId,
-        items: rows.map((r) => (r.foodId ? { foodId: r.foodId, grams: r.grams, servingLabel: r.servingLabel, fillPer100: r.aiPer100, nova: r.nova, clientId: newClientId() } : { name: r.name, grams: r.grams, per100: r.per100, servingLabel: r.servingLabel, nova: r.nova, clientId: newClientId() })),
+        items: rows.map((r) => (r.foodId ? { foodId: r.foodId, grams: r.grams, servingLabel: r.servingLabel, fillPer100: r.aiPer100, nova: r.nova, eatenAt, clientId: newClientId() } : { name: r.name, grams: r.grams, per100: r.per100, servingLabel: r.servingLabel, nova: r.nova, eatenAt, clientId: newClientId() })),
       });
       const corrections = rows.filter((r) => r.servingLabel && Math.abs(r.grams - r.aiGrams) / Math.max(1, r.aiGrams) > 0.15).map((r) => ({ phrase: `${r.servingLabel} ${r.name}`, grams: r.grams, foodId: r.foodId }));
       if (corrections.length) void learnPortions(ctx.personId, corrections).catch(() => undefined);
@@ -185,7 +212,7 @@ export function RegisterClient({ ctx, aiEnabled, sharedImages, voice = false }: 
         setRows([]);
         return;
       }
-      router.push(`/hoy`);
+      router.push(date === ctx.today ? "/hoy" : `/diario?fecha=${date}`);
       router.refresh();
     });
 
@@ -239,6 +266,10 @@ export function RegisterClient({ ctx, aiEnabled, sharedImages, voice = false }: 
             <input ref={camRef} type="file" accept="image/*" capture="environment" hidden onChange={(e) => void addFiles(e.target.files)} />
             <input ref={fileRef} type="file" accept="image/*" multiple hidden onChange={(e) => void addFiles(e.target.files)} />
           </div>
+          <WhenFields date={date} time={time} today={ctx.today} onDate={setDate} onTime={(t) => {
+            setTime(t);
+            if (t) setSlot(slotForTime(ctx.slots, t));
+          }} />
           <div className="grid grid-cols-[1fr_auto] items-end gap-3">
             <Field label="Comida">
               <Select value={slot} onChange={(e) => setSlot(e.target.value)}>
@@ -324,7 +355,8 @@ export function RegisterClient({ ctx, aiEnabled, sharedImages, voice = false }: 
             })}
           </ul>
           {est.notes ? <p className="text-sm text-ink-2">{est.notes}</p> : null}
-          <WhatIf ctx={ctx} item={sum} />
+          {date === ctx.date ? <WhatIf ctx={ctx} item={sum} /> : null}
+          <WhenFields date={date} time={time} today={ctx.today} onDate={setDate} onTime={setTime} />
           <div className="flex flex-wrap items-center gap-2">
             <Field label="Comida" className="min-w-40 flex-1">
               <Select value={slot} onChange={(e) => setSlot(e.target.value)}>
@@ -344,6 +376,27 @@ export function RegisterClient({ ctx, aiEnabled, sharedImages, voice = false }: 
           </div>
         </>
       )}
+    </div>
+  );
+}
+
+const dayLabel = (d: string, today: string) => {
+  const diff = Math.round((Date.parse(`${today}T12:00:00Z`) - Date.parse(`${d}T12:00:00Z`)) / 86_400_000);
+  if (diff === 0) return "hoy";
+  if (diff === 1) return "ayer";
+  return new Date(`${d}T12:00:00Z`).toLocaleDateString("es-ES", { weekday: "short", day: "numeric", month: "short", timeZone: "UTC" });
+};
+
+/** When it was eaten: entries go to that day and keep that time (for timing: caffeine, training…). */
+function WhenFields({ date, time, today, onDate, onTime }: { date: string; time: string; today: string; onDate: (d: string) => void; onTime: (t: string) => void }) {
+  return (
+    <div className="grid grid-cols-2 gap-3">
+      <Field label="Día">
+        <Input type="date" value={date} max={today} onChange={(e) => e.target.value && onDate(e.target.value)} />
+      </Field>
+      <Field label="Hora">
+        <Input type="time" value={time} onChange={(e) => onTime(e.target.value)} />
+      </Field>
     </div>
   );
 }

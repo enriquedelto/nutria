@@ -43,11 +43,12 @@ async function Content({ params }: { params: Promise<{ id: string }> }) {
   const { food: f, servings, additives, alerts, alternatives } = detail;
   const date = todayIn(ctx.person.timezone);
   const [day, lists, priceRows] = await Promise.all([getDay(ctx.person.id, date), quickLists(ctx.person.id), foodPrices(f, ctx.person.groupId)]);
-  const slots = day.meals.filter((m) => m.key !== "other").map((m) => ({ key: m.key, label: m.label }));
+  const slots = day.meals.filter((m) => m.key !== "other").map((m) => ({ key: m.key, label: m.label, time: m.time }));
   const slot = closestSlot(day.meals, ctx.person.timezone);
   const dayCtx = {
     personId: ctx.person.id,
     date,
+    today: date,
     slot: slots.some((s) => s.key === slot) ? slot : (slots[0]?.key ?? "lunch"),
     slots,
     totals: { kcal: day.totals.energy_kcal ?? 0, protein: day.totals.protein ?? 0, carbs: day.totals.carbs ?? 0, fat: day.totals.fat ?? 0 },

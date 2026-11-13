@@ -10,6 +10,7 @@ const Body = z.object({
   mode: z.enum(["text", "voice", "photo"]),
   mealSlot: z.string().max(40).optional(),
   date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
+  time: z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/).optional(),
 });
 
 /** AI meal estimate (text / voice transcript / photos + note). Nothing is saved to the diary here. */
@@ -17,5 +18,5 @@ export const POST = route(async (req, user) => {
   const b = Body.parse(await req.json());
   if (!b.text?.trim() && !b.images?.length) return json({ error: "Escribe algo o añade una foto" }, 400);
   const c = await aiCtx(user, b.personId, "diary", req);
-  return withAi(async () => json(await estimateMeal(c, { text: b.text, images: b.images ? toImages(b.images) : undefined, mode: b.mode, mealSlot: b.mealSlot, date: b.date })));
+  return withAi(async () => json(await estimateMeal(c, { text: b.text, images: b.images ? toImages(b.images) : undefined, mode: b.mode, mealSlot: b.mealSlot, date: b.date, time: b.time })));
 });

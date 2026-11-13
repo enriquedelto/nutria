@@ -15,13 +15,17 @@ import { Bar } from "@/components/ui/progress";
 import { n0, nutrient, nutrientName } from "@/lib/format";
 import { newClientId, sendOrQueue } from "@/lib/offline-queue";
 import { cn } from "@/lib/utils";
+import { defaultEntryTime, fromLocal } from "@/lib/slots";
 import type { FoodBrief } from "@/lib/data/foods";
 
 export type DayContext = {
   personId: string;
   date: string;
+  /** The person's local date (an entry logged today defaults to "now"). */
+  today: string;
   slot: string;
-  slots: { key: string; label: string }[];
+  /** `time` = the meal's usual time ("HH:MM[:SS]"). */
+  slots: { key: string; label: string; time?: string | null }[];
   totals: { kcal: number; protein: number; carbs: number; fat: number };
   target: { kcal: number; protein: number; carbs: number; fat: number } | null;
   favoriteIds: string[];
@@ -64,6 +68,7 @@ export function AddFoodDialog({ foodId, ctx, defaultGrams, onClose, onAdded }: {
   const [serving, setServing] = useState<string>("g");
   const [qty, setQty] = useState<number>(defaultGrams ?? 100);
   const [slot, setSlot] = useState(ctx.slot);
+  const [time, setTime] = useState(() => defaultEntryTime(ctx.date, ctx.today, ctx.slots.find((s) => s.key === ctx.slot)?.time));
   const [fav, setFav] = useState(ctx.favoriteIds.includes(foodId));
   const [pending, start] = useSafeTransition();
 
@@ -111,7 +116,7 @@ export function AddFoodDialog({ foodId, ctx, defaultGrams, onClose, onAdded }: {
           date: ctx.date,
           mealSlot: slot,
           origin: "manual",
-          items: [{ foodId: detail.food.id, grams, servingLabel: sv ? `${qty} × ${sv.label}` : null, servingQty: sv ? qty : null, clientId: newClientId() }],
+          items: [{ foodId: detail.food.id, grams, servingLabel: sv ? `${qty} × ${sv.label}` : null, servingQty: sv ? qty : null, eatenAt: time ? fromLocal(ctx.date, time).toISOString() : null, clientId: newClientId() }],
         });
         toast.success(res.queued ? "Guardado sin conexión; se enviará luego" : `${detail.food.nameEs ?? detail.food.name} añadido`);
         // Queued (offline): nothing changed on the server yet, and a refresh would force a full reload.
@@ -192,15 +197,20 @@ export function AddFoodDialog({ foodId, ctx, defaultGrams, onClose, onAdded }: {
                 </Select>
               </Field>
             </div>
-            <Field label="Comida">
-              <Select value={slot} onChange={(e) => setSlot(e.target.value)}>
-                {ctx.slots.map((s) => (
-                  <option key={s.key} value={s.key}>
-                    {s.label}
-                  </option>
-                ))}
-              </Select>
-            </Field>
+            <div className="grid grid-cols-[1fr_auto] gap-3">
+              <Field label="Comida">
+                <Select value={slot} onChange={(e) => setSlot(e.target.value)}>
+                  {ctx.slots.map((s) => (
+                    <option key={s.key} value={s.key}>
+                      {s.label}
+                    </option>
+                  ))}
+                </Select>
+              </Field>
+              <Field label="Hora">
+                <Input type="time" value={time} onChange={(e) => setTime(e.target.value)} className="w-28" />
+              </Field>
+            </div>
 
             <WhatIf ctx={ctx} item={item} />
 

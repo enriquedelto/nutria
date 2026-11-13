@@ -16,6 +16,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Templates, type TemplateBrief } from "./templates";
 import { n0 } from "@/lib/format";
 import { newClientId, sendOrQueue } from "@/lib/offline-queue";
+import { defaultEntryTime, fromLocal } from "@/lib/slots";
 import type { FoodBrief } from "@/lib/data/foods";
 import { Explore } from "./explore";
 
@@ -219,7 +220,7 @@ function QuickAdd({ ctx, onClose }: { ctx: DayContext; onClose: () => void }) {
                 date: ctx.date,
                 mealSlot: String(fd.get("slot")),
                 origin: "quick",
-                items: [{ name: String(fd.get("name") || "Registro rápido"), grams: 0, absolute: { energy_kcal: num("kcal"), protein: num("p"), carbs: num("c"), fat: num("f") }, clientId: newClientId() }],
+                items: [{ name: String(fd.get("name") || "Registro rápido"), grams: 0, absolute: { energy_kcal: num("kcal"), protein: num("p"), carbs: num("c"), fat: num("f") }, eatenAt: fd.get("time") ? fromLocal(ctx.date, String(fd.get("time"))).toISOString() : null, clientId: newClientId() }],
               });
               toast.success(res.queued ? "Guardado sin conexión; se enviará luego" : "Añadido");
               // Offline a refresh would force a full reload (and the offline page).
@@ -245,15 +246,20 @@ function QuickAdd({ ctx, onClose }: { ctx: DayContext; onClose: () => void }) {
               <Input name="f" type="number" inputMode="decimal" min={0} step="any" />
             </Field>
           </div>
-          <Field label="Comida">
-            <Select name="slot" defaultValue={ctx.slot}>
-              {ctx.slots.map((s) => (
-                <option key={s.key} value={s.key}>
-                  {s.label}
-                </option>
-              ))}
-            </Select>
-          </Field>
+          <div className="grid grid-cols-[1fr_auto] gap-3">
+            <Field label="Comida">
+              <Select name="slot" defaultValue={ctx.slot}>
+                {ctx.slots.map((s) => (
+                  <option key={s.key} value={s.key}>
+                    {s.label}
+                  </option>
+                ))}
+              </Select>
+            </Field>
+            <Field label="Hora">
+              <Input name="time" type="time" defaultValue={defaultEntryTime(ctx.date, ctx.today, ctx.slots.find((s) => s.key === ctx.slot)?.time)} className="w-28" />
+            </Field>
+          </div>
           <Button type="submit" className="w-full" disabled={pending}>
             Añadir
           </Button>
