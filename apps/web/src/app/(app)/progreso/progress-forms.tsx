@@ -10,7 +10,7 @@ import { acceptTdee, applyBulkReviewAction, clearKcalAdjust, deleteWeight, logMe
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent } from "@/components/ui/dialog";
 import { Field, Input, Select } from "@/components/ui/input";
-import { MEASURE_SITES } from "@nutria/nutrition";
+import { MEASURE_SITES, SKINFOLD_SITES } from "@nutria/nutrition";
 import { fileToJpeg } from "@/lib/image";
 import { dateShort, kg, sourceLabel } from "@/lib/format";
 
@@ -144,7 +144,7 @@ export function GoalForm({ personId, current }: { personId: string; current: { t
   );
 }
 
-const SITES = MEASURE_SITES.map((s) => [s.key, s.label] as const);
+
 
 
 export function MeasurementsForm({ personId, today }: { personId: string; today: string }) {
@@ -157,19 +157,36 @@ export function MeasurementsForm({ personId, today }: { personId: string; today:
       </Button>
       {open ? (
         <Dialog open onOpenChange={setOpen}>
-          <DialogContent title="Medidas (cm)" description="Con cuello y cintura (y cadera en mujeres) se estima tu % de grasa. Mide siempre igual: por la mañana, relajado.">
-            <form className="space-y-3" onSubmit={submitForm((fd) => start(async () => {
+          <DialogContent title="Medidas" description="Mide siempre igual: en ayunas, por la mañana, relajado, lado derecho. Rellena solo lo que midas.">
+            <form className="space-y-4" onSubmit={submitForm((fd) => start(async () => {
               const sites: Record<string, number> = {};
-              for (const [k] of SITES) if (fd.get(k)) sites[k] = Number(fd.get(k));
-              await logMeasurements(personId, String(fd.get("date")), sites);
+              for (const s of MEASURE_SITES) if (fd.get(s.key)) sites[s.key] = Number(fd.get(s.key));
+              const folds: Record<string, number> = {};
+              for (const s of SKINFOLD_SITES) if (fd.get(`fold_${s.key}`)) folds[s.key] = Number(fd.get(`fold_${s.key}`));
+              await logMeasurements(personId, String(fd.get("date")), sites, folds);
               setOpen(false);
             }))}>
               <Field label="Fecha"><Input name="date" type="date" defaultValue={today} max={today} /></Field>
-              <div className="grid grid-cols-2 gap-3">
-                {SITES.map(([k, label]) => (
-                  <Field key={k} label={label}><Input name={k} type="number" step="0.1" min={10} max={250} inputMode="decimal" /></Field>
-                ))}
-              </div>
+              <details open className="rounded-xl border border-line px-3 py-2">
+                <summary className="cursor-pointer text-sm font-semibold">Perímetros (cm)</summary>
+                <p className="mt-1 text-xs text-ink-3">Con cuello y cintura (y cadera en mujeres) se estima el % de grasa con la cinta.</p>
+                <div className="mt-2 grid grid-cols-2 gap-3">
+                  {MEASURE_SITES.map((s) => (
+                    <Field key={s.key} label={s.label} hint={s.hint}><Input name={s.key} type="number" step="0.1" min={10} max={250} inputMode="decimal" /></Field>
+                  ))}
+                </div>
+              </details>
+              <details className="rounded-xl border border-line px-3 py-2">
+                <summary className="cursor-pointer text-sm font-semibold">Pliegues (mm, plicómetro)</summary>
+                <p className="mt-1 text-xs text-ink-3">
+                  Pellizca la piel y la grasa con pulgar e índice, pon el plicómetro 1 cm al lado y lee a los 2 s. Haz 2–3 tomas por sitio y apunta la media. Con los 7 se usa Jackson-Pollock 7; con pectoral, abdominal y muslo (hombres) o tríceps, suprailíaco y muslo (mujeres), Jackson-Pollock 3.
+                </p>
+                <div className="mt-2 grid grid-cols-2 gap-3">
+                  {SKINFOLD_SITES.map((s) => (
+                    <Field key={s.key} label={s.label} hint={s.hint}><Input name={`fold_${s.key}`} type="number" step="0.5" min={1} max={79} inputMode="decimal" /></Field>
+                  ))}
+                </div>
+              </details>
               <Button type="submit" className="w-full" disabled={pending}>Guardar</Button>
             </form>
           </DialogContent>

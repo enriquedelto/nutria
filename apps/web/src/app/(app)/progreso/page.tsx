@@ -1,8 +1,10 @@
 import { Suspense } from "react";
 import { AlertTriangle } from "lucide-react";
-import { and, asc, avg, bodyMeasurements, dailySummaries, desc, eq, goals, gte, persons, progressPhotos, targetSets, tdeeEstimates, weightLogs } from "@nutria/db";
+import { and, asc, avg, bodyMeasurements, dailySummaries, desc, eq, goals, gte, persons, progressPhotos, targetSets, tdeeEstimates, weightLogs, skinfolds } from "@nutria/db";
 import { latestBulkReview, trustedDaySql } from "@nutria/core";
-import { addDays, compositionSeries, continuous, daysBetween, daysToGoal, ffmiLabel, forecastWeight, MEASURE_SITES, SITE_LABEL, todayIn, trendWeights } from "@nutria/nutrition";
+import { addDays, compositionSeries, continuous, daysBetween, daysToGoal, ffmiLabel, forecastWeight, MEASURE_SITES, SITE_LABEL, SKINFOLD_SITES, skinfoldBodyFatPct, todayIn, trendWeights } from "@nutria/nutrition";
+
+const COMP_SOURCE = { navy: "Estimada con la cinta (cuello y cintura)", skinfolds: "Con tus pliegues (Jackson-Pollock)", measured: "Con tu % de grasa medido" } as const;
 import { WeightChart, type WeightPoint } from "@/components/charts/weight-chart";
 import Link from "next/link";
 import { PageHeader } from "@/components/page-header";
@@ -24,14 +26,17 @@ async function Content() {
   const today = todayIn(ctx.person.timezone);
   const from = addDays(today, -180);
   const pid = ctx.person.id;
-  const [weights, [estimate], [goal], measures, photos, [intake], [me]] = await Promise.all([
+  const [weights, [estimate], [goal], measures, photos, [intake], [me], folds, allWeights] = await Promise.all([
     db().select().from(weightLogs).where(and(eq(weightLogs.personId, pid), gte(weightLogs.date, from))).orderBy(asc(weightLogs.date)),
     db().select().from(tdeeEstimates).where(eq(tdeeEstimates.personId, pid)).orderBy(desc(tdeeEstimates.date)).limit(1),
     db().select().from(goals).where(and(eq(goals.personId, pid), eq(goals.status, "active"), eq(goals.type, "weight"))).limit(1),
     db().select().from(bodyMeasurements).where(eq(bodyMeasurements.personId, pid)).orderBy(desc(bodyMeasurements.date)).limit(400),
     ctx.scopes.has("photos") ? db().select().from(progressPhotos).where(eq(progressPhotos.personId, pid)).orderBy(desc(progressPhotos.date)) : Promise.resolve([]),
     db().select({ kcal: avg(dailySummaries.kcal) }).from(dailySummaries).where(and(eq(dailySummaries.personId, pid), gte(dailySummaries.date, addDays(today, -14)), trustedDaySql())),
-    db().select({ goal: persons.goalType, adjust: targetSets.kcalAdjust, sex: persons.sex, heightCm: persons.heightCm }).from(persons).leftJoin(targetSets, and(eq(targetSets.personId, persons.id), eq(targetSets.isDefault, true))).where(eq(persons.id, pid)).limit(1),
+    db().select({ goal: persons.goalType, adjust: targetSets.kcalAdjust, sex: persons.sex, heightCm: persons.heightCm, birthDate: persons.birthDate }).from(persons).leftJoin(targetSets, and(eq(targetSets.personId, persons.id), eq(targetSets.isDefault, true))).where(eq(persons.id, pid)).limit(1),
+    db().select({ date: skinfolds.date, site: skinfolds.site, mm: skinfolds.mm }).from(skinfolds).where(eq(skinfolds.personId, pid)).orderBy(desc(skinfolds.date)).limit(200),
+    // Composition pairs each measurement with a weigh-in, also for measurements older than the chart window.
+    db().select({ date: weightLogs.date, kg: weightLogs.kg, bodyFatPct: weightLogs.bodyFatPct }).from(weightLogs).where(eq(weightLogs.personId, pid)).orderBy(asc(weightLogs.date)),
   ]);
   const bulk = me?.goal === "gain" ? await latestBulkReview(db(), pid) : null;
 
@@ -57,7 +62,11 @@ async function Content() {
   for (const m of measures) if (!latestBySite.has(m.site)) latestBySite.set(m.site, { cm: m.cm, date: m.date });
   const siteSeries = MEASURE_SITES.map((s) => ({ key: s.key, label: s.label, unit: "cm", points: measures.filter((m) => m.site === s.key).map((m) => ({ date: m.date, value: m.cm })).reverse() }));
   const sitesShown = [...MEASURE_SITES.map((s) => s.key as string).filter((k) => latestBySite.has(k)), ...[...latestBySite.keys()].filter((k) => !(k in SITE_LABEL))];
-  const comp = compositionSeries({ sex: me?.sex ?? null, heightCm: me?.heightCm ?? null, weights: weights.map((w) => ({ date: w.date, kg: w.kg, bodyFatPct: w.bodyFatPct })), measures });
+  const comp = compositionSeries({ sex: me?.sex ?? null, heightCm: me?.heightCm ?? null, weights: allWeights, measures, folds, birthDate: me?.birthDate ?? null });
+  const lastFoldDate = folds[0]?.date ?? null;
+  const lastFolds = folds.filter((f) => f.date === lastFoldDate);
+  const lastFoldMap = Object.fromEntries(lastFolds.map((f) => [f.site, f.mm]));
+  const foldResult = lastFoldDate && me?.sex && me.birthDate ? skinfoldBodyFatPct({ sex: me.sex, age: Math.floor(daysBetween(me.birthDate, lastFoldDate) / 365.25), folds: lastFoldMap }) : null;
   const lastComp = comp.at(-1) ?? null;
   const prevComp = lastComp ? ([...comp].reverse().find((c) => daysBetween(c.date, lastComp.date) >= 21) ?? null) : null;
   const signed = (v: number, unit: string) => `${v > 0 ? "+" : ""}${n1(v)} ${unit}`;
@@ -177,10 +186,39 @@ async function Content() {
             <p className="text-sm text-ink-3">Sin medidas. Con la cinta métrica verás si lo que cambia es músculo o grasa.</p>
           )}
           <MeasureChart series={siteSeries} label="Medida que se muestra" />
+          {lastFolds.length ? (
+            <div className="mt-4 border-t border-line pt-3">
+              <p className="mb-1 text-sm font-semibold">
+                Pliegues <span className="font-normal text-ink-3">· {dateShort(lastFoldDate!)}</span>
+              </p>
+              <ul className="grid grid-cols-2 gap-x-6 gap-y-1 text-sm">
+                {SKINFOLD_SITES.filter((s) => lastFoldMap[s.key] != null).map((s) => (
+                  <li key={s.key} className="flex justify-between">
+                    <span>{s.label}</span>
+                    <span className="num text-ink-2">{n1(lastFoldMap[s.key]!)} mm</span>
+                  </li>
+                ))}
+              </ul>
+              {foldResult ? (
+                <p className="mt-2 text-sm text-ink-2">
+                  Suma {n1(foldResult.sumMm)} mm → <strong className="num">{n1(foldResult.pct)} %</strong> de grasa ({foldResult.method === "jp7" ? "Jackson-Pollock 7" : "Jackson-Pollock 3"}).
+                </p>
+              ) : (
+                <p className="mt-2 text-xs text-ink-3">Para calcular la grasa faltan pliegues (los 7, o los 3 de tu sexo) o la fecha de nacimiento en tu perfil.</p>
+              )}
+              <MeasureChart
+                label="Pliegue que se muestra"
+                series={[
+                  { key: "sum", label: "Suma de pliegues", unit: "mm", points: [...new Set(folds.map((f) => f.date))].reverse().map((date) => ({ date, value: folds.filter((f) => f.date === date).reduce((a, f) => a + f.mm, 0) })) },
+                  ...SKINFOLD_SITES.map((s) => ({ key: s.key, label: s.label, unit: "mm", points: folds.filter((f) => f.site === s.key).map((f) => ({ date: f.date, value: f.mm })).reverse() })),
+                ]}
+              />
+            </div>
+          ) : null}
         </Card>
 
         <Card id="composicion">
-          <CardHeader title="Composición corporal" subtitle={lastComp ? `${lastComp.source === "navy" ? "Estimada con la cinta (cuello y cintura)" : "Con tu % de grasa medido"} · ${dateShort(lastComp.date)}` : undefined} />
+          <CardHeader title="Composición corporal" subtitle={lastComp ? `${COMP_SOURCE[lastComp.source]} · ${dateShort(lastComp.date)}` : undefined} />
           {lastComp ? (
             <div className="space-y-2 text-sm">
               <div className="grid grid-cols-3 gap-2 text-center">
@@ -206,7 +244,7 @@ async function Content() {
                 FFMI <strong className="num">{n1(lastComp.ffmiNorm)}</strong>
                 {me?.sex ? ` (${ffmiLabel(lastComp.ffmiNorm, me.sex)})` : ""}: masa magra para tu altura.
               </p>
-              {lastComp.source === "navy" ? <p className="text-xs text-ink-3">La estimación con cinta tiene un error de ±3–4 puntos: fíate de la tendencia, no del número exacto.</p> : null}
+              {lastComp.source !== "measured" ? <p className="text-xs text-ink-3">{lastComp.source === "navy" ? "La estimación con cinta" : "La estimación con pliegues"} tiene un error de ±3–4 puntos: fíate de la tendencia, no del número exacto. Compara siempre con el mismo método.</p> : null}
               <MeasureChart
                 label="Dato de composición que se muestra"
                 series={[

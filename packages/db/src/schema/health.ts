@@ -115,6 +115,22 @@ export const bodyMeasurements = pgTable(
   (t) => [index().on(t.personId, t.date), uniqueIndex("body_measurements_day_site_uq").on(t.personId, t.date, t.site)],
 );
 
+/** Skinfolds (mm, right side, caliper) — body fat by Jackson-Pollock. */
+export const skinfolds = pgTable(
+  "skinfolds",
+  {
+    id: id(),
+    personId: uuid()
+      .notNull()
+      .references(() => persons.id, { onDelete: "cascade" }),
+    date: date({ mode: "string" }).notNull(),
+    site: text().notNull(), // chest | midaxillary | triceps | subscapular | abdominal | suprailiac | thigh
+    mm: real().notNull(),
+    ...timestamps(),
+  },
+  (t) => [index().on(t.personId, t.date), uniqueIndex("skinfolds_day_site_uq").on(t.personId, t.date, t.site)],
+);
+
 export const progressPhotos = pgTable(
   "progress_photos",
   {

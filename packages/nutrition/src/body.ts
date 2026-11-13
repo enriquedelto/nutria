@@ -1,18 +1,64 @@
-/** Body measurements and composition: US Navy body-fat estimate, lean/fat mass and FFMI. */
+/** Body measurements and composition: tape and skinfold body-fat estimates, lean/fat mass and FFMI. */
 import { daysBetween } from "./tdee-adaptive";
 
+/** Tape sites (cm) with how to measure them: same way, same time (morning, fasted), right side. */
 export const MEASURE_SITES = [
-  { key: "waist", label: "Cintura" },
-  { key: "hips", label: "Cadera" },
-  { key: "chest", label: "Pecho" },
-  { key: "shoulders", label: "Hombros" },
-  { key: "arm", label: "Brazo" },
-  { key: "thigh", label: "Muslo" },
-  { key: "calf", label: "Gemelo" },
-  { key: "neck", label: "Cuello" },
+  { key: "waist", label: "Cintura", hint: "Punto más estrecho entre ombligo y esternón, al final de una espiración normal, sin meter tripa." },
+  { key: "hips", label: "Cadera", hint: "Máxima prominencia de los glúteos, cinta horizontal, pies juntos." },
+  { key: "chest", label: "Pecho", hint: "A la altura de los pezones, por las axilas, al final de una espiración normal." },
+  { key: "shoulders", label: "Hombros", hint: "Por lo más saliente de ambos deltoides, brazos relajados. Mejor con ayuda: solo es la medida menos fiable." },
+  { key: "neck", label: "Cuello", hint: "Justo debajo de la nuez, cinta horizontal, cabeza recta." },
+  { key: "arm", label: "Brazo relajado", hint: "Brazo colgando, máximo perímetro del bíceps sin contraer." },
+  { key: "arm_flexed", label: "Brazo flexionado", hint: "Codo a 90°, bíceps contraído al máximo, punto más ancho." },
+  { key: "forearm", label: "Antebrazo", hint: "Brazo extendido, palma arriba, máximo perímetro cerca del codo." },
+  { key: "thigh", label: "Muslo", hint: "Punto medio entre el pliegue inguinal y la rótula, de pie y relajado." },
+  { key: "calf", label: "Gemelo", hint: "Máximo perímetro, de pie con el peso repartido." },
+  { key: "wrist", label: "Muñeca", hint: "Punto más estrecho por encima del hueso de la muñeca. No cambia: basta una vez (tamaño de esqueleto)." },
+  { key: "ankle", label: "Tobillo", hint: "Punto más estrecho por encima de los maléolos. No cambia: basta una vez." },
 ] as const;
 export type MeasureSite = (typeof MEASURE_SITES)[number]["key"];
 export const SITE_LABEL: Record<string, string> = Object.fromEntries(MEASURE_SITES.map((s) => [s.key, s.label]));
+
+/** Skinfold sites (mm) of Jackson-Pollock 7; `jp3` = the three of the 3-site equation for that sex. */
+export const SKINFOLD_SITES = [
+  { key: "chest", label: "Pectoral", hint: "Diagonal, a 1/3 de la distancia de la axila al pezón.", jp3: ["male"] },
+  { key: "midaxillary", label: "Axilar medio", hint: "Vertical, en la línea media de la axila a la altura del esternón (xifoides).", jp3: [] },
+  { key: "triceps", label: "Tríceps", hint: "Vertical, detrás del brazo, a mitad entre hombro y codo, brazo relajado.", jp3: ["female"] },
+  { key: "subscapular", label: "Subescapular", hint: "Diagonal a 45°, 1–2 cm bajo la punta de la escápula.", jp3: [] },
+  { key: "abdominal", label: "Abdominal", hint: "Vertical, 2 cm a la derecha del ombligo.", jp3: ["male"] },
+  { key: "suprailiac", label: "Suprailíaco", hint: "Diagonal, justo encima de la cresta ilíaca (hueso de la cadera).", jp3: ["female"] },
+  { key: "thigh", label: "Muslo", hint: "Vertical, delante del muslo, a mitad entre ingle y rótula, pierna relajada.", jp3: ["male", "female"] },
+] as const;
+export type SkinfoldSite = (typeof SKINFOLD_SITES)[number]["key"];
+export const SKINFOLD_LABEL: Record<string, string> = Object.fromEntries(SKINFOLD_SITES.map((s) => [s.key, s.label]));
+
+/**
+ * Body fat from skinfolds (Jackson & Pollock 1978 men / Jackson, Pollock & Ward 1980 women;
+ * density → % with Siri). All 7 sites → 7-site equation; else the 3 sites of that sex.
+ * Typical error ±3–4 points; most useful for the trend, with the same caliper and person.
+ */
+export function skinfoldBodyFatPct(i: { sex: "male" | "female"; age: number; folds: Partial<Record<string, number>> }): { pct: number; method: "jp7" | "jp3"; sumMm: number } | null {
+  const f = i.folds;
+  const val = (k: string) => (f[k] != null && f[k]! > 0 ? f[k]! : null);
+  const all7 = SKINFOLD_SITES.map((s) => val(s.key));
+  let density: number;
+  let method: "jp7" | "jp3";
+  let sum: number;
+  if (all7.every((v) => v != null)) {
+    sum = all7.reduce<number>((a, v) => a + v!, 0);
+    method = "jp7";
+    density = i.sex === "male" ? 1.112 - 0.00043499 * sum + 0.00000055 * sum * sum - 0.00028826 * i.age : 1.097 - 0.00046971 * sum + 0.00000056 * sum * sum - 0.00012828 * i.age;
+  } else {
+    const three = SKINFOLD_SITES.filter((s) => (s.jp3 as readonly string[]).includes(i.sex)).map((s) => val(s.key));
+    if (three.some((v) => v == null)) return null;
+    sum = three.reduce<number>((a, v) => a + v!, 0);
+    method = "jp3";
+    density = i.sex === "male" ? 1.10938 - 0.0008267 * sum + 0.0000016 * sum * sum - 0.0002574 * i.age : 1.0994921 - 0.0009929 * sum + 0.0000023 * sum * sum - 0.0001392 * i.age;
+  }
+  const pct = 495 / density - 450;
+  if (!Number.isFinite(pct) || pct < 2 || pct > 60) return null;
+  return { pct: Math.round(pct * 10) / 10, method, sumMm: Math.round(sum * 10) / 10 };
+}
 
 /**
  * US Navy circumference method (metric). Men: neck and waist; women: neck, waist and hips.
@@ -61,8 +107,8 @@ export interface CompositionPoint extends BodyComposition {
   date: string;
   weightKg: number;
   bodyFatPct: number;
-  /** measured = entered with the weigh-in (scale, calipers…); navy = estimated from the tape. */
-  source: "measured" | "navy";
+  /** measured = entered with the weigh-in (scale, DXA…); skinfolds = calipers (Jackson-Pollock); navy = tape. */
+  source: "measured" | "skinfolds" | "navy";
 }
 
 /**
@@ -74,6 +120,9 @@ export function compositionSeries(i: {
   heightCm: number | null;
   weights: { date: string; kg: number; bodyFatPct?: number | null }[];
   measures: { date: string; site: string; cm: number }[];
+  /** Skinfolds (mm) and birth date (age at each date) for the Jackson-Pollock estimate. */
+  folds?: { date: string; site: string; mm: number }[];
+  birthDate?: string | null;
 }): CompositionPoint[] {
   if (!i.heightCm) return [];
   const h = i.heightCm;
@@ -95,6 +144,18 @@ export function compositionSeries(i: {
       const kg = nearestWeight(date);
       if (pct == null || kg == null) continue;
       out.set(date, { date, weightKg: kg, bodyFatPct: pct, source: "navy", ...bodyComposition(kg, pct, h) });
+    }
+  }
+  // Calipers beat the tape on the same day.
+  if (i.sex && i.birthDate && i.folds?.length) {
+    const byDate = new Map<string, Record<string, number>>();
+    for (const f of i.folds) byDate.set(f.date, { ...(byDate.get(f.date) ?? {}), [f.site]: f.mm });
+    for (const [date, folds] of byDate) {
+      const age = Math.floor(daysBetween(i.birthDate, date) / 365.25);
+      const r = skinfoldBodyFatPct({ sex: i.sex, age, folds });
+      const kg = nearestWeight(date);
+      if (!r || kg == null) continue;
+      out.set(date, { date, weightKg: kg, bodyFatPct: r.pct, source: "skinfolds", ...bodyComposition(kg, r.pct, h) });
     }
   }
   for (const w of i.weights) {

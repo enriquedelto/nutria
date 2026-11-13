@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { bodyComposition, compositionSeries, ffmiLabel, navyBodyFatPct, photoReminderDue } from "../src";
+import { bodyComposition, compositionSeries, ffmiLabel, navyBodyFatPct, photoReminderDue, skinfoldBodyFatPct } from "../src";
 
 describe("composición corporal", () => {
   it("fórmula de la Marina de EE. UU.", () => {
@@ -50,5 +50,32 @@ describe("composición corporal", () => {
     expect(photoReminderDue("2026-10-01", "2026-10-30")).toBe(false);
     expect(photoReminderDue("2026-10-01", "2026-11-26")).toBe(true);
     expect(photoReminderDue(null, "2026-11-26")).toBe(false);
+  });
+});
+
+describe("pliegues (Jackson-Pollock)", () => {
+  it("7 pliegues en hombre: coincide con la revisión de mayo (15,1 %)", () => {
+    const folds = { chest: 12, midaxillary: 10, triceps: 16, subscapular: 16, abdominal: 19, suprailiac: 12, thigh: 23 };
+    expect(skinfoldBodyFatPct({ sex: "male", age: 25, folds })).toEqual({ pct: 15.1, method: "jp7", sumMm: 108 });
+  });
+  it("sin los 7, usa los 3 del sexo; si faltan, null", () => {
+    const r = skinfoldBodyFatPct({ sex: "male", age: 27, folds: { chest: 12, abdominal: 19, thigh: 23 } });
+    expect(r?.method).toBe("jp3");
+    expect(r!.pct).toBeGreaterThan(10);
+    expect(r!.pct).toBeLessThan(20);
+    expect(skinfoldBodyFatPct({ sex: "female", age: 30, folds: { triceps: 18, suprailiac: 15, thigh: 25 } })?.method).toBe("jp3");
+    expect(skinfoldBodyFatPct({ sex: "male", age: 27, folds: { triceps: 10 } })).toBeNull();
+  });
+  it("en la serie de composición, los pliegues ganan a la cinta el mismo día", () => {
+    const s = compositionSeries({
+      sex: "male",
+      heightCm: 173.5,
+      birthDate: "2001-01-01",
+      weights: [{ date: "2026-05-02", kg: 78.9 }],
+      measures: [{ date: "2026-05-02", site: "neck", cm: 40.4 }, { date: "2026-05-02", site: "waist", cm: 83.4 }],
+      folds: Object.entries({ chest: 12, midaxillary: 10, triceps: 16, subscapular: 16, abdominal: 19, suprailiac: 12, thigh: 23 }).map(([site, mm]) => ({ date: "2026-05-02", site, mm })),
+    });
+    expect(s).toHaveLength(1);
+    expect(s[0]).toMatchObject({ source: "skinfolds", bodyFatPct: 15.1, leanKg: 67 });
   });
 });

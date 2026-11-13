@@ -52,6 +52,7 @@ const PERSON_TABLES = {
   agua: schema.waterLogs,
   pesos: schema.weightLogs,
   medidas: schema.bodyMeasurements,
+  pliegues: schema.skinfolds,
   objetivos: schema.targetSets,
   metas: schema.goals,
   tdee: schema.tdeeEstimates,

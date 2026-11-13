@@ -6,6 +6,7 @@ import {
   activities,
   and,
   bodyMeasurements,
+  skinfolds,
   cyclePeriods,
   cycleSymptoms,
   eq,
@@ -29,7 +30,7 @@ import {
   type AccessScope,
 } from "@nutria/db";
 import { acceptTdeeEstimate, addSupplementPlan, applyBulkReview, setKcalAdjust, weeklyBulkReview, latestWeight, missingProfileFields, recomputeDay, recomputeTargets, takeSupplement, untakeSupplement } from "@nutria/core";
-import { detectSubstance, exerciseKcal, stepsKcal, SUPPLEMENT_BY_CODE } from "@nutria/nutrition";
+import { detectSubstance, exerciseKcal, stepsKcal, SUPPLEMENT_BY_CODE, SKINFOLD_SITES, type SkinfoldSite } from "@nutria/nutrition";
 import { db } from "@/lib/db";
 import { recomputeTargetsSafe } from "@/lib/targets";
 import { emit } from "@/lib/events";
@@ -65,18 +66,30 @@ export async function deleteWeight(personId: string, id: string) {
   refresh();
 }
 
-export async function logMeasurements(personId: string, date: string, sites: Record<string, number>) {
+/** Tape measurements (cm) and skinfolds (mm) of a day; empty fields are left as they were. */
+export async function logMeasurements(personId: string, date: string, sites: Record<string, number>, folds: Record<string, number> = {}) {
   await guard(personId, "body");
+  const d = day.parse(date);
   const rows = Object.entries(sites)
     .filter(([, cm]) => Number.isFinite(cm) && cm > 0 && cm < 300)
-    .map(([site, cm]) => ({ personId, date: day.parse(date), site: z.string().max(30).parse(site), cm }));
+    .map(([site, cm]) => ({ personId, date: d, site: z.string().max(30).parse(site), cm }));
   if (rows.length)
     await db()
       .insert(bodyMeasurements)
       .values(rows)
-      .onConflictDoUpdate({ target: [bodyMeasurements.personId, bodyMeasurements.date, bodyMeasurements.site], set: { cm: sql`excluded.cm` } });
+      .onConflictDoUpdate({ target: [bodyMeasurements.personId, bodyMeasurements.date, bodyMeasurements.site], set: { cm: sql`excluded.cm`, updatedAt: new Date() } });
+  const foldRows = Object.entries(folds)
+    .filter(([, mm]) => Number.isFinite(mm) && mm > 0 && mm < 80)
+    .map(([site, mm]) => ({ personId, date: d, site: z.enum(SKINFOLD_KEYS).parse(site), mm }));
+  if (foldRows.length)
+    await db()
+      .insert(skinfolds)
+      .values(foldRows)
+      .onConflictDoUpdate({ target: [skinfolds.personId, skinfolds.date, skinfolds.site], set: { mm: sql`excluded.mm`, updatedAt: new Date() } });
   refresh();
 }
+
+const SKINFOLD_KEYS = SKINFOLD_SITES.map((s) => s.key) as [SkinfoldSite, ...SkinfoldSite[]];
 
 export async function setGoal(personId: string, input: { type: string; targetValue: number; targetDate?: string | null }) {
   await guard(personId, "body");
