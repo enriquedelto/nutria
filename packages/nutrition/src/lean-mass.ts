@@ -35,7 +35,10 @@ export interface LiftSeries {
   points: { date: string; value: number }[];
 }
 
-/** e1RM over time of the most trained lifts since `from` (at least 3 sessions each). */
+/** Multi-joint lifts: the best read of whole-body strength (and of lean mass) between measurements. */
+const COMPOUND = /press (de )?banca|bench press|sentadilla(?! b[uú]lgara)|squat|peso muerto(?! rumano)|deadlift|press (militar|de hombros?)|overhead press|dominada|pull.?up|remo con barra|barbell row|hip thrust/i;
+
+/** e1RM over time since `from` (at least 3 sessions each): multi-joint lifts first, then the most trained. */
 export function liftSeries(logs: TrainingLog[], from: string, top = 4): LiftSeries[] {
   const by = new Map<string, LiftSeries>();
   for (const l of [...logs].sort((a, b) => a.date.localeCompare(b.date))) {
@@ -53,7 +56,7 @@ export function liftSeries(logs: TrainingLog[], from: string, top = 4): LiftSeri
   }
   return [...by.values()]
     .filter((s) => s.points.length >= 3)
-    .sort((a, b) => b.points.length - a.points.length)
+    .sort((a, b) => Number(COMPOUND.test(b.name)) - Number(COMPOUND.test(a.name)) || b.points.length - a.points.length)
     .slice(0, top);
 }
 

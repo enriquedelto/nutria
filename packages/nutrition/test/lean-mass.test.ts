@@ -19,6 +19,18 @@ describe("fuerza", () => {
   });
 });
 
+describe("prioridad de básicos", () => {
+  it("los multiarticulares van antes aunque tengan menos sesiones", () => {
+    const ex = (date: string, id: string, name: string, kg: number): TrainingLog => ({ date, volumeKg: null, details: { exercises: [{ id, name, sets: [{ kg, reps: 8 }] }] } });
+    const logs = [
+      ...["2026-09-01", "2026-09-05", "2026-09-09", "2026-09-13", "2026-09-17"].map((d) => ex(d, "curl", "Curl con barra", 30)),
+      ...["2026-09-02", "2026-09-10", "2026-09-18"].map((d) => ex(d, "squat", "Sentadilla con barra", 80)),
+      ...["2026-09-03", "2026-09-11", "2026-09-19"].map((d) => ex(d, "bulg", "Sentadilla búlgara con mancuernas", 20)),
+    ];
+    expect(liftSeries(logs, "2026-08-01").map((s) => s.key)).toEqual(["squat", "curl", "bulg"]);
+  });
+});
+
 describe("señal de pérdida de masa magra", () => {
   const base = { plannedPerWeek: 4, sessionsLast28: 15, daysSinceLast: 2, weightChangeKg: 0.4, strengthPct: 2, waistChangeCm: 0.2 };
   it("todo en orden", () => {
