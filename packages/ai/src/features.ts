@@ -105,18 +105,27 @@ export interface MealEstimateResult {
  */
 export async function estimateMeal(
   c: PersonFeatureCtx,
-  input: { text?: string; images?: Images; mode: "text" | "voice" | "photo"; mealSlot?: string; date?: string; /** "HH:MM" when it was eaten. */ time?: string },
+  input: { text?: string; images?: Images; /** Photos of what was left on the plate (after eating). */ leftoverImages?: Images; mode: "text" | "voice" | "photo"; mealSlot?: string; date?: string; /** "HH:MM" when it was eaten. */ time?: string },
 ): Promise<MealEstimateResult> {
   const pc = await buildPersonContext(c.db, c.personId, c.scopes);
+  const before = input.images ?? [];
+  const after = input.leftoverImages ?? [];
   const content: AiContent[] = [
-    ...(input.images ?? []),
+    ...before,
+    ...(after.length
+      ? [
+          { type: "text" as const, text: `Fotos 1–${before.length}: el plato antes de comer.` },
+          ...after,
+          { type: "text" as const, text: `Fotos ${before.length + 1}–${before.length + after.length}: lo que sobró. Los gramos deben ser lo comido (lo de antes menos lo que sobró).` },
+        ]
+      : []),
     {
       type: "text",
       text: [
         contextBlock(pc.lines),
         input.mealSlot ? `Comida: ${mealSlotName(input.mealSlot)}.` : null,
         input.date && (input.date !== pc.today || input.time) ? `Se comió el ${formatDateEs(input.date)}${input.time ? ` a las ${input.time}` : ""}.` : null,
-        input.images?.length ? `${input.images.length} foto(s) de la misma comida.` : null,
+        before.length && !after.length ? `${before.length} foto(s) de la misma comida.` : null,
         input.text ? `Descripción${input.mode === "voice" ? " (dictada por voz)" : ""}: ${input.text}` : "Estima la comida de las fotos.",
       ]
         .filter(Boolean)
@@ -133,7 +142,7 @@ export async function estimateMeal(
   const estimateId = await saveEstimate(c, {
     personId: c.personId,
     kind: "meal",
-    input: { mode: input.mode, text: input.text ?? null, photos: input.images?.length ?? 0, mealSlot: input.mealSlot ?? null, date: input.date ?? pc.today, time: input.time ?? null },
+    input: { mode: input.mode, text: input.text ?? null, photos: before.length, leftoverPhotos: after.length, mealSlot: input.mealSlot ?? null, date: input.date ?? pc.today, time: input.time ?? null },
     output: { ...data, items },
     confidence: items.length ? items.reduce((s, i) => s + i.confidence, 0) / items.length : 0,
     model,

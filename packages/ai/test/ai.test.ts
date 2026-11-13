@@ -142,6 +142,26 @@ describe("registro por IA (simulado)", () => {
   });
 });
 
+describe("fotos antes y después", () => {
+  it("etiqueta las fotos de antes y de lo que sobró y pide lo comido", async () => {
+    let seen: { type: string; text?: string }[] = [];
+    const provider = new MockProvider({
+      meal_photo: (req) => {
+        seen = req.content as typeof seen;
+        return { items: [{ name: "Lentejas", searchQuery: "lentejas cocidas", grams: 250, confidence: 0.7, nova: 1, per100: [{ code: "energy_kcal", amount: 116 }] }], questions: [] };
+      },
+    });
+    const img = { type: "image" as const, mediaType: "image/jpeg" as const, data: "AAAA" };
+    const r = await estimateMeal({ db, userId, personId, scopes: ALL, provider }, { images: [img, img], leftoverImages: [img], mode: "photo", date: "2026-11-12", time: "14:05" });
+    expect(r.items[0]!.grams).toBe(250);
+    const texts = seen.filter((c) => c.type === "text").map((c) => c.text!).join(" | ");
+    expect(seen.filter((c) => c.type === "image")).toHaveLength(3);
+    expect(texts).toContain("Fotos 1–2: el plato antes de comer.");
+    expect(texts).toContain("Fotos 3–3: lo que sobró");
+    expect(texts).toMatch(/Se comió el .*12 de noviembre a las 14:05/);
+  });
+});
+
 describe("coach (simulado)", () => {
   it("usa herramientas, crea propuestas y guarda la conversación", async () => {
     const provider = new MockProvider({}, () => [

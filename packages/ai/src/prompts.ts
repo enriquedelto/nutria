@@ -29,6 +29,7 @@ Tarea: convertir la descripción de una comida (texto, voz transcrita o fotos co
 - "nova": grupo NOVA del alimento tal como se come. 1 = sin procesar o mínimamente (fruta, verdura, leche, huevos, carne o pescado frescos, arroz, legumbres, avena, café, infusiones). 2 = ingrediente culinario (aceite, mantequilla, azúcar, sal). 3 = procesado (pan de panadería, queso, conservas de verdura o pescado, jamón curado). 4 = ultraprocesado (pan de molde industrial, embutido con aditivos, nuggets, mayonesa y salsas envasadas, bollería, refrescos, cereales azucarados, platos preparados). En platos caseros, el grupo del ingrediente principal.
 - Si hay ambigüedad importante, añade como mucho dos preguntas breves en "questions".
 - En fotos, usa el tamaño del plato, cubiertos y manos como referencia. Si hay varias fotos, son la misma comida.
+- Si hay fotos de lo que sobró, compáralas con las de antes: cada alimento lleva los gramos realmente comidos (antes − sobras); no incluyas lo que se dejó entero.
 Códigos de nutrientes válidos: ${NUTRIENT_CODES}.`,
 
   label: `${BASE}

@@ -19,7 +19,8 @@ import { n0 } from "@/lib/format";
 import { newClientId, sendOrQueue } from "@/lib/offline-queue";
 import { cn } from "@/lib/utils";
 import { photoTakenAt } from "@/lib/exif";
-import { defaultEntryTime, fromLocal, slotForTime } from "@/lib/slots";
+import { defaultEntryTime, fromLocal, localDateTime, slotForTime } from "@/lib/slots";
+import { DraftList, saveAsPending, StartMeal, type Draft } from "./meal-drafts";
 
 type Estimate = {
   estimateId: string;
@@ -55,7 +56,7 @@ type Row = {
   aiPer100: NutrientMap;
 };
 
-export function RegisterClient({ ctx, aiEnabled, sharedImages, voice = false }: { ctx: DayContext; aiEnabled: boolean; sharedImages: string[]; voice?: boolean }) {
+export function RegisterClient({ ctx, aiEnabled, sharedImages, drafts, voice = false }: { ctx: DayContext; aiEnabled: boolean; sharedImages: string[]; drafts: Draft[]; voice?: boolean }) {
   const params = useSearchParams();
   const router = useRouter();
   const [text, setText] = useState(params.get("texto") ?? "");
@@ -68,6 +69,10 @@ export function RegisterClient({ ctx, aiEnabled, sharedImages, voice = false }: 
   const [est, setEst] = useState<Estimate | null>(null);
   const [rows, setRows] = useState<Row[]>([]);
   const [busy, setBusy] = useState(false);
+  /** The meal draft being analysed (its entries take its day and start time; it is deleted on save). */
+  const [draftId, setDraftId] = useState<string | null>(null);
+  const [aiFailed, setAiFailed] = useState(false);
+  const [parking, setParking] = useState(false);
   const [picking, setPicking] = useState<string | null>(null);
   const [saving, start] = useSafeTransition();
   const fileRef = useRef<HTMLInputElement>(null);
@@ -111,19 +116,16 @@ export function RegisterClient({ ctx, aiEnabled, sharedImages, voice = false }: 
     setMode("photo");
   };
 
-  const analyze = async () => {
+  const runEstimate = async (body: Record<string, unknown>, fromDraft: boolean) => {
     setBusy(true);
+    setAiFailed(false);
     try {
-      const res = await fetch("/api/ai/meal", {
-        method: "POST",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({ personId: ctx.personId, text: text.trim() || undefined, images: images.length ? images.map(({ mediaType, data }) => ({ mediaType, data })) : undefined, mode: images.length ? "photo" : mode, mealSlot: slot, date, time }),
-      });
+      const res = await fetch("/api/ai/meal", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(body) });
       const d = await res.json();
       if (!res.ok) throw new Error(d.error ?? "Error de la IA");
       const e = d as Estimate;
       setEst(e);
-      if (e.mealSlot && ctx.slots.some((s) => s.key === e.mealSlot) && !params.get("comida")) setSlot(e.mealSlot);
+      if (!fromDraft && e.mealSlot && ctx.slots.some((s) => s.key === e.mealSlot) && !params.get("comida")) setSlot(e.mealSlot);
       setRows(
         e.items.map((it, i) => ({
           key: `${i}`,
@@ -142,8 +144,40 @@ export function RegisterClient({ ctx, aiEnabled, sharedImages, voice = false }: 
       );
     } catch (e) {
       toast.error(errorText(e, "No se pudo analizar"));
+      // No quota or no connection: the photos and the time can be kept for later.
+      if (!fromDraft) setAiFailed(true);
     } finally {
       setBusy(false);
+    }
+  };
+
+  const analyze = () => {
+    setDraftId(null);
+    return runEstimate({ personId: ctx.personId, text: text.trim() || undefined, images: images.length ? images.map(({ mediaType, data }) => ({ mediaType, data })) : undefined, mode: images.length ? "photo" : mode, mealSlot: slot, date, time }, false);
+  };
+
+  const analyzeDraft = (d: Draft) => {
+    const [dd, tt] = localDateTime(new Date(d.startedAt));
+    setDate(dd);
+    setTime(tt);
+    if (d.mealSlot && ctx.slots.some((s) => s.key === d.mealSlot)) setSlot(d.mealSlot);
+    setDraftId(d.id);
+    return runEstimate({ personId: ctx.personId, draftId: d.id, text: text.trim() || undefined, mode: "photo", mealSlot: d.mealSlot ?? slot }, true);
+  };
+
+  const parkForLater = async () => {
+    setParking(true);
+    try {
+      await saveAsPending({ personId: ctx.personId, date, time, mealSlot: slot, text: text.trim(), images });
+      toast.success("Guardada en pendientes: analízala cuando vuelva la IA");
+      setImages([]);
+      setText("");
+      setAiFailed(false);
+      router.refresh();
+    } catch (e) {
+      toast.error(errorText(e, "No se pudo guardar"));
+    } finally {
+      setParking(false);
     }
   };
 
@@ -188,6 +222,7 @@ export function RegisterClient({ ctx, aiEnabled, sharedImages, voice = false }: 
         mealSlot: slot,
         origin,
         estimateId: est.estimateId,
+        draftId,
         items: rows.map((r) => (r.foodId ? { foodId: r.foodId, grams: r.grams, servingLabel: r.servingLabel, fillPer100: r.aiPer100, nova: r.nova, eatenAt, clientId: newClientId() } : { name: r.name, grams: r.grams, per100: r.per100, servingLabel: r.servingLabel, nova: r.nova, eatenAt, clientId: newClientId() })),
       });
       const corrections = rows.filter((r) => r.servingLabel && Math.abs(r.grams - r.aiGrams) / Math.max(1, r.aiGrams) > 0.15).map((r) => ({ phrase: `${r.servingLabel} ${r.name}`, grams: r.grams, foodId: r.foodId }));
@@ -212,6 +247,7 @@ export function RegisterClient({ ctx, aiEnabled, sharedImages, voice = false }: 
         setRows([]);
         return;
       }
+      setDraftId(null);
       router.push(date === ctx.today ? "/hoy" : `/diario?fecha=${date}`);
       router.refresh();
     });
@@ -226,6 +262,8 @@ export function RegisterClient({ ctx, aiEnabled, sharedImages, voice = false }: 
 
   return (
     <div className="space-y-4">
+      {!est ? <DraftList drafts={drafts} slots={ctx.slots} today={ctx.today} busyId={busy ? draftId : null} onAnalyze={(d) => void analyzeDraft(d)} /> : null}
+      {!est ? <StartMeal personId={ctx.personId} slots={ctx.slots} /> : null}
       {!est ? (
         <Card className="space-y-4">
           <Field label="¿Qué has comido?" hint="Cuanto más concreto, mejor: cantidades, marcas, cómo estaba cocinado.">
@@ -284,6 +322,14 @@ export function RegisterClient({ ctx, aiEnabled, sharedImages, voice = false }: 
               {busy ? <Loader2 className="animate-spin" /> : <Sparkles />} {busy ? "Analizando…" : "Analizar"}
             </Button>
           </div>
+          {aiFailed && (images.length || text.trim()) ? (
+            <div className="flex flex-wrap items-center justify-between gap-2 rounded-xl bg-paper-2 px-3 py-2 text-sm">
+              <span className="text-ink-2">Guarda las fotos, la nota y la hora y analízala más tarde.</span>
+              <Button type="button" size="sm" variant="outline" disabled={parking} onClick={() => void parkForLater()}>
+                {parking ? <Loader2 className="animate-spin" /> : null} Guardar para más tarde
+              </Button>
+            </div>
+          ) : null}
         </Card>
       ) : (
         <>

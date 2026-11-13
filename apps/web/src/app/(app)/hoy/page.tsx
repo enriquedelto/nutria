@@ -16,6 +16,7 @@ import { QuickParam, TemplateSuggestion, YesterdayCheck } from "@/components/dia
 import { HOME_CARDS } from "@/lib/home-cards";
 import { getDay, getHomeExtras } from "@/lib/data/day";
 import { getPersonContext } from "@/lib/session";
+import { staleOpenDraft } from "@/lib/meal-drafts";
 import { dateLong, kg, n0, n1, time } from "@/lib/format";
 
 export const metadata = { title: "Hoy" };
@@ -24,7 +25,7 @@ export const metadata = { title: "Hoy" };
 async function Today() {
   const ctx = await getPersonContext();
   const date = todayIn(ctx.person.timezone);
-  const [day, extras] = await Promise.all([getDay(ctx.person.id, date), getHomeExtras(ctx.person.id, ctx.person.timezone, ctx.scopes)]);
+  const [day, extras, eating] = await Promise.all([getDay(ctx.person.id, date), getHomeExtras(ctx.person.id, ctx.person.timezone, ctx.scopes), ctx.canWrite ? staleOpenDraft(ctx.person.id) : Promise.resolve(null)]);
   const cards = (day.person.settings.homeCards?.length ? day.person.settings.homeCards : HOME_CARDS) as string[];
   const slots = day.meals.map((m) => ({ key: m.key, label: m.label }));
 
@@ -42,6 +43,14 @@ async function Today() {
     entreno: extras.training ? <TrainingCard key="entreno" plan={extras.training} proteinLeft={day.target ? Math.round(day.target.protein - (day.totals.protein ?? 0)) : null} /> : null,
     comidas: (
       <div key="comidas" className="space-y-3 sm:col-span-2">
+        {eating ? (
+          <Link href="/registrar" className="flex items-center justify-between gap-3 rounded-card border border-herb/50 bg-herb-soft/40 px-4 py-3 text-sm">
+            <span>
+              Comida en curso desde las <span className="num font-medium">{time(eating.startedAt, ctx.person.timezone)}</span>. ¿Terminaste? Haz la foto de lo que sobró.
+            </span>
+            <span className="shrink-0 font-medium text-herb">Seguir →</span>
+          </Link>
+        ) : null}
         {ctx.canWrite && extras.yesterday && dayLogStatus(extras.yesterday, day.target?.kcal) === "suspect" ? (
           <YesterdayCheck personId={ctx.person.id} date={extras.yesterday.date} kcal={extras.yesterday.kcal} />
         ) : null}

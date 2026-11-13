@@ -1,4 +1,4 @@
-import { mkdir, writeFile } from "node:fs/promises";
+import { mkdir, rm, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { unzipSync } from "fflate";
 import type { PgBoss } from "pg-boss";
@@ -11,6 +11,7 @@ import {
   integrationAccounts,
   isNull,
   lt,
+  mealDrafts,
   notifications,
   personAccess,
   persons,
@@ -283,7 +284,10 @@ export const handlers: Handlers = {
     const n1 = await db.delete(notifications).where(lt(notifications.createdAt, ago(90))).returning({ id: notifications.id });
     const n2 = await db.delete(aiEstimates).where(and(sql`${aiEstimates.status} in ('discarded','failed','pending')`, lt(aiEstimates.createdAt, ago(30)))).returning({ id: aiEstimates.id });
     const n3 = await db.delete(session).where(lt(session.expiresAt, new Date())).returning({ id: session.id });
-    return { notifications: n1.length, estimates: n2.length, sessions: n3.length };
+    // Meal drafts nobody finished in a month: rows and their encrypted photos.
+    const n4 = await db.delete(mealDrafts).where(lt(mealDrafts.updatedAt, ago(30))).returning({ id: mealDrafts.id, personId: mealDrafts.personId });
+    for (const d of n4) await rm(join(uploadDir(), "meal-drafts", d.personId, d.id), { recursive: true, force: true });
+    return { notifications: n1.length, estimates: n2.length, sessions: n3.length, mealDrafts: n4.length };
   },
 
   [JOBS.disk]: async (_d, { db }) => {

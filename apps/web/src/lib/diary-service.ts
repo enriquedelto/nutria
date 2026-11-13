@@ -1,6 +1,7 @@
 import "server-only";
 import { z } from "zod";
-import { aiActions, and, desc, eq, foods, inArray, isNull } from "@nutria/db";
+import { aiActions, and, desc, eq, foods, inArray, isNull, mealDrafts } from "@nutria/db";
+import { deleteDraft } from "./meal-drafts";
 import { addEntries, DIARY_ORIGINS, DiaryItemInput } from "@nutria/core";
 import { db } from "./db";
 import { emit } from "./events";
@@ -14,6 +15,8 @@ export const AddPayload = z.object({
   origin: z.enum(DIARY_ORIGINS).default("manual"),
   items: z.array(DiaryItemInput).min(1).max(50),
   estimateId: z.string().uuid().nullish(),
+  /** Meal draft these entries come from: deleted (with its photos) once they are saved. */
+  draftId: z.string().uuid().nullish(),
 });
 export type AddPayload = z.infer<typeof AddPayload>;
 
@@ -27,9 +30,13 @@ export async function translateIfNeeded(foodIds: (string | null | undefined)[]) 
 }
 
 export async function addDiaryItems(userId: string, raw: unknown) {
-  const input = AddPayload.parse(raw);
+  const { draftId, ...input } = AddPayload.parse(raw);
   await assertAccess(userId, input.personId, "diary", true);
   const rows = await addEntries(db(), { ...input, userId, estimateId: input.estimateId ?? null });
+  if (draftId && rows.length) {
+    const [d] = await db().select({ id: mealDrafts.id, personId: mealDrafts.personId }).from(mealDrafts).where(and(eq(mealDrafts.id, draftId), eq(mealDrafts.personId, input.personId))).limit(1);
+    if (d) await deleteDraft(d);
+  }
   void enqueue("gamification.evaluate", { personId: input.personId }, { singletonKey: `gam:${input.personId}`, startAfter: 30 });
   void translateIfNeeded(rows.map((r) => r.foodId));
   void emit(userId, "diary.entry_created", { personId: input.personId, date: input.date, mealSlot: input.mealSlot, count: rows.length, kcal: Math.round(rows.reduce((a, r) => a + r.kcal, 0)) });

@@ -168,6 +168,36 @@ export const mealSlots = pgTable(
   (t) => [uniqueIndex().on(t.personId, t.key)],
 );
 
+/** One photo of a meal draft: the plate before eating or what was left. File is AES-GCM encrypted. */
+export type MealDraftPhoto = { key: string; phase: "before" | "after"; takenAt: string | null };
+
+/**
+ * A meal being eaten (photo before → eat → photo of the leftovers) or saved to analyse later
+ * (no AI quota, eaten out). Becomes diary entries with `eatenAt = startedAt`; then it is deleted.
+ */
+export const mealDrafts = pgTable(
+  "meal_drafts",
+  {
+    id: id(),
+    personId: uuid()
+      .notNull()
+      .references(() => persons.id, { onDelete: "cascade" }),
+    userId: text()
+      .notNull()
+      .references(() => user.id, { onDelete: "cascade" }),
+    date: date({ mode: "string" }).notNull(),
+    mealSlot: text(),
+    /** When the meal started (first photo's time, or when it was created). */
+    startedAt: timestamp({ withTimezone: true }).notNull(),
+    text: text().notNull().default(""),
+    photos: jsonb().$type<MealDraftPhoto[]>().notNull().default([]),
+    /** open = being eaten · pending = saved to analyse later */
+    status: text().notNull().default("open"),
+    ...timestamps(),
+  },
+  (t) => [index().on(t.personId, t.status), check("meal_drafts_status_ck", sql`${t.status} in ('open', 'pending')`)],
+);
+
 export type DiaryLockedValues = Record<string, number>;
 
 /**
