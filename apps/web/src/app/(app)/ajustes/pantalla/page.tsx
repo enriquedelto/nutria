@@ -8,7 +8,8 @@ import { Skeleton } from "@/components/ui/empty";
 import { db } from "@/lib/db";
 import { HOME_CARD_NAMES, HOME_CARDS } from "@/lib/home-cards";
 import { getPersonContext } from "@/lib/session";
-import { DisplaySettings, ThemePicker } from "../settings-client";
+import { HIDEABLE_SECTIONS, SECTION_LABELS } from "@/lib/sections";
+import { DisplaySettings, SectionVisibility, ThemePicker } from "../settings-client";
 
 export const metadata = { title: "Pantalla" };
 
@@ -38,6 +39,18 @@ async function Content() {
   );
 }
 
+async function Sections() {
+  const ctx = await getPersonContext();
+  const own = ctx.persons.find((p) => p.isSelf);
+  if (!own) return null;
+  return (
+    <Card>
+      <CardHeader title="Secciones del menú" subtitle="Se aplica a tu cuenta, veas a quien veas" />
+      <SectionVisibility personId={own.id} sections={HIDEABLE_SECTIONS.map((c) => ({ code: c, label: SECTION_LABELS[c] }))} initial={HIDEABLE_SECTIONS.filter((c) => ctx.hiddenSections.includes(c))} />
+    </Card>
+  );
+}
+
 export default function PantallaPage() {
   return (
     <>
@@ -47,6 +60,9 @@ export default function PantallaPage() {
           <CardHeader title="Tema" subtitle="Se guarda en este dispositivo" />
           <ThemePicker />
         </Card>
+        <Suspense fallback={<Skeleton className="h-28" />}>
+          <Sections />
+        </Suspense>
         <Suspense fallback={<Skeleton className="h-96" />}>
           <Content />
         </Suspense>

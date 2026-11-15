@@ -762,6 +762,35 @@ test("registro rápido: plantilla en un toque, atajos y acciones de los avisos",
   expect(manifest.shortcuts.map((s) => s.url)).toEqual(expect.arrayContaining(["/hoy?rapido=ayer", "/hoy?rapido=batido"]));
 });
 
+test("pantalla: ocultar una sección la quita del menú y de Más, pero la página sigue abriendo", async ({ browser }) => {
+  const page = adminPage;
+  const menu = page.getByRole("navigation", { name: "Secciones" });
+  await page.goto("/ajustes/pantalla");
+  const retos = page.getByRole("button", { name: "Retos", exact: true });
+  await expect(retos).toHaveAttribute("aria-pressed", "true");
+  const saved = page.waitForResponse((r) => r.request().method() === "POST" && r.url().includes("/ajustes/pantalla"));
+  await retos.click();
+  await saved;
+  await expect(retos).toHaveAttribute("aria-pressed", "false");
+  await page.goto("/hoy");
+  await expect(menu.getByRole("link", { name: "Compra" })).toBeVisible();
+  await expect(menu.getByRole("link", { name: "Retos" })).toHaveCount(0);
+  const phone = await browser.newContext({ storageState: await page.context().storageState(), viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true });
+  const m = await phone.newPage();
+  await m.goto("/mas");
+  await expect(m.getByRole("link", { name: "Compra" })).toBeVisible();
+  await expect(m.getByRole("link", { name: "Retos" })).toHaveCount(0);
+  await phone.close();
+  const res = await page.goto("/retos");
+  expect(res?.status()).toBe(200);
+  // Back to visible so the rest of the suite sees the full menu.
+  await page.goto("/ajustes/pantalla");
+  const back = page.waitForResponse((r) => r.request().method() === "POST" && r.url().includes("/ajustes/pantalla"));
+  await retos.click();
+  await back;
+  await expect(retos).toHaveAttribute("aria-pressed", "true");
+});
+
 test("todas las páginas cargan sin errores de servidor", async () => {
   const page = adminPage;
   const errors: string[] = [];

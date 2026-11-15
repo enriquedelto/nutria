@@ -22,6 +22,10 @@ import {
 } from "./types";
 
 export const DEFAULT_MODEL = "claude-opus-5-5";
+
+/** Background and simple reading tasks: AI_MODEL_FAST, when set, so they don't use up the limit photo logging and the coach need. */
+const FAST_FEATURES = new Set(["translate_foods", "label"]);
+export const modelFor = (feature: string): string | undefined => (FAST_FEATURES.has(feature) && process.env.AI_MODEL_FAST) || undefined;
 const FALLBACK_BETA = "server-side-fallback-2026-07-01";
 
 /* ------------------------------- helpers -------------------------------- */
@@ -118,21 +122,22 @@ export class ApiProvider implements AiProvider {
     this.client = new Anthropic({ apiKey, maxRetries: 0 });
   }
 
-  private usage(start: number, u: { input_tokens: number; output_tokens: number; cache_read_input_tokens?: number | null; cache_creation_input_tokens?: number | null }[]): AiUsage {
+  private usage(start: number, u: { input_tokens: number; output_tokens: number; cache_read_input_tokens?: number | null; cache_creation_input_tokens?: number | null }[], model = this.model): AiUsage {
     const input = u.reduce((s, x) => s + x.input_tokens + (x.cache_read_input_tokens ?? 0) + (x.cache_creation_input_tokens ?? 0), 0);
     const output = u.reduce((s, x) => s + x.output_tokens, 0);
     // Opus 5.5 list price: $4 / $20 per MTok (estimate; cache reads billed lower).
-    return { inputTokens: input, outputTokens: output, costUsd: (input * 4 + output * 20) / 1e6, durationMs: Date.now() - start, model: this.model };
+    return { inputTokens: input, outputTokens: output, costUsd: (input * 4 + output * 20) / 1e6, durationMs: Date.now() - start, model };
   }
 
   async structured<S extends z.ZodType>(req: StructuredRequest<S>) {
     const start = Date.now();
+    const model = req.model ?? this.model;
     const msg = await withRetry(
       () =>
         this.client.beta.messages
           .stream(
             {
-              model: this.model,
+              model,
               max_tokens: 32000,
               betas: [FALLBACK_BETA],
               fallbacks: "default",
@@ -147,7 +152,7 @@ export class ApiProvider implements AiProvider {
     );
     if (msg.stop_reason === "refusal") throw new AiError("La IA rechazó la petición", "refusal");
     const text = msg.content.flatMap((b) => (b.type === "text" ? [b.text] : [])).join("");
-    return { data: parseStructured(req.schema, text), usage: this.usage(start, [msg.usage]) };
+    return { data: parseStructured(req.schema, text), usage: this.usage(start, [msg.usage], model) };
   }
 
   async run(req: RunRequest): Promise<RunResult> {
@@ -224,14 +229,14 @@ export class SubscriptionProvider implements AiProvider {
     private token = process.env.CLAUDE_CODE_OAUTH_TOKEN,
   ) {}
 
-  private baseOptions(signal?: AbortSignal) {
+  private baseOptions(signal?: AbortSignal, model = this.model) {
     const abortController = new AbortController();
     signal?.addEventListener("abort", () => abortController.abort());
     const env: Record<string, string> = {};
     for (const [k, v] of Object.entries(process.env)) if (v != null && !/^(ANTHROPIC_API_KEY|DATABASE_URL|APP_ENCRYPTION_KEY|BETTER_AUTH_SECRET)$/.test(k)) env[k] = v;
     if (this.token) env.CLAUDE_CODE_OAUTH_TOKEN = this.token;
     return {
-      model: this.model,
+      model,
       abortController,
       env,
       cwd: process.env.AI_SANDBOX_DIR ?? process.cwd(),
@@ -254,10 +259,11 @@ export class SubscriptionProvider implements AiProvider {
     q: AsyncIterable<import("@anthropic-ai/claude-agent-sdk").SDKMessage>,
     start: number,
     on: { text?: (d: string) => void; tool?: (name: string, input: unknown) => void } = {},
+    model = this.model,
   ) {
     let text = "";
     let structured: unknown;
-    let usage: AiUsage = { inputTokens: 0, outputTokens: 0, costUsd: null, durationMs: 0, model: this.model };
+    let usage: AiUsage = { inputTokens: 0, outputTokens: 0, costUsd: null, durationMs: 0, model };
     const toolCalls: { name: string; input: unknown }[] = [];
     for await (const m of q) {
       if (m.type === "stream_event") {
@@ -285,7 +291,7 @@ export class SubscriptionProvider implements AiProvider {
           outputTokens: u.output_tokens,
           costUsd: m.total_cost_usd,
           durationMs: Date.now() - start,
-          model: this.model,
+          model,
         };
         if (m.subtype === "success") {
           structured = m.structured_output;
@@ -307,7 +313,7 @@ export class SubscriptionProvider implements AiProvider {
           sdk.query({
             prompt: this.prompt(req.content),
             options: {
-              ...this.baseOptions(req.signal),
+              ...this.baseOptions(req.signal, req.model),
               systemPrompt: req.system,
               effort: req.effort ?? "medium",
               maxTurns: 3,
@@ -315,6 +321,8 @@ export class SubscriptionProvider implements AiProvider {
             },
           }),
           start,
+          {},
+          req.model,
         ),
       { signal: req.signal },
     );

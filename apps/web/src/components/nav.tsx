@@ -20,6 +20,7 @@ import {
   Trophy,
   Users,
 } from "lucide-react";
+import { isHidden } from "@/lib/sections";
 import { cn } from "@/lib/utils";
 
 export const SECTIONS = [
@@ -42,19 +43,19 @@ export const SECTIONS = [
 const isActive = (path: string, href: string) => path === href || path.startsWith(href + "/");
 
 /** usePathname is request-time data: render inactive links in the static shell, then the live one. */
-export function Sidebar({ admin }: { admin?: React.ReactNode }) {
+export function Sidebar({ admin, hidden = [] }: { admin?: React.ReactNode; hidden?: readonly string[] }) {
   return (
-    <Suspense fallback={<SidebarView path="" admin={admin} />}>
-      <LiveSidebar admin={admin} />
+    <Suspense fallback={<SidebarView path="" admin={admin} hidden={hidden} />}>
+      <LiveSidebar admin={admin} hidden={hidden} />
     </Suspense>
   );
 }
 
-function LiveSidebar({ admin }: { admin?: React.ReactNode }) {
-  return <SidebarView path={usePathname()} admin={admin} />;
+function LiveSidebar({ admin, hidden }: { admin?: React.ReactNode; hidden: readonly string[] }) {
+  return <SidebarView path={usePathname()} admin={admin} hidden={hidden} />;
 }
 
-function SidebarView({ path, admin }: { path: string; admin?: React.ReactNode }) {
+function SidebarView({ path, admin, hidden }: { path: string; admin?: React.ReactNode; hidden: readonly string[] }) {
   return (
     <nav aria-label="Secciones" className="no-print sticky top-0 hidden h-dvh w-60 shrink-0 flex-col gap-1 overflow-y-auto border-r border-line px-3 py-5 lg:flex">
       <Link href="/hoy" className="mb-4 flex items-center gap-2 px-2">
@@ -62,7 +63,7 @@ function SidebarView({ path, admin }: { path: string; admin?: React.ReactNode })
         <img src="/icons/icon.svg" alt="" className="size-8" />
         <span className="font-display text-xl font-semibold">Nutria</span>
       </Link>
-      {SECTIONS.map(({ href, label, icon: Icon }) => (
+      {SECTIONS.filter((s) => !isHidden(s.href, hidden)).map(({ href, label, icon: Icon }) => (
         <Link
           key={href}
           href={href}
@@ -143,9 +144,9 @@ function BottomTabsView({ path }: { path: string }) {
   );
 }
 
-/** Mobile "Más" grid: every section not in the bottom tabs. */
-export function MoreGrid({ admin }: { admin?: boolean }) {
-  const items = [...SECTIONS.filter((s) => !TABS.some((t) => t.href === s.href)), ...(admin ? [{ href: "/admin", label: "Administración", icon: Shield }] : [])];
+/** Mobile "Más" grid: every section not in the bottom tabs, minus the hidden ones. */
+export function MoreGrid({ admin, hidden = [] }: { admin?: boolean; hidden?: readonly string[] }) {
+  const items = [...SECTIONS.filter((s) => !TABS.some((t) => t.href === s.href) && !isHidden(s.href, hidden)), ...(admin ? [{ href: "/admin", label: "Administración", icon: Shield }] : [])];
   return (
     <ul className="grid grid-cols-3 gap-3 sm:grid-cols-4">
       {items.map(({ href, label, icon: Icon }) => (

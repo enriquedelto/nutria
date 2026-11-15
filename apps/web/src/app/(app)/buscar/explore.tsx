@@ -77,9 +77,18 @@ export function Explore({ personId, q, hasAllergens, onOpen }: { personId: strin
   }, [params, q]);
 
   // Several quick taps before the URL updates must not drop each other: start from the last one sent.
+  // A URL of ours that lands late (a newer one already sent) must not roll the state back;
+  // anything else (back button, a link) is adopted.
   const latest = useRef(params.toString());
+  const inFlight = useRef<string[]>([]);
   useEffect(() => {
-    latest.current = params.toString();
+    const cur = params.toString();
+    const i = inFlight.current.indexOf(cur);
+    if (i >= 0) {
+      inFlight.current = inFlight.current.slice(i + 1);
+      if (inFlight.current.length) return;
+    } else inFlight.current = [];
+    latest.current = cur;
   }, [params]);
   const set = (patch: Record<string, string | null>) => {
     const sp = new URLSearchParams(latest.current);
@@ -89,6 +98,7 @@ export function Explore({ personId, q, hasAllergens, onOpen }: { personId: strin
     }
     sp.set("ver", "explorar");
     latest.current = sp.toString();
+    inFlight.current.push(latest.current);
     router.replace(`${pathname}?${sp}`, { scroll: false });
   };
   const toggle = (k: string) => set({ [k]: new URLSearchParams(latest.current).get(k) === "1" ? null : "1" });

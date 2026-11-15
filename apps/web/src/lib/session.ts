@@ -48,6 +48,8 @@ export type PersonContext = {
   person: PersonSummary;
   scopes: Set<AccessScope>;
   canWrite: boolean;
+  /** Menu sections the user hid (own person's settings), whoever is active. */
+  hiddenSections: string[];
 };
 
 /** Persons the user can see plus the active one (cookie, falling back to the own person). */
@@ -69,7 +71,8 @@ export async function getPersonContext(): Promise<PersonContext> {
   const person = persons.find((p) => p.id === wanted) ?? persons.find((p) => p.isSelf) ?? persons[0]!;
   const access = await getPersonAccess(db(), user.id, person.id);
   if (!access) redirect("/hoy");
-  return { user, persons, person, scopes: access.scopes, canWrite: access.canWrite };
+  const own = rows.find((r) => r.person.userId === user.id)?.person.settings.hiddenSections ?? [];
+  return { user, persons, person, scopes: access.scopes, canWrite: access.canWrite, hiddenSections: own };
 }
 
 /** Throws (redirect) if the active person lacks a scope; returns the context otherwise. */

@@ -1,4 +1,5 @@
 "use server";
+import { HIDEABLE_SECTIONS } from "@/lib/sections";
 import { UserError } from "@/lib/errors";
 import { refresh } from "next/cache";
 import { z } from "zod";
@@ -113,6 +114,7 @@ const Settings = z.object({
   energyUnit: z.enum(["kcal", "kj"]).optional(),
   waterGoalMl: z.number().int().min(500).max(8000).optional(),
   enabledModules: z.array(z.string().max(30)).max(30).optional(),
+  hiddenSections: z.array(z.enum(HIDEABLE_SECTIONS)).max(HIDEABLE_SECTIONS.length).optional(),
   mealReminders: z.boolean().optional(),
   caffeine: z
     .object({

@@ -68,6 +68,8 @@ export type PersonSettings = {
   energyUnit?: "kcal" | "kj";
   waterGoalMl?: number;
   enabledModules?: string[];
+  /** Sections hidden from the menu (hrefs without the slash); the pages still open. Read from the user's own person. */
+  hiddenSections?: string[];
   mealReminders?: boolean;
   /** Caffeine curve: own half-life and fixed bedtime ("HH:MM"); defaults come from data. */
   caffeine?: { halfLifeH?: number; bedtime?: string };

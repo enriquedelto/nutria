@@ -8,6 +8,7 @@ import { saveMealSlots, updatePersonSettings } from "@/actions/settings";
 import { Button } from "@/components/ui/button";
 import { Field, Input, Select } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
+import type { HideableSection } from "@/lib/sections";
 
 /* -------------------------------- theme -------------------------------- */
 
@@ -52,6 +53,36 @@ export function ThemePicker() {
           </button>
         );
       })}
+    </div>
+  );
+}
+
+/* ---------------------------- hidden sections ---------------------------- */
+
+/** Sections to hide from the menu and «Más»; the pages still open from links. */
+export function SectionVisibility({ personId, sections, initial }: { personId: string; sections: { code: HideableSection; label: string }[]; initial: HideableSection[] }) {
+  const [hidden, setHidden] = useState(initial);
+  const [pending, start] = useSafeTransition();
+  const toggle = (c: HideableSection) => {
+    const next = hidden.includes(c) ? hidden.filter((x) => x !== c) : [...hidden, c];
+    setHidden(next);
+    start(async () => {
+      await updatePersonSettings(personId, { hiddenSections: next });
+    });
+  };
+  return (
+    <div className="space-y-2">
+      <p className="text-sm text-ink-2">Pulsa para esconder lo que no usas. No se borra nada: las páginas siguen abriendo desde sus enlaces.</p>
+      <div className="flex flex-wrap gap-1.5">
+        {sections.map((s) => {
+          const shown = !hidden.includes(s.code);
+          return (
+            <button key={s.code} type="button" disabled={pending} aria-pressed={shown} onClick={() => toggle(s.code)} className={cn("rounded-full border px-3 py-1 text-sm", shown ? "border-herb bg-herb-soft text-herb" : "border-line text-ink-3 line-through hover:bg-paper-2")}>
+              {s.label}
+            </button>
+          );
+        })}
+      </div>
     </div>
   );
 }

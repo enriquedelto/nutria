@@ -33,7 +33,7 @@ import {
 import { addDays, completeDerived, countsForAverages, DAY_STATUS_LABEL, dayLogStatus, formatDateEs, macroColumns, microGaps, missingFrom, round, scaleNutrients, type NutrientMap } from "@nutria/nutrition";
 import { buildPersonContext, mealSlotName, portionKey } from "./context";
 import { contextBlock, HEALTH_DISCLAIMER, PROMPTS } from "./prompts";
-import { getProvider } from "./provider";
+import { getProvider, modelFor } from "./provider";
 import { assertQuota, recordUsage } from "./quota";
 import * as S from "./schemas";
 import { toolsFor } from "./tools";
@@ -63,7 +63,7 @@ async function call<Sc extends z.ZodType>(
   const provider = c.provider ?? getProvider();
   await assertQuota(c.db, c.userId, provider.backend);
   try {
-    const { data, usage } = await provider.structured({ feature, system, content, schema, effort, signal: c.signal });
+    const { data, usage } = await provider.structured({ feature, system, content, schema, effort, signal: c.signal, model: modelFor(feature) });
     await recordUsage(c.db, { userId: c.userId, feature, backend: provider.backend, usage });
     return { data, model: usage.model };
   } catch (e) {

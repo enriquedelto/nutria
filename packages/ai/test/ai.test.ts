@@ -14,6 +14,7 @@ import {
   MealEstimate,
   MealPlanDraft,
   MockProvider,
+  modelFor,
   defaultMockHandlers,
   portionKey,
   toolsFor,
@@ -195,5 +196,23 @@ describe("cuota y porciones", () => {
     const [m] = await db.select().from(portionMemory).where(eq(portionMemory.personId, personId));
     expect(m?.grams).toBe(110);
     expect(m?.samples).toBe(2);
+  });
+});
+
+describe("modelo por función", () => {
+  it("traducción y etiquetas usan AI_MODEL_FAST si existe; el resto, el modelo normal", () => {
+    const prev = process.env.AI_MODEL_FAST;
+    try {
+      delete process.env.AI_MODEL_FAST;
+      expect(modelFor("translate_foods")).toBeUndefined();
+      process.env.AI_MODEL_FAST = "claude-haiku-5-5";
+      expect(modelFor("translate_foods")).toBe("claude-haiku-5-5");
+      expect(modelFor("label")).toBe("claude-haiku-5-5");
+      expect(modelFor("meal_photo")).toBeUndefined();
+      expect(modelFor("coach")).toBeUndefined();
+    } finally {
+      if (prev == null) delete process.env.AI_MODEL_FAST;
+      else process.env.AI_MODEL_FAST = prev;
+    }
   });
 });

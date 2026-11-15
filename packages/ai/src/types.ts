@@ -59,6 +59,8 @@ export interface StructuredRequest<S extends z.ZodType> {
   schema: S;
   effort?: Effort;
   signal?: AbortSignal;
+  /** Overrides the provider's model for this call (see modelFor). */
+  model?: string;
 }
 
 export interface RunRequest {
