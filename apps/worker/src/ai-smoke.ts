@@ -4,7 +4,7 @@
  *   pnpm --filter @nutria/worker ai:smoke
  */
 import { aiUsage, closeDb, desc, eq, getDb, getPersonAccess, persons, user, type Database } from "@nutria/db";
-import { coachChat, estimateMeal, structureRecipe, suggestSubstitutions, translateFoodNames, whatToEat } from "@nutria/ai";
+import { coachChat, estimateMeal, refineMeal, structureRecipe, suggestSubstitutions, translateFoodNames, whatToEat } from "@nutria/ai";
 
 class Rollback extends Error {}
 const db = getDb(process.env.DATABASE_URL!);
@@ -37,6 +37,12 @@ try {
     await step("Registro por texto", async () => {
       const r = await estimateMeal(c, { text: "un plato de lentejas con chorizo y un trozo de pan", mode: "text" });
       return `${r.items.map((i) => `${i.name} ${Math.round(i.grams)} g`).join(", ")} → ${Math.round(r.totals.kcal ?? 0)} kcal`;
+    });
+    await step("Corregir un registro en palabras", async () => {
+      const first = await estimateMeal(c, { text: "un plato de arroz con pollo y una ensalada", mode: "text" });
+      const r = await refineMeal(c, { refineOf: first.estimateId, correction: "el doble de arroz y sin ensalada", items: first.items.map((i) => ({ name: i.name, grams: i.grams, servingLabel: i.servingLabel })) });
+      const show = (xs: { name: string; grams: number }[]) => xs.map((i) => `${i.name} ${Math.round(i.grams)} g`).join(", ");
+      return `${show(first.items)} → ${show(r.items)}`;
     });
     await step("Traducción de alimentos (modelo rápido si AI_MODEL_FAST)", async () => {
       const r = await translateFoodNames(c, [{ id: "a", name: "Chicken breast, roasted" }, { id: "b", name: "Lentils, boiled, drained" }]);
