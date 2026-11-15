@@ -3,8 +3,8 @@
  * Everything runs inside a transaction that is rolled back: no estimates, conversations or usage remain.
  *   pnpm --filter @nutria/worker ai:smoke
  */
-import { closeDb, eq, getDb, getPersonAccess, persons, user, type Database } from "@nutria/db";
-import { coachChat, estimateMeal, structureRecipe, suggestSubstitutions, whatToEat } from "@nutria/ai";
+import { aiUsage, closeDb, desc, eq, getDb, getPersonAccess, persons, user, type Database } from "@nutria/db";
+import { coachChat, estimateMeal, structureRecipe, suggestSubstitutions, translateFoodNames, whatToEat } from "@nutria/ai";
 
 class Rollback extends Error {}
 const db = getDb(process.env.DATABASE_URL!);
@@ -37,6 +37,11 @@ try {
     await step("Registro por texto", async () => {
       const r = await estimateMeal(c, { text: "un plato de lentejas con chorizo y un trozo de pan", mode: "text" });
       return `${r.items.map((i) => `${i.name} ${Math.round(i.grams)} g`).join(", ")} → ${Math.round(r.totals.kcal ?? 0)} kcal`;
+    });
+    await step("Traducción de alimentos (modelo rápido si AI_MODEL_FAST)", async () => {
+      const r = await translateFoodNames(c, [{ id: "a", name: "Chicken breast, roasted" }, { id: "b", name: "Lentils, boiled, drained" }]);
+      const [u] = await t.select({ model: aiUsage.model }).from(aiUsage).where(eq(aiUsage.feature, "translate_foods")).orderBy(desc(aiUsage.createdAt)).limit(1);
+      return `${r.map((x) => x.nameEs).join(" · ")} (modelo: ${u?.model ?? "?"})`;
     });
     await step("Receta desde texto", async () => {
       const r = await structureRecipe(c, { sourceType: "text", text: "Tortilla de patatas para 4: 6 huevos, 600 g de patatas, 1 cebolla, aceite de oliva y sal. Freír patata y cebolla, batir los huevos, mezclar y cuajar por ambos lados." });
