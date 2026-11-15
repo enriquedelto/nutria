@@ -19,6 +19,7 @@ export const MealItem = z.object({
   confidence: z.number().describe("0 a 1"),
   per100: Per100.describe("Estimación por 100 g, por si no se encuentra el alimento"),
   nova: z.number().nullable().optional().describe("Grupo NOVA 1–4 del alimento tal como se come"),
+  optional: z.boolean().nullable().optional().describe("true = añadido probable que no se ve ni se menciona (p. ej. el aceite de freír); la persona decide si lo suma"),
 });
 export type MealItem = z.infer<typeof MealItem>;
 
@@ -26,7 +27,8 @@ export const MealEstimate = z.object({
   items: z.array(MealItem),
   mealSlot: MealSlotCode.nullable().optional(),
   notes: z.string().nullable().optional(),
-  questions: z.array(z.string()).describe("Preguntas para afinar si algo es ambiguo (máx. 2)").default([]),
+  questions: z.array(z.string()).describe("Como mucho UNA pregunta, solo si la respuesta cambia mucho las kcal").default([]),
+  answers: z.array(z.string()).describe("2–3 respuestas cortas de un toque para la pregunta ('poco', 'normal', 'mucho'); vacío si no hay pregunta").default([]),
 });
 export type MealEstimate = z.infer<typeof MealEstimate>;
 

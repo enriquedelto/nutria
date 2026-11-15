@@ -214,6 +214,45 @@ test("lo registrado por la IA se puede deshacer", async () => {
   await expect(page.getByText("Tortilla de patatas")).toHaveCount(before);
 });
 
+test("revisión de la IA: tamaño del plato, seguir revisando más tarde y corregir en palabras", async () => {
+  const page = adminPage;
+  await page.goto("/registrar");
+  await page.getByPlaceholder(/lentejas con chorizo/).fill("Tortilla con pan para revisar");
+  await page.getByRole("button", { name: "Analizar" }).click();
+  const grams = page.getByRole("spinbutton", { name: "Gramos" });
+  await expect(grams.first()).toHaveValue("150");
+  await page.getByRole("button", { name: "Plato ×1.5" }).click();
+  await expect(grams.first()).toHaveValue("225");
+  await expect(grams.nth(1)).toHaveValue("60");
+
+  // «Volver» keeps it: after a reload it is still there, with its grams.
+  const saved = page.waitForResponse((r) => r.request().method() === "PATCH" && r.url().includes("/api/ai/estimates/"));
+  await page.getByRole("button", { name: "Volver" }).click();
+  await saved;
+  await page.goto("/registrar");
+  await expect(page.getByText("Seguir revisando")).toBeVisible();
+  await page.getByRole("button", { name: "Seguir", exact: true }).first().click();
+  await expect(grams.first()).toHaveValue("225");
+  await expect(page.getByRole("button", { name: "Plato ×1.5" })).toHaveAttribute("aria-pressed", "true");
+
+  // A correction in words revises the list without a new photo.
+  await page.getByLabel("Corregir").fill("el doble de tortilla y sin pan");
+  await page.getByRole("button", { name: "Corregir", exact: true }).click();
+  await expect(page.getByText("Corregido")).toBeVisible();
+  await expect(grams).toHaveCount(1);
+  await expect(grams.first()).toHaveValue("300");
+  await page.getByRole("button", { name: /^Más / }).click();
+  await expect(grams.first()).toHaveValue("330");
+  await expect(page.getByRole("button", { name: /^Registrar \d+ kcal/ })).toBeEnabled();
+
+  // Only the corrected one is pending; discarding it empties the list.
+  await page.getByRole("button", { name: "Volver" }).click();
+  await page.goto("/registrar");
+  await expect(page.getByRole("button", { name: "Seguir", exact: true })).toHaveCount(1);
+  await page.getByRole("button", { name: /^Descartar / }).click();
+  await expect(page.getByText("Seguir revisando")).toHaveCount(0);
+});
+
 test("receta manual con nutrición calculada", async () => {
   const page = adminPage;
   await page.goto("/recetas/nueva");

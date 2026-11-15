@@ -456,6 +456,15 @@ export function defaultMockHandlers(): Record<string, MockHandler> {
     }),
     meal_photo: () => defaultMockHandlers().meal_text!({ feature: "meal_text", system: "", content: [] }),
     meal_voice: () => defaultMockHandlers().meal_text!({ feature: "meal_text", system: "", content: [] }),
+    // "el doble de tortilla" doubles it, "media ración" halves everything, "sin pan" drops the bread.
+    meal_refine: (req) => {
+      const text = req.content.map((x) => (x.type === "text" ? x.text : "")).join(" ").toLowerCase();
+      const base = defaultMockHandlers().meal_text!({ feature: "meal_text", system: "", content: [] }) as { items: { name: string; grams: number }[] };
+      const items = base.items
+        .filter((i) => !(text.includes("sin pan") && i.name === "Pan blanco"))
+        .map((i) => ({ ...i, grams: text.includes("media ración") ? i.grams / 2 : text.includes("doble de tortilla") && i.name === "Tortilla de patatas" ? i.grams * 2 : i.grams }));
+      return { ...base, items, notes: "Corrección simulada", questions: [], answers: [] };
+    },
     label: () => ({
       name: "Yogur natural",
       brand: "Marca simulada",

@@ -27,9 +27,19 @@ Tarea: convertir la descripción de una comida (texto, voz transcrita o fotos co
 - "searchQuery" debe ser corta y genérica para buscar en la base de datos ("lentejas cocidas", "pan de barra"); incluye la marca solo si aparece.
 - "per100" es tu mejor estimación por 100 g (energy_kcal, protein, carbs, fat, fiber y, si procede, sugars, sat_fat, salt; en café, té, refrescos de cola y bebidas energéticas incluye siempre caffeine en mg; en bebidas alcohólicas, alcohol en g).
 - "nova": grupo NOVA del alimento tal como se come. 1 = sin procesar o mínimamente (fruta, verdura, leche, huevos, carne o pescado frescos, arroz, legumbres, avena, café, infusiones). 2 = ingrediente culinario (aceite, mantequilla, azúcar, sal). 3 = procesado (pan de panadería, queso, conservas de verdura o pescado, jamón curado). 4 = ultraprocesado (pan de molde industrial, embutido con aditivos, nuggets, mayonesa y salsas envasadas, bollería, refrescos, cereales azucarados, platos preparados). En platos caseros, el grupo del ingrediente principal.
-- Si hay ambigüedad importante, añade como mucho dos preguntas breves en "questions".
+- Pregunta solo si la respuesta cambia mucho las kcal (más de un 20 %) y no se puede deducir: como mucho UNA pregunta breve en "questions", con 2–3 respuestas de un toque en "answers" (de cantidad: "poco", "normal", "mucho"; o de tipo: "frito", "a la plancha"). Si no hace falta, ambas listas vacías.
+- Si el plato está frito, salteado, rehogado o es una ensalada aliñada y el aceite no se ve ni se menciona, añade el aceite (o la salsa habitual) como alimento aparte con "optional": true y una cantidad prudente (p. ej. 1 cucharada, 10 g). La persona decide si lo suma.
 - En fotos, usa el tamaño del plato, cubiertos y manos como referencia. Si hay varias fotos, son la misma comida.
 - Si hay fotos de lo que sobró, compáralas con las de antes: cada alimento lleva los gramos realmente comidos (antes − sobras); no incluyas lo que se dejó entero.
+Códigos de nutrientes válidos: ${NUTRIENT_CODES}.`,
+
+  mealRefine: `${BASE}
+
+Tarea: corregir una estimación de comida que ya existe, según lo que dice la persona.
+- Recibes la lista actual (alimento, gramos y medida) y la corrección ("sin queso", "el doble de arroz", "era media ración", "la tortilla era de 2 huevos").
+- Devuelve la lista COMPLETA revisada: aplica la corrección y deja igual todo lo demás (mismos nombres y gramos).
+- "media ración" o "el doble" sin decir de qué = todo el plato. Si añade algo, estímalo como en un registro normal.
+- Mismas reglas de "searchQuery", "per100" y "nova" que al estimar. Sin preguntas: "questions" y "answers" vacías.
 Códigos de nutrientes válidos: ${NUTRIENT_CODES}.`,
 
   label: `${BASE}

@@ -8,6 +8,7 @@ import {
   assertQuota,
   coachChat,
   estimateMeal,
+  refineMeal,
   executeTool,
   extractJson,
   learnPortion,
@@ -121,6 +122,40 @@ describe("registro por IA (simulado)", () => {
     const usage = await db.select().from(aiUsage).where(eq(aiUsage.userId, userId));
     expect(usage.some((u) => u.feature === "meal_text")).toBe(true);
     expect(r.items.map((i) => i.nova)).toEqual([3, 4]);
+  });
+  it("corrige en palabras sin volver a analizar: nueva estimación y la anterior queda sustituida", async () => {
+    const provider = new MockProvider(defaultMockHandlers());
+    const first = await estimateMeal({ db, userId, personId, scopes: ALL, provider }, { text: "tortilla y pan", mode: "text", mealSlot: "lunch" });
+    const r = await refineMeal(
+      { db, userId, personId, scopes: ALL, provider },
+      { refineOf: first.estimateId, correction: "el doble de tortilla y sin pan", items: first.items.map((i) => ({ name: i.name, grams: i.grams, servingLabel: i.servingLabel })), mealSlot: "lunch" },
+    );
+    expect(r.items.map((i) => [i.name, i.grams])).toEqual([["Tortilla de patatas", 300]]);
+    expect(r.questions).toEqual([]);
+    const [old] = await db.select().from(aiEstimates).where(eq(aiEstimates.id, first.estimateId));
+    expect(old?.status).toBe("superseded");
+    const [fresh] = await db.select().from(aiEstimates).where(eq(aiEstimates.id, r.estimateId));
+    expect(fresh?.status).toBe("pending");
+    expect((fresh?.input as { refineOf?: string }).refineOf).toBe(first.estimateId);
+    const usage = await db.select().from(aiUsage).where(eq(aiUsage.userId, userId));
+    expect(usage.some((u) => u.feature === "meal_refine")).toBe(true);
+  });
+  it("una sola pregunta con respuestas; los añadidos opcionales no suman al total", async () => {
+    const provider = new MockProvider({
+      meal_photo: () => ({
+        items: [
+          { name: "Huevo frito", searchQuery: "huevo frito", grams: 60, confidence: 0.6, per100: [{ code: "energy_kcal", amount: 200 }, { code: "protein", amount: 13 }] },
+          { name: "Aceite de oliva", searchQuery: "aceite de oliva", grams: 10, confidence: 0.5, optional: true, per100: [{ code: "energy_kcal", amount: 900 }, { code: "fat", amount: 100 }] },
+        ],
+        questions: ["¿Cuántos huevos eran?", "¿Con pan?"],
+        answers: ["1", "2", "3", "4"],
+      }),
+    });
+    const r = await estimateMeal({ db, userId, personId, scopes: ALL, provider }, { text: "huevos fritos", mode: "photo" });
+    expect(r.questions).toEqual(["¿Cuántos huevos eran?"]);
+    expect(r.answers).toEqual(["1", "2", "3"]);
+    expect(r.items[1]!.optional).toBe(true);
+    expect(r.totals.kcal).toBeCloseTo(120, 0); // the oil (90 kcal) is not counted until added
   });
   it("descarta fichas con energía implausible y conserva la cafeína estimada", async () => {
     await db.insert(foods).values([

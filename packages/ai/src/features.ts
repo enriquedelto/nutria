@@ -95,7 +95,9 @@ export interface MealEstimateResult {
   mealSlot: string | null;
   items: MatchedItem[];
   notes: string | null;
+  /** At most one question, with one-tap answers. */
   questions: string[];
+  answers: string[];
   totals: ReturnType<typeof macroColumns>;
 }
 
@@ -134,20 +136,50 @@ export async function estimateMeal(
   ];
   const feature = `meal_${input.mode}`;
   const { data, model } = await call(c, feature, PROMPTS.meal, content, S.MealEstimate, input.images?.length ? "medium" : "low");
-  const items = await Promise.all(data.items.map((it) => matchItem(c.db, pc.groupId, it)));
-  const totals = macroColumns(items.reduce<NutrientMap>((acc, i) => {
+  return finishMealEstimate(c, pc.groupId, data, model, { mode: input.mode, text: input.text ?? null, photos: before.length, leftoverPhotos: after.length, mealSlot: input.mealSlot ?? null, date: input.date ?? pc.today, time: input.time ?? null }, input.mealSlot);
+}
+
+/**
+ * Correct an estimate in words ("sin queso", "el doble de arroz") without analysing the photos again:
+ * the AI gets the current list (as the person has it now) and returns it revised. The corrected
+ * estimate is a new pending one; the previous one is marked superseded.
+ */
+export async function refineMeal(
+  c: PersonFeatureCtx,
+  input: { refineOf?: string; correction: string; items: { name: string; grams: number; servingLabel?: string | null; kcalPer100?: number | null }[]; mealSlot?: string; date?: string; time?: string },
+): Promise<MealEstimateResult> {
+  const pc = await buildPersonContext(c.db, c.personId, c.scopes);
+  const list = input.items.map((i) => `- ${i.name}: ${Math.round(i.grams)} g${i.servingLabel ? ` (${i.servingLabel})` : ""}${i.kcalPer100 != null ? `, ~${Math.round(i.kcalPer100)} kcal/100 g` : ""}`).join("\n");
+  const text = [contextBlock(pc.lines), input.mealSlot ? `Comida: ${mealSlotName(input.mealSlot)}.` : null, `Estimación actual:\n${list || "(vacía)"}`, `Corrección de la persona: ${input.correction}`].filter(Boolean).join("\n\n");
+  const { data, model } = await call(c, "meal_refine", PROMPTS.mealRefine, [{ type: "text", text }], S.MealEstimate, "low");
+  const out = await finishMealEstimate(c, pc.groupId, { ...data, questions: [], answers: [] }, model, { mode: "refine", refineOf: input.refineOf ?? null, correction: input.correction, mealSlot: input.mealSlot ?? null, date: input.date ?? pc.today, time: input.time ?? null }, input.mealSlot);
+  if (input.refineOf) await supersedeEstimate(c.db, c.userId, input.refineOf);
+  return out;
+}
+
+/** A newer analysis replaced this pending estimate: it leaves the «Seguir revisando» list. */
+export async function supersedeEstimate(db: Database, userId: string, id: string) {
+  await db.update(aiEstimates).set({ status: "superseded", updatedAt: new Date() }).where(and(eq(aiEstimates.id, id), eq(aiEstimates.userId, userId), eq(aiEstimates.status, "pending")));
+}
+
+async function finishMealEstimate(c: PersonFeatureCtx, groupId: string | null, data: S.MealEstimate, model: string, input: Record<string, unknown>, mealSlot?: string): Promise<MealEstimateResult> {
+  const items = await Promise.all(data.items.map((it) => matchItem(c.db, groupId, it)));
+  // Optional add-ons (oil nobody mentioned) don't count until the person adds them.
+  const totals = macroColumns(items.filter((i) => !i.optional).reduce<NutrientMap>((acc, i) => {
     for (const [k, v] of Object.entries(i.nutrients)) acc[k] = (acc[k] ?? 0) + v;
     return acc;
   }, {}));
+  const questions = data.questions.slice(0, 1);
+  const answers = questions.length ? data.answers.slice(0, 3) : [];
   const estimateId = await saveEstimate(c, {
     personId: c.personId,
     kind: "meal",
-    input: { mode: input.mode, text: input.text ?? null, photos: before.length, leftoverPhotos: after.length, mealSlot: input.mealSlot ?? null, date: input.date ?? pc.today, time: input.time ?? null },
-    output: { ...data, items },
+    input,
+    output: { ...data, questions, answers, items },
     confidence: items.length ? items.reduce((s, i) => s + i.confidence, 0) / items.length : 0,
     model,
   });
-  return { estimateId, mealSlot: input.mealSlot ?? data.mealSlot ?? null, items, notes: data.notes ?? null, questions: data.questions, totals };
+  return { estimateId, mealSlot: mealSlot ?? data.mealSlot ?? null, items, notes: data.notes ?? null, questions, answers, totals };
 }
 
 /** Catalogue kcal/100 g within max(20 kcal, 35 %) of the AI estimate (any value if there is no estimate). */

@@ -9,6 +9,7 @@ import { requireScope } from "@/lib/session";
 import { clockNow, closestSlot } from "@/lib/slots";
 import { readShareMeta } from "@/lib/uploads";
 import { listDrafts } from "@/lib/meal-drafts";
+import { listPendingMeals } from "@/lib/meal-estimates";
 import { RegisterClient } from "./register-client";
 
 export const metadata = { title: "Registrar con IA" };
@@ -17,7 +18,7 @@ async function Content({ searchParams }: { searchParams: Promise<Record<string, 
   const sp = await searchParams;
   const ctx = await requireScope("diary", { write: true });
   const date = isDate(sp.fecha) ? sp.fecha : todayIn(ctx.person.timezone);
-  const [day, drafts] = await Promise.all([getDay(ctx.person.id, date), listDrafts(ctx.person.id)]);
+  const [day, drafts, pending] = await Promise.all([getDay(ctx.person.id, date), listDrafts(ctx.person.id), listPendingMeals(ctx.user.id, ctx.person.id)]);
   const slots = day.meals.filter((m) => m.key !== "other").map((m) => ({ key: m.key, label: m.label, time: m.time }));
   const wanted = sp.comida ?? closestSlot(day.meals, ctx.person.timezone);
   const slot = slots.some((s) => s.key === wanted) ? wanted : (slots[0]?.key ?? "lunch");
@@ -33,6 +34,7 @@ async function Content({ searchParams }: { searchParams: Promise<Record<string, 
         aiEnabled={aiConfigured() && ctx.scopes.has("ai")}
         sharedImages={shared}
         drafts={drafts}
+        pending={pending}
         voice={sp.voz === "1"}
         ctx={{
           personId: ctx.person.id,

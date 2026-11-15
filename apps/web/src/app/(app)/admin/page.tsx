@@ -1,6 +1,6 @@
 import { Suspense } from "react";
 import { connection } from "next/server";
-import { aiUsage, and, asc, auditLog, count, desc, eq, foods, gte, sql, user } from "@nutria/db";
+import { aiEstimates, aiUsage, and, asc, auditLog, count, desc, eq, foods, gte, sql, user } from "@nutria/db";
 import { rowsOf } from "@nutria/core";
 import { quotaConfig } from "@nutria/ai";
 import { PageHeader } from "@/components/page-header";
@@ -40,7 +40,7 @@ async function Content() {
   dayStart.setHours(0, 0, 0, 0);
   const monthStart = new Date(dayStart.getFullYear(), dayStart.getMonth(), 1);
   const cfg = quotaConfig();
-  const [users, usage, byFeature, sources, resets, jobs, recentAudit] = await Promise.all([
+  const [users, usage, byFeature, sources, resets, jobs, recentAudit, [meals]] = await Promise.all([
     db().select({ id: user.id, name: user.name, email: user.email, role: user.role, twoFactor: user.twoFactorEnabled, createdAt: user.createdAt }).from(user).orderBy(asc(user.createdAt)),
     db()
       .select({ userId: aiUsage.userId, today: sql<number>`count(*) filter (where ${aiUsage.createdAt} >= ${dayStart.toISOString()})`.mapWith(Number), month: count(), usd: sql<number>`coalesce(sum(${aiUsage.costUsd}),0)`.mapWith(Number), errors: sql<number>`count(*) filter (where ${aiUsage.ok} <> 'ok')`.mapWith(Number) })
@@ -52,6 +52,15 @@ async function Content() {
     db().select().from(auditLog).where(and(eq(auditLog.action, "password_reset_requested"), gte(auditLog.createdAt, hoursAgo(1)))).orderBy(desc(auditLog.createdAt)).limit(10),
     jobStats(),
     db().select({ a: auditLog, who: user.name }).from(auditLog).leftJoin(user, eq(user.id, auditLog.userId)).orderBy(desc(auditLog.createdAt)).limit(25),
+    // Photo/text logging, last 30 days: a corrected or re-analysed estimate counts once (the superseded ones are left out).
+    db()
+      .select({
+        total: count(),
+        abandoned: sql<number>`count(*) filter (where ${aiEstimates.status} = 'discarded' or (${aiEstimates.status} = 'pending' and ${aiEstimates.createdAt} < now() - interval '24 hours'))`.mapWith(Number),
+        medianS: sql<number | null>`percentile_cont(0.5) within group (order by extract(epoch from (${aiEstimates.confirmedAt} - ${aiEstimates.createdAt}))) filter (where ${aiEstimates.status} = 'confirmed')`.mapWith((v) => (v == null ? null : Number(v))),
+      })
+      .from(aiEstimates)
+      .where(and(eq(aiEstimates.kind, "meal"), gte(aiEstimates.createdAt, hoursAgo(24 * 30)), sql`${aiEstimates.status} <> 'superseded'`)),
   ]);
   const use = new Map(usage.map((u) => [u.userId, u]));
   const nameOf = new Map(users.map((u) => [u.id, u.name]));
@@ -118,6 +127,12 @@ async function Content() {
 
       <Card>
         <CardHeader title="IA este mes" subtitle="Por función" />
+        {meals && meals.total ? (
+          <p className="mb-2 rounded-xl bg-paper-2 px-3 py-2 text-sm">
+            Registro con IA (30 días): <span className="num font-medium">{meals.medianS != null ? `${n0(meals.medianS)} s` : "—"}</span> de mediana hasta guardar ·{" "}
+            <span className="num font-medium">{n0((meals.abandoned / meals.total) * 100)} %</span> sin guardar ({n0(meals.total)} análisis)
+          </p>
+        ) : null}
         <ul className="divide-y divide-line text-sm">
           {byFeature.map((f) => (
             <li key={f.feature} className="flex justify-between py-1.5">
