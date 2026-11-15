@@ -86,7 +86,7 @@ async function Content() {
         </Card>
       ) : null}
       {items.length ? (
-        <div className="grid gap-4 lg:grid-cols-3">
+        <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
           {LOCS.map(([code, name, Icon]) => {
             const here = items.filter((i) => i.location === code);
             return (

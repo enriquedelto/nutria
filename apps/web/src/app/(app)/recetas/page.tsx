@@ -54,7 +54,7 @@ async function List({ searchParams }: { searchParams: PageProps<"/recetas">["sea
         </div>
       ) : null}
       {rows.length ? (
-        <ul className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+        <ul className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
           {rows.map(({ r, stars, n }) => (
             <li key={r.id}>
               <Link href={`/recetas/${r.id}`} className="group block overflow-hidden rounded-2xl border border-line bg-card transition-shadow hover:shadow-md">

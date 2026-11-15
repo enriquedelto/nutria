@@ -64,7 +64,7 @@ async function Content() {
 
       <Card>
         <CardHeader title="Recomendados para tu objetivo" subtitle={`Dosis calculadas para ${kg.toLocaleString("es-ES")} kg. Evidencia: A fuerte, B moderada, C limitada.`} />
-        <div className="grid gap-3 md:grid-cols-2">
+        <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
           {recommended.map((c) => (
             <CatalogItem key={c.code} personId={pid} item={c} canWrite={ctx.canWrite && !p?.isChild} />
           ))}
@@ -72,7 +72,7 @@ async function Content() {
         {others.length ? (
           <details className="mt-3">
             <summary className="cursor-pointer text-sm font-medium text-ink-2">Otros con evidencia menor ({others.length})</summary>
-            <div className="mt-3 grid gap-3 md:grid-cols-2">
+            <div className="mt-3 grid grid-cols-1 gap-3 md:grid-cols-2">
               {others.map((c) => (
                 <CatalogItem key={c.code} personId={pid} item={c} canWrite={ctx.canWrite && !p?.isChild} />
               ))}

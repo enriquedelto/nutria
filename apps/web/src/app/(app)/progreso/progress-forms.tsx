@@ -18,7 +18,7 @@ export function WeightForm({ personId, today }: { personId: string; today: strin
   const [pending, start] = useSafeTransition();
   return (
     <form
-      className="grid grid-cols-[1fr_1fr_auto] items-end gap-2 sm:grid-cols-[9rem_7rem_7rem_auto]"
+      className="grid grid-cols-[minmax(0,1fr)_minmax(0,1fr)_auto] items-end gap-2 sm:grid-cols-[9rem_7rem_7rem_auto]"
       onSubmit={submitForm((fd, form) =>
         start(async () => {
           await logWeight(personId, { date: String(fd.get("date")), kg: Number(fd.get("kg")), bodyFatPct: fd.get("bf") ? Number(fd.get("bf")) : null });

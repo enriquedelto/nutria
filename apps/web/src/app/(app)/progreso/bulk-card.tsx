@@ -38,7 +38,7 @@ export function BulkCard({ personId, review, kcalAdjust, canWrite }: { personId:
               <span>{d.message}</span>
             </p>
             {d.verdict !== "no_data" ? (
-              <div className="grid grid-cols-[5.5rem_1fr_6rem] items-center gap-x-2 gap-y-1 text-xs" aria-label="Ritmo de subida">
+              <div className="grid grid-cols-[5.5rem_minmax(0,1fr)_6rem] items-center gap-x-2 gap-y-1 text-xs" aria-label="Ritmo de subida">
                 <span className="text-ink-3">Objetivo</span>
                 <RateBar value={d.targetRateKgWeek} max={maxRate} color="var(--ink-3)" />
                 <span className="num text-right">{rate(d.targetRateKgWeek)}</span>
@@ -86,7 +86,7 @@ export function BulkCard({ personId, review, kcalAdjust, canWrite }: { personId:
                 {d.sets.map((s) => {
                   const st = setsStatus(s.avg4);
                   return (
-                    <li key={s.muscle} className="grid grid-cols-[6.5rem_1fr_5.5rem] items-center gap-2 text-xs">
+                    <li key={s.muscle} className="grid grid-cols-[6.5rem_minmax(0,1fr)_5.5rem] items-center gap-2 text-xs">
                       <span>{MUSCLE_LABEL[s.muscle]}</span>
                       <SetsBar value={s.avg4} />
                       <span className={cn("num text-right", st === "low" ? "text-persimmon" : st === "high" ? "text-ink-2" : "text-herb")}>

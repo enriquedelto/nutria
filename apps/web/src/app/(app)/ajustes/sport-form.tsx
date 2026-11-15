@@ -61,7 +61,7 @@ export function SportForm({ personId, initial, openGymDays, weightKg }: { person
 
       {v.active ? (
         <div className="space-y-4 border-l-2 border-herb/40 pl-4">
-          <div className="grid gap-3 sm:grid-cols-2">
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
             <Field label="Enfoque">
               <Select value={v.focus} onChange={(e) => set("focus", e.target.value as SportValues["focus"])}>
                 <option value="hypertrophy">Hipertrofia (ganar músculo)</option>

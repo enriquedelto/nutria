@@ -58,7 +58,7 @@ async function Content() {
   const jobNames = [...new Set(jobs.byState.map((j) => j.name))];
 
   return (
-    <div className="grid gap-4 xl:grid-cols-2">
+    <div className="grid grid-cols-1 gap-4 xl:grid-cols-2">
       <Card className="xl:col-span-2">
         <CardHeader title="Usuarios" subtitle={`${users.length} cuentas · IA: ${cfg.dailyRequests} peticiones/día por persona (admins sin límite) · ${process.env.AI_BACKEND ?? "subscription"}${aiConfigured() ? "" : " (sin configurar: falta el token o la clave)"}`} action={<InviteHousehold />} />
         <div className="overflow-x-auto">

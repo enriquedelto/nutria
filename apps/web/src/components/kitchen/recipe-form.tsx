@@ -79,7 +79,7 @@ export function RecipeForm({ initial, recipeId, estimateId }: { initial?: Recipe
         })
       )}
     >
-      <div className="grid gap-3 sm:grid-cols-[1fr_7rem_7rem_7rem]">
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-[minmax(0,1fr)_7rem_7rem_7rem]">
         <Field label="Título">
           <Input name="title" required maxLength={200} defaultValue={d.title} />
         </Field>
@@ -96,7 +96,7 @@ export function RecipeForm({ initial, recipeId, estimateId }: { initial?: Recipe
       <Field label="Descripción">
         <Textarea name="description" rows={2} maxLength={2000} defaultValue={d.description ?? ""} />
       </Field>
-      <div className="grid gap-4 md:grid-cols-2">
+      <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
         <Field label="Ingredientes" hint="Uno por línea con cantidad: «200 g de garbanzos cocidos», «2 dientes de ajo». «## Para la salsa» abre una sección.">
           <Textarea rows={14} value={ings} onChange={(e) => setIngs(e.target.value)} required className="font-mono text-sm" />
         </Field>
@@ -104,7 +104,7 @@ export function RecipeForm({ initial, recipeId, estimateId }: { initial?: Recipe
           <Textarea rows={14} value={steps} onChange={(e) => setSteps(e.target.value)} className="text-sm" />
         </Field>
       </div>
-      <div className="grid gap-3 sm:grid-cols-4">
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-4">
         <Field label="Etiquetas" className="sm:col-span-2" hint="Separadas por comas">
           <Input name="tags" defaultValue={(d.tags ?? []).join(", ")} placeholder="legumbres, rápida, táper" />
         </Field>
@@ -115,7 +115,7 @@ export function RecipeForm({ initial, recipeId, estimateId }: { initial?: Recipe
           <Input name="fridge" type="number" min={0} max={30} defaultValue={d.fridgeDays ?? 3} />
         </Field>
       </div>
-      <div className="grid gap-3 sm:grid-cols-[1fr_auto] sm:items-end">
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-end">
         <Field label="Imagen (URL)">
           <Input name="image" type="url" defaultValue={d.imageUrl ?? ""} />
         </Field>

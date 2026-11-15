@@ -213,7 +213,7 @@ async function Today() {
         </div>
         {!ctx.canWrite ? <Badge tone="warn">Solo lectura</Badge> : null}
       </div>
-      <div className="grid gap-4 sm:grid-cols-2">{cards.map((c) => blocks[c] ?? null)}</div>
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">{cards.map((c) => blocks[c] ?? null)}</div>
     </>
   );
 }
@@ -251,7 +251,7 @@ export default function HoyPage() {
   return (
     <Suspense
       fallback={
-        <div className="grid gap-4 sm:grid-cols-2">
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
           <Skeleton className="h-10 w-60 sm:col-span-2" />
           <Skeleton className="h-48 sm:col-span-2" />
           <Skeleton className="h-32" />

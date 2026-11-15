@@ -23,7 +23,7 @@ async function Content() {
       <p className="max-w-2xl text-sm text-ink-2">
         Al activar una condición, Nutria ajusta tus objetivos (por ejemplo, el sodio en hipertensión o los carbohidratos por comida en diabetes), te avisa al registrar alimentos poco adecuados y se lo cuenta al coach. Es información orientativa: sigue siempre las pautas de tu equipo sanitario.
       </p>
-      <div className="grid gap-3 md:grid-cols-2">
+      <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
         {all.map((c) => {
           const on = active.get(c.code);
           return (

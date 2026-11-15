@@ -160,7 +160,7 @@ export function ReceiptReview(p: ReviewProps) {
                   <Trash2 />
                 </Button>
               </div>
-              <div className="grid grid-cols-[1fr_1fr_1.2fr] gap-2">
+              <div className="grid grid-cols-[minmax(0,1fr)_minmax(0,1fr)_minmax(0,1.2fr)] gap-2">
                 <Field label="Cantidad">
                   <Input inputMode="decimal" defaultValue={String(l.quantity)} onChange={(e) => patch(l.key, { quantity: num(e.target.value) ?? 0 })} />
                 </Field>

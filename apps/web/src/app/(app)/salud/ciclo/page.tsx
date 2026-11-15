@@ -45,7 +45,7 @@ async function Content() {
       <p className="flex items-center gap-2 text-sm text-ink-2">
         <Lock className="size-4" /> Privado: solo tú lo ves, salvo que des permiso de «ciclo» a alguien en Familia.
       </p>
-      <div className="grid gap-4 lg:grid-cols-[1fr_22rem]">
+      <div className="grid grid-cols-1 gap-4 lg:grid-cols-[minmax(0,1fr)_22rem]">
         <Card>
           {now ? (
             <>

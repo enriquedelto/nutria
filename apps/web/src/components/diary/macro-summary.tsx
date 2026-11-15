@@ -18,7 +18,7 @@ export function MacroSummary({ totals, target, exerciseKcal = 0, unit = "kcal" }
   const goal = target ? target.kcal + eatBack : null;
   const left = goal != null ? goal - kcal : null;
   return (
-    <div className="grid items-center gap-5 sm:grid-cols-[auto_1fr]">
+    <div className="grid grid-cols-1 items-center gap-5 sm:grid-cols-[auto_minmax(0,1fr)]">
       <div className="flex justify-center">
         <Ring value={kcal} max={goal}>
           <div>
@@ -65,7 +65,7 @@ export function MacroSummary({ totals, target, exerciseKcal = 0, unit = "kcal" }
 
 export function MicroList({ totals, codes, targets }: { totals: NutrientMap; codes: string[]; targets: Record<string, { min?: number; max?: number; target?: number }> }) {
   return (
-    <ul className="grid gap-x-6 gap-y-3 sm:grid-cols-2">
+    <ul className="grid grid-cols-1 gap-x-6 gap-y-3 sm:grid-cols-2">
       {codes.map((c) => {
         const v = totals[c] ?? 0;
         const t = targets[c];

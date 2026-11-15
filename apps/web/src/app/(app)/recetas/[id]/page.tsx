@@ -76,14 +76,14 @@ async function Content({ params }: { params: PageProps<"/recetas/[id]">["params"
           </>
         }
       />
-      <div className="grid gap-4 lg:grid-cols-[1fr_20rem]">
+      <div className="grid grid-cols-1 gap-4 lg:grid-cols-[minmax(0,1fr)_20rem]">
         <div className="space-y-4">
           {r.imageUrl ? (
             // eslint-disable-next-line @next/next/no-img-element
             <img src={r.imageUrl} alt="" referrerPolicy="no-referrer" className="aspect-[16/7] w-full rounded-2xl object-cover" />
           ) : null}
           {r.description ? <p className="text-ink-2">{r.description}</p> : null}
-          <div className="grid gap-4 md:grid-cols-[minmax(0,20rem)_1fr]">
+          <div className="grid grid-cols-1 gap-4 md:grid-cols-[minmax(0,20rem)_minmax(0,1fr)]">
             <Card>
               <CardHeader title="Ingredientes" />
               <ScaledIngredients ingredients={d.ingredients} baseServings={r.servings} />

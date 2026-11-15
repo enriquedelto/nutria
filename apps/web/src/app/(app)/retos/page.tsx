@@ -110,7 +110,7 @@ async function Content() {
           <NewChallenge today={today} members={k.members.map((m) => ({ id: m.id, name: m.name }))} metrics={METRIC_LABEL} />
         </div>
         {active.length ? (
-          <div className="grid gap-4 lg:grid-cols-2">
+          <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
             {active.map((c) => (
               <Board key={c.id} c={c} />
             ))}
@@ -121,7 +121,7 @@ async function Content() {
         {past.length ? (
           <details>
             <summary className="cursor-pointer text-sm text-ink-2">Retos terminados</summary>
-            <div className="mt-3 grid gap-4 lg:grid-cols-2">
+            <div className="mt-3 grid grid-cols-1 gap-4 lg:grid-cols-2">
               {past.map((c) => (
                 <Board key={c.id} c={c} />
               ))}

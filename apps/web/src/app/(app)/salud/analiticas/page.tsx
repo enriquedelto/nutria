@@ -40,7 +40,7 @@ async function Content() {
   const out = rows.filter((s) => s.points.at(-1)!.flag !== "normal");
 
   return (
-    <div className="grid gap-4 lg:grid-cols-[1fr_22rem]">
+    <div className="grid grid-cols-1 gap-4 lg:grid-cols-[minmax(0,1fr)_22rem]">
       <div className="space-y-4">
         {ctx.canWrite ? (
           <Card>
@@ -56,7 +56,7 @@ async function Content() {
                 const last = s.points.at(-1)!;
                 const prev = s.points.at(-2);
                 return (
-                  <li key={s.name} className="grid grid-cols-[1fr_auto] items-center gap-x-3 gap-y-1 py-2.5 sm:grid-cols-[1fr_6rem_8rem]">
+                  <li key={s.name} className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-x-3 gap-y-1 py-2.5 sm:grid-cols-[minmax(0,1fr)_6rem_8rem]">
                     <div className="min-w-0">
                       <p className="truncate font-medium">{s.name}</p>
                       <p className="text-xs text-ink-3">

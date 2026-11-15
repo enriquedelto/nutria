@@ -101,7 +101,7 @@ async function Content() {
       </Step>
 
       <Step n={3} title="Por dónde empezar">
-        <div className="grid gap-3 sm:grid-cols-2">
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
           {[
             { href: "/registrar", icon: MessageCircle, title: "Registra tu primera comida", text: "Escríbela, díctala o hazle una foto: la IA la convierte en alimentos." },
             { href: "/buscar", icon: ScanBarcode, title: "Escanea un producto", text: "Código de barras con Nutri-Score, NOVA, aditivos y alérgenos." },

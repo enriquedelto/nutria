@@ -246,7 +246,7 @@ function QuickAdd({ ctx, onClose }: { ctx: DayContext; onClose: () => void }) {
               <Input name="f" type="number" inputMode="decimal" min={0} step="any" />
             </Field>
           </div>
-          <div className="grid grid-cols-[1fr_auto] gap-3">
+          <div className="grid grid-cols-[minmax(0,1fr)_auto] gap-3">
             <Field label="Comida">
               <Select name="slot" defaultValue={ctx.slot}>
                 {ctx.slots.map((s) => (

@@ -40,7 +40,7 @@ async function Content() {
   const bedStr = bedAvg != null ? `${String(Math.floor((bedAvg / 60 + 12) % 24)).padStart(2, "0")}:${String(Math.round(bedAvg % 60)).padStart(2, "0")}` : "—";
 
   return (
-    <div className="grid gap-4 lg:grid-cols-[1fr_22rem]">
+    <div className="grid grid-cols-1 gap-4 lg:grid-cols-[minmax(0,1fr)_22rem]">
       <div className="space-y-4">
         <Card>
           <CardHeader title="Horas de sueño" subtitle="Últimos 30 días" />

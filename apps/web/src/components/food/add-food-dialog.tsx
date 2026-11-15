@@ -179,7 +179,7 @@ export function AddFoodDialog({ foodId, ctx, defaultGrams, onClose, onAdded }: {
               </ul>
             ) : null}
 
-            <div className="grid grid-cols-[1fr_1.4fr] gap-3">
+            <div className="grid grid-cols-[minmax(0,1fr)_minmax(0,1.4fr)] gap-3">
               <Field label="Cantidad">
                 <Input type="number" inputMode="decimal" min={0} step="any" value={qty} onChange={(e) => setQty(Number(e.target.value))} />
               </Field>
@@ -199,7 +199,7 @@ export function AddFoodDialog({ foodId, ctx, defaultGrams, onClose, onAdded }: {
                 </Select>
               </Field>
             </div>
-            <div className="grid grid-cols-[1fr_auto] gap-3">
+            <div className="grid grid-cols-[minmax(0,1fr)_auto] gap-3">
               <Field label="Comida">
                 <Select value={slot} onChange={(e) => setSlot(e.target.value)}>
                   {ctx.slots.map((s) => (
@@ -282,7 +282,7 @@ export function WhatIf({ ctx, item }: { ctx: DayContext; item: NutrientMap }) {
       <p className="mb-2 text-xs font-medium uppercase tracking-wide text-ink-3">¿Y si lo añado?</p>
       <div className="space-y-2">
         {rows.map((r) => (
-          <div key={r.k} className="grid grid-cols-[5rem_1fr_6.5rem] items-center gap-2 text-sm">
+          <div key={r.k} className="grid grid-cols-[5rem_minmax(0,1fr)_6.5rem] items-center gap-2 text-sm">
             <span className="text-ink-2">{r.label}</span>
             <Bar value={r.now + r.add} max={r.t} color={r.color} label={r.label} />
             <span className={cn("num text-right", r.now + r.add > r.t * 1.05 ? "text-persimmon" : "text-ink-2")}>

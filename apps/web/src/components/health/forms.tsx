@@ -34,7 +34,7 @@ export function ExerciseForm({ personId, today, activities }: { personId: string
   const cats = [...new Set(activities.map((a) => a.category))];
   return (
     <form
-      className="grid gap-2 sm:grid-cols-[1fr_6rem_9rem_auto] sm:items-end"
+      className="grid grid-cols-1 gap-2 sm:grid-cols-[minmax(0,1fr)_6rem_9rem_auto] sm:items-end"
       onSubmit={submitForm((fd, form) =>
         start(async () => {
           await logExercise(personId, { date: String(fd.get("date")), activityCode: String(fd.get("activity")), minutes: Number(fd.get("minutes")), kcal: fd.get("kcal") ? Number(fd.get("kcal")) : null });
@@ -180,7 +180,7 @@ export function SleepForm({ personId, today }: { personId: string; today: string
   const [quality, setQuality] = useState(3);
   return (
     <form
-      className="grid gap-3 sm:grid-cols-2"
+      className="grid grid-cols-1 gap-3 sm:grid-cols-2"
       onSubmit={submitForm((fd) =>
         start(async () => {
           const date = String(fd.get("date"));
@@ -310,7 +310,7 @@ export function SymptomForm({ personId }: { personId: string }) {
           </button>
         ))}
       </div>
-      <div className="grid gap-2 sm:grid-cols-[1fr_12rem]">
+      <div className="grid grid-cols-1 gap-2 sm:grid-cols-[minmax(0,1fr)_12rem]">
         <Field label="Síntoma">
           <Input value={symptom} onChange={(e) => setSymptom(e.target.value)} required maxLength={60} />
         </Field>

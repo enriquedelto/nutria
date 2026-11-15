@@ -155,7 +155,7 @@ export function InviteMember() {
   return (
     <div className="space-y-3">
       <form
-        className="grid grid-cols-[1fr_auto] gap-2 sm:grid-cols-[1fr_9rem_auto] sm:items-end"
+        className="grid grid-cols-[minmax(0,1fr)_auto] gap-2 sm:grid-cols-[minmax(0,1fr)_9rem_auto] sm:items-end"
         onSubmit={submitForm((fd) =>
           start(async () => {
             try {

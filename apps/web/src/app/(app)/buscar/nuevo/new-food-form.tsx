@@ -87,7 +87,7 @@ export function NewFoodForm({ personId, barcode, label, aiEnabled }: { personId:
           <input ref={cam} type="file" accept="image/*" capture="environment" multiple hidden onChange={(e) => void readLabel(e.target.files)} />
         </Card>
       ) : null}
-      <Card className="grid gap-3 sm:grid-cols-2">
+      <Card className="grid grid-cols-1 gap-3 sm:grid-cols-2">
         <Field label="Nombre" className="sm:col-span-2">
           <Input required value={meta.name} onChange={(e) => setMeta({ ...meta, name: e.target.value })} maxLength={160} />
         </Field>

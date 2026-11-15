@@ -85,6 +85,8 @@
     color: var(--ink);
     font-family: var(--font-body), system-ui, sans-serif;
     font-feature-settings: "tnum" 0;
+    /* A long food name without spaces (codes, brands, URLs) wraps instead of pushing the page sideways. */
+    overflow-wrap: break-word;
   }
   h1,
   h2,

@@ -48,7 +48,7 @@ export function NewToken() {
   return (
     <div className="space-y-3">
       <form
-        className="grid gap-2 sm:grid-cols-[1fr_auto_8rem_auto] sm:items-end"
+        className="grid grid-cols-1 gap-2 sm:grid-cols-[minmax(0,1fr)_auto_8rem_auto] sm:items-end"
         onSubmit={submitForm((fd) =>
           start(async () => {
             const t = await createApiToken({ name: String(fd.get("name")), scopes, expiresDays: fd.get("exp") ? Number(fd.get("exp")) : null });
@@ -174,7 +174,7 @@ export function OpenGymConnect({ personId, defaultUrl, label = "Conectar" }: { p
   const [pending, start] = useSafeTransition();
   return (
     <form
-      className="grid gap-2 sm:grid-cols-[1fr_10rem_auto] sm:items-end"
+      className="grid grid-cols-1 gap-2 sm:grid-cols-[minmax(0,1fr)_10rem_auto] sm:items-end"
       onSubmit={submitForm((fd) =>
         start(async () => {
           try {
@@ -228,7 +228,7 @@ export function OpenPricesConnect() {
   const [pending, start] = useSafeTransition();
   return (
     <form
-      className="grid gap-2 sm:grid-cols-[1fr_1fr_auto] sm:items-end"
+      className="grid grid-cols-1 gap-2 sm:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_auto] sm:items-end"
       onSubmit={submitForm((fd) =>
         start(async () => {
           try {

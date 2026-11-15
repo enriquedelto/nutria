@@ -25,7 +25,7 @@ async function Content() {
   const longest = done.length ? Math.max(...done.map(hours)) : null;
 
   return (
-    <div className="grid gap-4 lg:grid-cols-[1fr_22rem]">
+    <div className="grid grid-cols-1 gap-4 lg:grid-cols-[minmax(0,1fr)_22rem]">
       <Card>
         <CardHeader title={active ? "Ayuno en curso" : "Empezar un ayuno"} subtitle={active ? `Desde las ${time(active.startedAt, tz)} del ${dateShort(active.startedAt.toISOString().slice(0, 10))}` : "Te avisaremos al llegar a la meta"} />
         <FastingTimer

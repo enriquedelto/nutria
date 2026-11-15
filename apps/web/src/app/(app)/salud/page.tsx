@@ -75,7 +75,7 @@ async function Content() {
         {has("health") ? <Tile href="/salud/condiciones" icon={<Stethoscope className="size-4" />} title="Condiciones" value={conds.length || "—"} hint={conds.map((c) => c.name).join(", ") || "Ninguna activa"} /> : null}
       </div>
 
-      <div className="grid gap-4 lg:grid-cols-2">
+      <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
         {todayDoses.length ? (
           <Card>
             <CardHeader title="Tomas de hoy" action={<Link href="/salud/medicacion" className="text-sm text-herb hover:underline">Gestionar</Link>} />

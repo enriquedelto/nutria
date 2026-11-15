@@ -26,7 +26,7 @@ export function AddPantry({ defaultLocation = "despensa" }: { defaultLocation?: 
   return (
     <div className="space-y-3">
       <form
-        className="grid grid-cols-2 gap-2 sm:grid-cols-[1fr_5rem_5rem_8rem_8rem_auto] sm:items-end"
+        className="grid grid-cols-2 gap-2 sm:grid-cols-[minmax(0,1fr)_5rem_5rem_8rem_8rem_auto] sm:items-end"
         onSubmit={submitForm((fd, form) =>
           start(async () => {
             try {
@@ -115,7 +115,7 @@ export function AddPantry({ defaultLocation = "despensa" }: { defaultLocation?: 
           <DialogContent title="¿Esto es lo que hay?" description="Revisa lo que ha visto la IA antes de guardarlo.">
             <ul className="max-h-[55vh] space-y-2 overflow-y-auto">
               {draft.items.map((it, i) => (
-                <li key={i} className="grid grid-cols-[1fr_4.5rem_4rem_auto] items-center gap-1.5">
+                <li key={i} className="grid grid-cols-[minmax(0,1fr)_4.5rem_4rem_auto] items-center gap-1.5">
                   <Input value={it.name} onChange={(e) => setDraft((d) => d && { ...d, items: d.items.map((x, j) => (j === i ? { ...x, name: e.target.value } : x)) })} className="h-9" />
                   <Input type="number" value={it.quantity} onChange={(e) => setDraft((d) => d && { ...d, items: d.items.map((x, j) => (j === i ? { ...x, quantity: Number(e.target.value) } : x)) })} className="h-9" />
                   <span className="text-xs text-ink-3">{it.unit} · {it.location}</span>

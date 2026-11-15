@@ -16,7 +16,7 @@ export function ChangePassword() {
   const [pending, start] = useSafeTransition();
   return (
     <form
-      className="grid gap-2 sm:grid-cols-[1fr_1fr_auto] sm:items-end"
+      className="grid grid-cols-1 gap-2 sm:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_auto] sm:items-end"
       onSubmit={submitForm((fd) =>
         start(async () => {
           const { error } = await authClient.changePassword({ currentPassword: String(fd.get("current")), newPassword: String(fd.get("next")), revokeOtherSessions: true });
@@ -104,7 +104,7 @@ export function TwoFactor({ enabled }: { enabled: boolean }) {
 
   if (step === "verify")
     return (
-      <div className="grid gap-4 sm:grid-cols-[auto_1fr]">
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-[auto_minmax(0,1fr)]">
         {/* eslint-disable-next-line @next/next/no-img-element */}
         {qr ? <img src={qr} alt="Código QR para la app de autenticación" className="size-48 rounded-xl bg-white p-2" /> : null}
         <form

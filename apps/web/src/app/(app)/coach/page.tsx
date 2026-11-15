@@ -38,7 +38,7 @@ async function Content({ searchParams }: { searchParams: Promise<Record<string, 
       proposals: ((m.parts ?? []) as { type: string; kind?: string; summary?: string; status?: string }[]).filter((p) => p.type === "proposal").map((p) => ({ kind: p.kind!, summary: p.summary!, status: p.status }) satisfies ChatProposal),
     }));
   return (
-    <div className="grid gap-4 lg:grid-cols-[15rem_1fr]">
+    <div className="grid grid-cols-1 gap-4 lg:grid-cols-[15rem_minmax(0,1fr)]">
       <aside className="hidden space-y-2 lg:block">
         <Button asChild className="w-full" variant="soft">
           <Link href="/coach">

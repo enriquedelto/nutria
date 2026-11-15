@@ -148,7 +148,7 @@ export function Explore({ personId, q, hasAllergens, onOpen }: { personId: strin
         })}
       </ul>
 
-      <div className="grid grid-cols-[1fr_1fr_auto] gap-2">
+      <div className="grid grid-cols-[minmax(0,1fr)_minmax(0,1fr)_auto] gap-2">
         <Select aria-label="Origen" value={origin} onChange={(e) => set({ origen: e.target.value || null })}>
           {ORIGINS.map(([v, l]) => (
             <option key={v} value={v}>

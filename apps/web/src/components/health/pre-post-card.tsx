@@ -35,7 +35,7 @@ export function PrePostCard({ a, weeks }: { a: PrePostAnalysis; weeks: number })
           Faltan datos: {a.sessions} de {MIN_SESSIONS_FOR_BEST} sesiones con la hora de la comida previa. Registra las comidas con su hora real (o con «Empezar comida») los días de entreno y aquí saldrá tu franja ideal.
         </p>
       )}
-      <div className="mt-3 grid gap-3 sm:grid-cols-2">
+      <div className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-2">
         <Buckets title="Horas desde la comida con hidratos" rows={a.gap} best={a.bestGap?.key} />
         <Buckets title="Hidratos en las 4 h previas" rows={a.carbs} best={a.bestCarbs?.key} />
       </div>

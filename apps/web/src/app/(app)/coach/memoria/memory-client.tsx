@@ -48,7 +48,7 @@ export function MemoryClient({
       {canWrite ? (
         <Card>
           <form
-            className="grid gap-3 sm:grid-cols-[10rem_1fr_auto] sm:items-end"
+            className="grid grid-cols-1 gap-3 sm:grid-cols-[10rem_minmax(0,1fr)_auto] sm:items-end"
             onSubmit={submitForm((fd, form) =>
               start(async () => {
                 await addMemory(personId, String(fd.get("category")), String(fd.get("content")));

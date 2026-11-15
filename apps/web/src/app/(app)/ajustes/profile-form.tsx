@@ -53,7 +53,7 @@ function GainRate({ rate, weightKg, onChange }: { rate: number; weightKg: number
   return (
     <div className="space-y-2 sm:col-span-2">
       {weightKg ? (
-        <div className="grid gap-2 sm:grid-cols-2">
+        <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
           {gainRatePresets(weightKg).map((p) => (
             <button key={p.key} type="button" aria-pressed={Math.abs(rate - p.kgPerWeek) < 0.005} onClick={() => onChange(p.kgPerWeek)} className={cn("rounded-xl border p-2.5 text-left text-sm", Math.abs(rate - p.kgPerWeek) < 0.005 ? "border-herb bg-herb-soft" : "border-line hover:bg-paper-2")}>
               <span className="font-semibold">
@@ -104,7 +104,7 @@ export function ProfileForm({ personId, initial, allergens, timezones, isChild }
         });
       }}
     >
-      <fieldset className="grid gap-3 sm:grid-cols-2">
+      <fieldset className="grid grid-cols-1 gap-3 sm:grid-cols-2">
         <legend className="mb-2 font-display text-lg font-semibold">Datos básicos</legend>
         <Field label="Nombre">
           <Input value={v.displayName} onChange={(e) => set("displayName", e.target.value)} required maxLength={40} />
@@ -154,7 +154,7 @@ export function ProfileForm({ personId, initial, allergens, timezones, isChild }
 
       <fieldset className="space-y-3">
         <legend className="mb-2 font-display text-lg font-semibold">Actividad y objetivo</legend>
-        <div className="grid gap-2 sm:grid-cols-5">
+        <div className="grid grid-cols-1 gap-2 sm:grid-cols-5">
           {ACTIVITY.map(([k, label, hint]) => (
             <button key={k} type="button" aria-pressed={v.activityLevel === k} onClick={() => set("activityLevel", k)} className={cn("rounded-xl border p-2.5 text-left text-sm", v.activityLevel === k ? "border-herb bg-herb-soft" : "border-line hover:bg-paper-2")}>
               <span className="font-semibold">{label}</span>
@@ -163,7 +163,7 @@ export function ProfileForm({ personId, initial, allergens, timezones, isChild }
           ))}
         </div>
         {!isChild ? (
-          <div className="grid gap-3 sm:grid-cols-2">
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
             <Field label="Objetivo">
               <Select value={v.goalType} onChange={(e) => set("goalType", e.target.value as ProfileValues["goalType"])}>
                 <option value="lose">Perder grasa</option>

@@ -99,7 +99,7 @@ async function Content() {
   };
 
   return (
-    <div className="grid gap-4 lg:grid-cols-2">
+    <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
       <div className="space-y-4">
         <Card>
           <CardHeader title={g?.name ?? "Hogar"} subtitle={`${members.length} ${members.length === 1 ? "cuenta" : "cuentas"} · ${plural(groupPersons.length, "persona", "personas")}`} action={isAdmin ? <RenameGroup name={g?.name ?? ""} /> : null} />

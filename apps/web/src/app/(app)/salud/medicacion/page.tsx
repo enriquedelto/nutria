@@ -42,7 +42,7 @@ async function Content() {
   const adherence = past.length ? Math.round((past.filter((x) => x.status === "taken").length / past.length) * 100) : null;
 
   return (
-    <div className="grid gap-4 lg:grid-cols-[1fr_22rem]">
+    <div className="grid grid-cols-1 gap-4 lg:grid-cols-[minmax(0,1fr)_22rem]">
       <div className="space-y-4">
         <Card>
           <CardHeader title="Hoy" subtitle={adherence != null ? `Adherencia últimos 7 días: ${adherence} %` : undefined} />

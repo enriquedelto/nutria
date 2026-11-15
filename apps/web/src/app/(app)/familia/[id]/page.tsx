@@ -36,7 +36,7 @@ async function Content({ params }: { params: PageProps<"/familia/[id]">["params"
   const shareable = members.filter((m) => m.userId !== p.userId && !rows.some((r) => r.userId === m.userId));
 
   return (
-    <div className="grid gap-4 lg:grid-cols-2">
+    <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
       <div className="space-y-4">
         <Card>
           <div className="flex items-center gap-3">

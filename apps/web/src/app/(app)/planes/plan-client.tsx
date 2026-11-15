@@ -179,7 +179,7 @@ export function PlanBoard(props: {
             <Coverage c={cov.get(d)} />
             <div className="space-y-2">
               {shown.map((s) => (
-                <div key={s.key} className="grid grid-cols-[5.5rem_1fr] gap-2">
+                <div key={s.key} className="grid grid-cols-[5.5rem_minmax(0,1fr)] gap-2">
                   <span className="pt-1.5 text-xs text-ink-3">{s.label}</span>
                   <Cell items={cell(d, s.key)} names={names} days={days} slots={slots} people={people} proteinOf={proteinOf} onAdd={() => setAdding({ date: d, slot: s.key })} />
                 </div>

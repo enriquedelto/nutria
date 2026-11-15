@@ -29,7 +29,7 @@ export function TrainingCard({ plan, proteinLeft, children }: { plan: TrainingDa
         }
         subtitle={plan.done ? `Entreno de ${t.start} a ${t.end}` : plan.known ? `Sueles entrenar hacia las ${t.start}` : "Aún no sé a qué hora entrenas: supongo las 18:30"}
       />
-      <div className="grid gap-2 text-sm sm:grid-cols-2">
+      <div className="grid grid-cols-1 gap-2 text-sm sm:grid-cols-2">
         <div className={cn("rounded-xl p-3", before ? "bg-herb-soft/60" : "bg-paper-2", plan.done || plan.phase === "late" ? "opacity-60" : "")}>
           <p className="font-medium">
             Antes <span className="num font-normal text-ink-2">· {t.preFrom}–{t.preTo}</span>

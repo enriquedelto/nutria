@@ -125,7 +125,7 @@ export function DisplaySettings({ personId, initial, cards, micros, canEdit, wat
         </div>
       </fieldset>
 
-      <fieldset disabled={!canEdit} className="grid gap-3 sm:grid-cols-3">
+      <fieldset disabled={!canEdit} className="grid grid-cols-1 gap-3 sm:grid-cols-3">
         <legend className="mb-2 font-display text-lg font-semibold">Unidades</legend>
         <Field label="Sistema">
           <Select value={v.units} onChange={(e) => setV((x) => ({ ...x, units: e.target.value as Display["units"] }))}>
@@ -173,7 +173,7 @@ export function MealSlotsEditor({ personId, initial }: { personId: string; initi
     <div className="space-y-3">
       <ul className="space-y-2">
         {slots.map((s, i) => (
-          <li key={i} className="grid grid-cols-[1fr_7rem_5rem_auto] items-end gap-2">
+          <li key={i} className="grid grid-cols-[minmax(0,1fr)_7rem_5rem_auto] items-end gap-2">
             <Field label={i === 0 ? "Nombre" : undefined}>
               <Input value={s.label} maxLength={30} onChange={(e) => set(i, { label: e.target.value, key: initial.some((x) => x.key === s.key) ? s.key : slug(e.target.value) })} />
             </Field>

@@ -308,7 +308,7 @@ export function RegisterClient({ ctx, aiEnabled, sharedImages, drafts, voice = f
             setTime(t);
             if (t) setSlot(slotForTime(ctx.slots, t));
           }} />
-          <div className="grid grid-cols-[1fr_auto] items-end gap-3">
+          <div className="grid grid-cols-[minmax(0,1fr)_auto] items-end gap-3">
             <Field label="Comida">
               <Select value={slot} onChange={(e) => setSlot(e.target.value)}>
                 {ctx.slots.map((s) => (
@@ -365,7 +365,7 @@ export function RegisterClient({ ctx, aiEnabled, sharedImages, drafts, voice = f
                       <Trash2 className="size-4" />
                     </button>
                   </div>
-                  <div className="mt-2 grid grid-cols-[6rem_1fr_auto] gap-2">
+                  <div className="mt-2 grid grid-cols-[6rem_minmax(0,1fr)_auto] gap-2">
                     <Input type="number" inputMode="decimal" min={0} value={r.grams} aria-label="Gramos" onChange={(e) => setRows((rs) => rs.map((x) => (x.key === r.key ? { ...x, grams: Number(e.target.value) } : x)))} />
                     <Select value={r.foodId ?? ""} onChange={(e) => void switchFood(r.key, e.target.value || null)} aria-label="Alimento de la base de datos">
                       <option value="">Usar estimación de la IA</option>

@@ -75,7 +75,7 @@ async function Content() {
   const weekMin = week.reduce((a, l) => a + l.durationMin, 0);
 
   return (
-    <div className="grid gap-4 lg:grid-cols-[1fr_22rem]">
+    <div className="grid grid-cols-1 gap-4 lg:grid-cols-[minmax(0,1fr)_22rem]">
       <div className="space-y-4">
         <Card>
           <CardHeader title="Gasto por ejercicio" subtitle={`Esta semana: ${plural(week.length, "sesión", "sesiones")} · ${n0(weekMin)} min · ${n0(week.reduce((a, l) => a + l.kcal, 0))} kcal`} />

@@ -873,6 +873,16 @@ test("en el móvil, ninguna página desborda ni da errores", async ({ browser })
       return out;
     });
 
+  // A logged food with a very long name (and one unbroken word) must not widen any page.
+  await page.goto("/buscar/nuevo");
+  await page.getByLabel("Nombre").fill("Yogur griego natural desnatado con trozos de melocotón y maracuyá edición limitada ExtraCremosoSinLactosaProteicoPlus");
+  await page.getByLabel("kcal", { exact: true }).fill("90");
+  await page.getByRole("button", { name: "Guardar alimento" }).click();
+  await expect(page).toHaveURL(/\/buscar\?abrir=[0-9a-f-]{36}/);
+  await page.goto(page.url());
+  await page.getByRole("dialog").getByRole("button", { name: /^Añadir \d+ g/ }).click();
+  await expect(page.getByRole("dialog")).toHaveCount(0);
+
   for (const r of await allRoutes(page)) {
     route = r;
     const t0 = Date.now();
