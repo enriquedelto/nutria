@@ -4,6 +4,7 @@
  */
 import {
   and,
+  dailySummaries,
   eq,
   gte,
   inArray,
@@ -26,6 +27,7 @@ import {
 } from "@nutria/db";
 import { addDays, expiryStatus, isoDow, photoReminderDue, proteinGapG, todayIn } from "@nutria/nutrition";
 import { targetsForDate } from "./targets";
+import { DAY_CLOSE, DAY_CLOSE_TIME, dayCloseGap } from "./day-close";
 import { proteinIdeas, proteinToday } from "./timing";
 import { notify, QUICK_ACTIONS } from "./notify";
 import { supplementTakenOn } from "./supplements";
@@ -172,6 +174,41 @@ export async function remindersTick(db: Database, now = new Date(), windowMin = 
       url: "/hoy",
       tag: "protein",
       timezone: p.timezone,
+    });
+    sent++;
+  }
+
+  // «Cerrar el día»: on by default (off in Avisos), at config.times[0] (22:30), only for a day
+  // logged under 70 % of the target and not marked yet.
+  const close = await db
+    .select({ personId: persons.id, userId: persons.userId, timezone: persons.timezone, config: notificationPrefs.config })
+    .from(persons)
+    .leftJoin(notificationPrefs, and(eq(notificationPrefs.userId, persons.userId), eq(notificationPrefs.type, DAY_CLOSE)))
+    .where(sql`${persons.userId} is not null and (${notificationPrefs.enabled} is true or ${notificationPrefs.id} is null)`);
+  for (const p of close) {
+    const today = todayIn(p.timezone, now);
+    const t = Array.isArray(p.config?.times) && typeof p.config.times[0] === "string" ? (p.config.times[0] as string) : DAY_CLOSE_TIME;
+    const at = zonedTime(today, t, p.timezone);
+    if (at <= since || at > now) continue;
+    const [[day], target] = await Promise.all([
+      db.select().from(dailySummaries).where(and(eq(dailySummaries.personId, p.personId), eq(dailySummaries.date, today))).limit(1),
+      targetsForDate(db, p.personId, today),
+    ]);
+    const gap = dayCloseGap(day, target?.kcal);
+    if (!gap) continue;
+    await notify(db, {
+      userId: p.userId!,
+      type: DAY_CLOSE,
+      title: `🌙 Faltan ~${gap} kcal hoy`,
+      body: "¿No comiste más, se te olvidó algo o comiste fuera?",
+      url: `/registrar?fecha=${today}`,
+      tag: `day-close-${today}`,
+      timezone: p.timezone,
+      actions: [
+        { action: "day_complete", title: "Completo", post: { url: "/api/diary/quick", body: { kind: "day_complete", date: today } } },
+        { action: "log", title: "Registrar", url: `/registrar?fecha=${today}` },
+        { action: "out", title: "Fuera", url: `/registrar?fecha=${today}&texto=${encodeURIComponent("Comí fuera: ")}` },
+      ],
     });
     sent++;
   }

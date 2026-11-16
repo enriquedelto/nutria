@@ -7,6 +7,7 @@ import {
   and,
   asc,
   between,
+  checkins,
   cyclePeriods,
   desc,
   diaryEntries,
@@ -297,6 +298,36 @@ const getBulkReview = define({
   },
 });
 
+const getCheckins = define({
+  name: "get_checkins",
+  description:
+    "Check-ins semanales (los lunes), del más reciente al más antiguo: fase (volumen/mantenimiento/definición), ritmo real de peso frente al objetivo, días bien registrados, propuesta de kcal y si se aceptó, y la señal de recuperación (carga de entreno de la semana frente a la habitual, pulso y sueño si hay datos; dice con qué datos se calculó).",
+  scope: "body",
+  input: z.object({ limit: z.number().int().min(1).max(8).default(4) }),
+  async run({ limit }, ctx) {
+    const rows = await ctx.db.select().from(checkins).where(eq(checkins.personId, ctx.personId)).orderBy(desc(checkins.weekStart)).limit(limit);
+    if (!rows.length) return "Aún no hay check-ins: se hacen los lunes (o desde Progreso → Check-in semanal).";
+    return rows.map((r) => {
+      const d = r.data as { observedRateKgWeek?: number | null; weekLoggedDays?: number; weekWeighIns?: number; proposal?: { verdict: string; targetRateKgWeek: number; reasons: string[] }; recovery?: unknown };
+      return {
+        week: r.weekStart,
+        phase: r.phase,
+        status: r.status,
+        kcalBefore: r.kcalBefore,
+        kcalAfter: r.kcalAfter,
+        observedRateKgWeek: d.observedRateKgWeek ?? null,
+        targetRateKgWeek: d.proposal?.targetRateKgWeek ?? null,
+        loggedDays: d.weekLoggedDays,
+        weighIns: d.weekWeighIns,
+        verdict: d.proposal?.verdict,
+        reasons: d.proposal?.reasons,
+        answers: r.answers,
+        recovery: d.recovery,
+      };
+    });
+  },
+});
+
 const getForecast = define({
   name: "get_forecast",
   description: "Previsión de peso a 30/60/90 días según la ingesta media reciente y el TDEE estimado.",
@@ -516,6 +547,7 @@ export const READ_TOOLS: AiTool[] = [
   getProfile,
   getWeight,
   getBulkReview,
+  getCheckins,
   getForecast,
   getExercise,
   getSleep,

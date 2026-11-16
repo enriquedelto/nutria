@@ -13,13 +13,14 @@ const TYPES: { type: string; label: string; hint: string; times?: string[] }[] =
   { type: "meal_reminder", label: "Registrar comidas", hint: "A las horas que elijas, si aún no has registrado", times: ["14:30", "21:30"] },
   { type: "water", label: "Beber agua", hint: "Recordatorio suave", times: ["11:00", "17:00"] },
   { type: "protein", label: "Proteína del día", hint: "Por la tarde, si aún te faltan 20 g o más (activo de serie con el objetivo «ganar»)", times: ["20:00"] },
+  { type: "day_close", label: "Cerrar el día", hint: "Por la noche, si el día va por debajo del 70 % de tus kcal: «Completo», «Registrar» o «Fuera» (activo de serie)", times: ["22:30"] },
   { type: "post_workout", label: "Después de entrenar", hint: "Cuando llega tu entreno de openGym: proteína en las 2 h siguientes" },
   { type: "medication", label: "Medicación", hint: "A la hora de cada toma (ignora el silencio)" },
   { type: "supplement", label: "Suplementos", hint: "Según la pauta de cada suplemento" },
   { type: "fasting", label: "Ayuno", hint: "Al completar la meta" },
   { type: "expiry", label: "Caducidades", hint: "Productos de la despensa a punto de caducar" },
   { type: "weekly_report", label: "Informe semanal", hint: "Los domingos a las 20:00, con un cambio para la semana" },
-  { type: "bulk_review", label: "Revisión del volumen", hint: "Los lunes, si conviene cambiar las calorías (objetivo ganar)" },
+  { type: "checkin", label: "Check-in semanal", hint: "Los lunes: cómo vas, y si conviene cambiar las calorías" },
   { type: "lean_mass", label: "Pérdida de masa magra", hint: "Los lunes, si entrenas mucho menos de lo previsto o bajan peso y fuerza sin que baje la cintura" },
   { type: "progress_photo", label: "Fotos de progreso", hint: "Cada 4 semanas desde tu última foto (y la primera, si aún no tienes)" },
   { type: "plan_ready", label: "Plan listo", hint: "Cuando la IA termina un plan" },
@@ -50,7 +51,7 @@ async function Content() {
             const p = by.get(t.type);
             const times = Array.isArray(p?.config.times) ? (p!.config.times as string[]) : (t.times ?? []);
             // Reminders with times are opt-in; event notifications are on unless disabled.
-            const enabled = p ? p.enabled : t.type === "protein" ? me?.goal === "gain" : !t.times;
+            const enabled = p ? p.enabled : t.type === "protein" ? me?.goal === "gain" : t.type === "day_close" || !t.times;
             return <PrefRow key={t.type} type={t.type} label={t.label} hint={t.hint} enabled={enabled} times={times} withTimes={!!t.times} />;
           })}
         </ul>

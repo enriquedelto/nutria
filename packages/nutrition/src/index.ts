@@ -23,3 +23,5 @@ export * from "./day-status";
 export * from "./meal-timing";
 export * from "./training-time";
 export * from "./lean-mass";
+export * from "./checkin";
+export * from "./recovery";

@@ -172,6 +172,37 @@ export const tdeeEstimates = pgTable(
   (t) => [uniqueIndex().on(t.personId, t.date)],
 );
 
+/**
+ * Weekly check-in: one per person and week (Monday). Proposes a kcal change from the trend
+ * weight, the logging and the phase (bulk / maintain / cut); the person answers and decides.
+ * It is also the history of target changes.
+ */
+export const checkins = pgTable(
+  "checkins",
+  {
+    id: id(),
+    personId: uuid()
+      .notNull()
+      .references(() => persons.id, { onDelete: "cascade" }),
+    weekStart: date({ mode: "string" }).notNull(),
+    /** bulk | maintain | cut (from the goal when it was built). */
+    phase: text().notNull(),
+    /** pending | accepted | rejected */
+    status: text().notNull().default("pending"),
+    kcalBefore: integer(),
+    /** Proposed change of the daily kcal (0 = keep). */
+    kcalDelta: integer().notNull().default(0),
+    kcalAfter: integer(),
+    /** Inputs, proposal, suspect days and recovery signal, as shown. */
+    data: jsonb().$type<Record<string, unknown>>().notNull().default({}),
+    /** adherence, pace, excluded days. */
+    answers: jsonb().$type<Record<string, unknown>>().notNull().default({}),
+    decidedAt: timestamp({ withTimezone: true }),
+    ...timestamps(),
+  },
+  (t) => [uniqueIndex().on(t.personId, t.weekStart)],
+);
+
 /* ---------------------- M7 exercise, steps, fasting ----------------------- */
 
 /** Compendium of Physical Activities (seeded). */

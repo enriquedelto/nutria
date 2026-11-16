@@ -52,7 +52,7 @@ export async function latestBulkReview(db: Database, personId: string) {
  * Builds (or rebuilds) this week's review. Runs on Mondays after the adaptive TDEE; only for
  * people whose goal is to gain. Notifies when there is a kcal proposal.
  */
-export async function weeklyBulkReview(db: Database, personId: string, now = new Date()) {
+export async function weeklyBulkReview(db: Database, personId: string, now = new Date(), opts: { notify?: boolean } = {}) {
   const [p] = await db.select({ goalType: persons.goalType, userId: persons.userId, timezone: persons.timezone }).from(persons).where(eq(persons.id, personId)).limit(1);
   if (p?.goalType !== "gain") return null;
   const snap = await adaptiveSnapshot(db, personId, now);
@@ -114,7 +114,8 @@ export async function weeklyBulkReview(db: Database, personId: string, now = new
     await tx.delete(insights).where(and(eq(insights.personId, personId), eq(insights.kind, BULK_REVIEW), eq(insights.periodEnd, end)));
     await tx.insert(insights).values(row);
   });
-  if (review.kcalDelta && p.userId)
+  // The weekly cron passes notify:false: the Monday check-in is the one notification.
+  if (review.kcalDelta && p.userId && opts.notify !== false)
     await notify(db, { userId: p.userId, type: BULK_REVIEW, title: `💪 ${TITLES[review.verdict]}`, body: review.message, url: "/progreso#volumen", timezone: p.timezone });
   return data;
 }

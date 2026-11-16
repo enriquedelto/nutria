@@ -142,6 +142,35 @@ test("revisión del volumen: sin datos todavía, a mano desde Progreso", async (
   await expect(card.getByText(/Sin entrenos de openGym/)).toBeVisible();
 });
 
+test("check-in semanal: hacerlo a mano, responder y cerrarlo; «Completo» desde el aviso nocturno", async () => {
+  const page = adminPage; // goal «gain», one weigh-in from the welcome: not enough data yet
+  await page.goto("/progreso");
+  await page.getByRole("link", { name: /Check-in semanal/ }).click();
+  await expect(page).toHaveURL(/\/progreso\/checkin$/);
+  await page.getByRole("button", { name: "Hacer el check-in ahora" }).click();
+  await expect(page.getByRole("button", { name: "Lo registré todo" })).toHaveAttribute("aria-pressed", "true");
+  await expect(page.getByRole("group", { name: "Ritmo" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Recuperación: Sin datos" })).toBeVisible();
+  // Partly logged week: the proposal says it will not change the kcal.
+  await page.getByRole("button", { name: "Solo algunas comidas" }).click();
+  await expect(page.getByText(/se registró solo en parte/)).toBeVisible();
+  await expect(page.getByRole("button", { name: "Solo algunas comidas" })).toHaveAttribute("aria-pressed", "true");
+  await page.getByRole("button", { name: "Hecho" }).click();
+  await expect(page.getByText("Check-in hecho")).toBeVisible();
+  await expect(page.getByText("Decidido: sin cambios.")).toBeVisible();
+  await page.reload();
+  await expect(page.getByRole("button", { name: "Hacer el check-in ahora" })).toHaveCount(0);
+  // Hoy only shows the card while it is pending.
+  await page.goto("/hoy");
+  await expect(page.getByRole("link", { name: /Check-in semanal/ })).toHaveCount(0);
+
+  // «Completo» on the night notification marks the day without opening the app.
+  const r = await page.request.post("/api/diary/quick", { data: { kind: "day_complete" } });
+  expect(await r.json()).toEqual({ ok: true, message: "Hoy, marcado como completo" });
+  await page.goto("/ajustes/notificaciones");
+  await expect(page.getByText("Cerrar el día")).toBeVisible();
+});
+
 test("proteína por comida y tarjeta del entreno en Hoy", async () => {
   const page = adminPage; // 62,5 kg, sport profile on: ideal dose max(25, 0.4 g/kg) = 25 g
   await page.goto("/hoy");
@@ -746,7 +775,7 @@ test("IA en la cocina (simulada): sustituciones y foto de la nevera", async () =
 });
 
 const ROUTES = [
-  "/hoy", "/diario", "/buscar", "/buscar/nuevo", "/registrar", "/coach", "/coach/memoria", "/progreso", "/progreso/informe", "/informe",
+  "/hoy", "/diario", "/buscar", "/buscar/nuevo", "/registrar", "/coach", "/coach/memoria", "/progreso", "/progreso/informe", "/progreso/checkin", "/informe",
   "/salud", "/salud/medicacion", "/salud/suplementos", "/salud/sintomas", "/salud/analiticas", "/salud/ayuno", "/salud/ejercicio", "/salud/sueno", "/salud/ciclo", "/salud/condiciones",
   "/recetas", "/recetas/nueva", "/recetas/importar", "/planes", "/despensa", "/compra", "/compra/tickets", "/compra/precios", "/familia", "/retos", "/mas", "/admin",
   "/ajustes", "/ajustes/objetivos", "/ajustes/comidas", "/ajustes/pantalla", "/ajustes/notificaciones", "/ajustes/seguridad", "/ajustes/integraciones", "/ajustes/datos",

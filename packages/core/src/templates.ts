@@ -1,6 +1,7 @@
 /** Faster logging: meal templates (one-tap), repeated-meal suggestions and the quick actions behind notifications. */
 import { and, desc, diaryEntries, eq, gte, isNotNull, mealSlots, mealTemplates, persons, sql, type Database, type MealTemplateItem } from "@nutria/db";
 import { addDays, todayIn } from "@nutria/nutrition";
+import { setDayLogStatus } from "./day-close";
 import { addEntries, copyMeal } from "./diary";
 import { supplementsForDate, takeSupplement } from "./supplements";
 
@@ -89,7 +90,8 @@ async function slotNow(db: Database, personId: string, timeZone: string, now: Da
   return best;
 }
 
-export type QuickKind = "usual" | "yesterday" | "shake";
+/** day_complete: «Completo» on the night notification (marks `date`, or today, as fully logged). */
+export type QuickKind = "usual" | "yesterday" | "shake" | "day_complete";
 
 /**
  * One-tap logging without opening the app (notification actions, app shortcuts):
@@ -98,10 +100,18 @@ export type QuickKind = "usual" | "yesterday" | "shake";
  *  - shake: today's whey dose, or a template called «batido».
  * Always answers with a short message for the user.
  */
-export async function quickLog(db: Database, input: { personId: string; userId: string; kind: QuickKind; slot?: string | null }, now = new Date()): Promise<{ ok: boolean; message: string }> {
+export async function quickLog(db: Database, input: { personId: string; userId: string; kind: QuickKind; slot?: string | null; date?: string | null }, now = new Date()): Promise<{ ok: boolean; message: string }> {
   const [p] = await db.select({ tz: persons.timezone }).from(persons).where(eq(persons.id, input.personId)).limit(1);
   if (!p) return { ok: false, message: "Persona no encontrada" };
   const today = todayIn(p.tz, now);
+
+  if (input.kind === "day_complete") {
+    // The notification carries its day: answered after midnight it still marks the right one.
+    const day = input.date && input.date <= today && input.date >= addDays(today, -3) ? input.date : today;
+    await setDayLogStatus(db, input.personId, day, "complete");
+    return { ok: true, message: day === today ? "Hoy, marcado como completo" : "Día marcado como completo" };
+  }
+
   const slot = input.slot ?? (await slotNow(db, input.personId, p.tz, now));
   const [slotRow] = await db.select({ label: mealSlots.label }).from(mealSlots).where(and(eq(mealSlots.personId, input.personId), eq(mealSlots.key, slot))).limit(1);
   const label = (slotRow?.label ?? "comida").toLowerCase();

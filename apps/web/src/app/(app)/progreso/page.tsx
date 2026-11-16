@@ -143,6 +143,13 @@ async function Content() {
           )}
         </Card>
 
+        <Link href="/progreso/checkin" className="flex items-center justify-between gap-3 rounded-card border border-line bg-paper px-4 py-3 text-sm">
+          <span>
+            <span className="font-medium">Check-in semanal</span> <span className="text-ink-3">· cada lunes, y el historial de cambios de calorías</span>
+          </span>
+          <span className="shrink-0 font-medium text-herb">Abrir →</span>
+        </Link>
+
         {me?.goal === "gain" ? <BulkCard personId={pid} review={bulk} kcalAdjust={me.adjust ?? 0} canWrite={ctx.canWrite} /> : null}
 
         <Card>

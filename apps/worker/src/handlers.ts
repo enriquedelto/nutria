@@ -44,6 +44,7 @@ import {
   uploadDir,
   weeklyAdaptiveTdee,
   weeklyBulkReview,
+  weeklyCheckin,
   notifyLeanMass,
   buildWeeklyReport,
   photoReminders,
@@ -101,10 +102,17 @@ export const handlers: Handlers = {
     let n = 0;
     let lean = 0;
     for (const p of ids) {
-      if (await weeklyBulkReview(db, p.id).catch((e) => log.warn("volumen", { personId: p.id, error: String(e) }))) n++;
+      if (await weeklyBulkReview(db, p.id, new Date(), { notify: false }).catch((e) => log.warn("volumen", { personId: p.id, error: String(e) }))) n++;
       if (await notifyLeanMass(db, p.id).catch((e) => log.warn("masa magra", { personId: p.id, error: String(e) }))) lean++;
     }
     return { persons: n, leanMassAlerts: lean };
+  },
+
+  [JOBS.checkinWeekly]: async ({ personId }, { db }) => {
+    const ids = personId ? [{ id: personId }] : await personsWithWeight(db);
+    let n = 0;
+    for (const p of ids) if (await weeklyCheckin(db, p.id).catch((e) => log.warn("check-in", { personId: p.id, error: String(e) }))) n++;
+    return { persons: n };
   },
 
   [JOBS.weeklyReport]: async ({ personId }, { db, boss }) => {

@@ -18,7 +18,7 @@ import { getDay, getHomeExtras } from "@/lib/data/day";
 import { getPersonContext } from "@/lib/session";
 import { staleOpenDraft } from "@/lib/meal-drafts";
 import { db } from "@/lib/db";
-import { leanMassStatus, trainingDayMeals } from "@nutria/core";
+import { currentCheckin, leanMassStatus, trainingDayMeals } from "@nutria/core";
 import { eq, progressPhotos } from "@nutria/db";
 import { TrainingMeals } from "@/components/diary/training-meals";
 import { minuteOfDay } from "@/lib/slots";
@@ -31,10 +31,11 @@ async function Today() {
   const ctx = await getPersonContext();
   const date = todayIn(ctx.person.timezone);
   const [day, extras, eating] = await Promise.all([getDay(ctx.person.id, date), getHomeExtras(ctx.person.id, ctx.person.timezone, ctx.scopes), ctx.canWrite ? staleOpenDraft(ctx.person.id) : Promise.resolve(null)]);
-  const [mealsAround, lean, photoRows] = await Promise.all([
+  const [mealsAround, lean, photoRows, checkin] = await Promise.all([
     extras.training ? trainingDayMeals(db(), ctx.person.id, date) : Promise.resolve(null),
     ctx.scopes.has("body") ? leanMassStatus(db(), ctx.person.id) : Promise.resolve(null),
     ctx.scopes.has("photos") ? db().select({ date: progressPhotos.date, pose: progressPhotos.pose }).from(progressPhotos).where(eq(progressPhotos.personId, ctx.person.id)) : Promise.resolve([]),
+    ctx.canWrite && ctx.scopes.has("body") ? currentCheckin(db(), ctx.person.id, date) : Promise.resolve(null),
   ]);
   const photos = photoStatus(photoRows, date);
   // First photos only nudged for people who train (planned days); after that, every 4 weeks.
@@ -63,6 +64,14 @@ async function Today() {
         {lean?.check.level === "alert" ? (
           <Link href="/progreso#masa-magra" className="block rounded-card border border-danger/40 bg-danger/5 px-4 py-3 text-sm">
             <span className="font-medium">Posible pérdida de masa magra.</span> <span className="text-ink-2">{lean.check.reasons[0]}</span> <span className="font-medium text-herb">Ver →</span>
+          </Link>
+        ) : null}
+        {checkin?.status === "pending" ? (
+          <Link href="/progreso/checkin" className="flex items-center justify-between gap-3 rounded-card border border-herb/50 bg-herb-soft/40 px-4 py-3 text-sm">
+            <span>
+              <span className="font-medium">Check-in semanal.</span> <span className="text-ink-2">{checkin.data.proposal.kcalDelta ? checkin.data.proposal.reasons[0] : "Dos preguntas para ver cómo vas."}</span>
+            </span>
+            <span className="shrink-0 font-medium text-herb">Hacer →</span>
           </Link>
         ) : null}
         {photoDue ? (
