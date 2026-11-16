@@ -69,6 +69,7 @@ async function Content() {
             cycleCarbs: sport.exists ? !!sp.cycleCarbs : true,
             waterAuto: sport.exists ? !!sp.waterAuto : true,
             gymHours: sp.gymHours ?? [],
+            trainingTimes: sp.trainingTimes ?? {},
           }}
         />
       </Card>

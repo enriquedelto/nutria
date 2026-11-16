@@ -28,6 +28,37 @@ export interface SportProfile {
   waterAuto?: boolean;
   /** Gym opening hours ("HH:MM"), same every day: used to suggest the best time to train. */
   gymHours?: { from: string; to: string }[];
+  /** Fixed start time per ISO weekday ("1".."7" → "HH:MM"); wins over the openGym median. */
+  trainingTimes?: Record<string, string>;
+  /** «Solo para hoy»: start time for one date; wins over everything except a logged workout. */
+  timeToday?: { date: string; time: string };
+}
+
+/** Where the training start time of a day comes from (strongest first). */
+export type TrainingTimeSource = "logged" | "today" | "fixed" | "usual" | "default";
+export const TRAINING_TIME_SOURCE: Record<TrainingTimeSource, string> = {
+  logged: "registrado",
+  today: "solo para hoy",
+  fixed: "tu hora fija",
+  usual: "hora habitual en openGym",
+  default: "supuesta",
+};
+export const DEFAULT_TRAINING_TIME = "18:30";
+
+/** Planned start time of `date` from the profile and the openGym median (logged workouts aside). */
+export function plannedTrainingStart(sp: SportProfile, date: string, dow: number, usual: string | null): { time: string; source: Exclude<TrainingTimeSource, "logged"> } {
+  if (sp.timeToday?.date === date) return { time: sp.timeToday.time, source: "today" };
+  const fixed = sp.trainingTimes?.[String(dow)];
+  if (fixed) return { time: fixed, source: "fixed" };
+  if (usual) return { time: usual, source: "usual" };
+  return { time: DEFAULT_TRAINING_TIME, source: "default" };
+}
+
+function parseTrainingTimes(v: unknown): Record<string, string> | undefined {
+  if (!v || typeof v !== "object") return undefined;
+  const out: Record<string, string> = {};
+  for (const [k, t] of Object.entries(v as Record<string, unknown>)) if (/^[1-7]$/.test(k) && HHMM.test(String(t))) out[k] = String(t);
+  return Object.keys(out).length ? out : undefined;
 }
 
 const HHMM = /^([01]\d|2[0-3]):[0-5]\d$/;
@@ -57,6 +88,11 @@ export function sportProfile(config: Record<string, unknown> | null | undefined)
     cycleCarbs: c.cycleCarbs === true,
     waterAuto: c.waterAuto === true,
     gymHours: parseGymHours(c.gymHours),
+    trainingTimes: parseTrainingTimes(c.trainingTimes),
+    timeToday:
+      c.timeToday && typeof c.timeToday === "object" && /^\d{4}-\d{2}-\d{2}$/.test(String((c.timeToday as { date?: unknown }).date)) && HHMM.test(String((c.timeToday as { time?: unknown }).time))
+        ? { date: String((c.timeToday as { date: string }).date), time: String((c.timeToday as { time: string }).time) }
+        : undefined,
   };
 }
 

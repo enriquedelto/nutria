@@ -600,10 +600,26 @@ describe("proteína y timing del entreno", () => {
     await core.remindersTick(db, at(D, "20:02"));
     expect(await db.select().from(notifications).where(eq(notifications.type, "protein"))).toHaveLength(1);
 
+    // Start time priority: openGym median < fixed time of the weekday < «solo para hoy» < logged.
+    expect(plan!.source).toBe("usual");
+    await core.saveSportProfile(db, pid, true, { trainingTimes: { "1": "19:30", "3": "07:00" } });
+    let p2 = await core.trainingDayPlan(db, pid, at(D, "16:00"));
+    expect(p2).toMatchObject({ source: "fixed", known: true });
+    expect(p2!.timing.start).toBe("19:30");
+    expect((await core.trainingDayMeals(db, pid, D, at(D, "16:00"))).session).toMatchObject({ source: "fixed", start: 19 * 60 + 30 });
+    await core.saveSportProfile(db, pid, true, { timeToday: { date: D, time: "20:15" } });
+    p2 = await core.trainingDayPlan(db, pid, at(D, "16:00"));
+    expect(p2).toMatchObject({ source: "today" });
+    expect(p2!.timing.start).toBe("20:15");
+    expect((await core.caffeineDay(db, pid, D, at(D, "16:00"))).trainingSource).toBe("today");
+    // «Solo para hoy» expires the next day: back to the fixed time.
+    expect((await core.trainingDayPlan(db, pid, at("2027-03-08", "16:00")))!.timing.start).toBe("19:30");
+    await core.saveSportProfile(db, pid, true, { timeToday: undefined, trainingTimes: undefined });
+
     // Workout logged today: real times, already in the post window.
     await db.insert(exerciseLogs).values({ personId: pid, date: D, startedAt: at(D, "17:00"), name: "Torso", durationMin: 60, kcal: 300 });
     const done = await core.trainingDayPlan(db, pid, at(D, "18:30"));
-    expect(done).toMatchObject({ phase: "post", done: true });
+    expect(done).toMatchObject({ phase: "post", done: true, source: "logged" });
     expect(done!.timing).toMatchObject({ start: "17:00", end: "18:00", postUntil: "20:00" });
     expect(await core.notifyPostWorkout(db, pid, [{ startedAt: at(D, "17:00"), durationMin: 60 }], 72, at(D, "18:30"))).toBe(true);
     expect(await core.notifyPostWorkout(db, pid, [{ startedAt: at("2027-02-22", "18:40"), durationMin: 70 }], 72, at(D, "18:30"))).toBe(false);

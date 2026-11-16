@@ -25,7 +25,7 @@ import { Field, Input, Select } from "@/components/ui/input";
 import { useSafeTransition } from "@/lib/use-safe-transition";
 import { cn } from "@/lib/utils";
 
-const TRAINING_SOURCE: Record<string, string> = { logged: "registrado hoy", usual: "tu hora habitual", default: "sin historial: 18:30" };
+const TRAINING_SOURCE: Record<string, string> = { logged: "registrado hoy", today: "solo para hoy", fixed: "tu hora fija", usual: "tu hora habitual", default: "sin historial: 18:30" };
 const BED_SOURCE: Record<string, string> = { manual: "fijada por ti", sleep: "tu hora habitual de acostarte", default: "sin registro de sueño: 23:30" };
 const TIME_SOURCE: Record<string, string> = { eaten: "", slot: "hora habitual de la comida", created: "hora en que lo registraste" };
 

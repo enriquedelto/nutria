@@ -55,7 +55,7 @@ async function Today() {
       </Card>
     ),
     entreno: extras.training ? (
-      <TrainingCard key="entreno" plan={extras.training} proteinLeft={day.target ? Math.round(day.target.protein - (day.totals.protein ?? 0)) : null}>
+      <TrainingCard key="entreno" plan={extras.training} personId={ctx.person.id} canWrite={ctx.canWrite} proteinLeft={day.target ? Math.round(day.target.protein - (day.totals.protein ?? 0)) : null}>
         {mealsAround?.session && mealsAround.weightKg ? <TrainingMeals session={mealsAround.session} meals={mealsAround.meals} weightKg={mealsAround.weightKg} nowMin={minuteOfDay(ctx.person.timezone)} /> : null}
       </TrainingCard>
     ) : null,

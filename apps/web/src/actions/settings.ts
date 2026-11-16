@@ -18,7 +18,7 @@ import {
   weightLogs,
 } from "@nutria/db";
 import { todayIn, parseGymHours } from "@nutria/nutrition";
-import { audit, latestWeight, missingProfileFields, notify, pairOpenGym, saveSportProfile, syncOpenGym, WEBHOOK_EVENTS } from "@nutria/core";
+import { audit, getSportProfile, latestWeight, missingProfileFields, notify, pairOpenGym, saveSportProfile, syncOpenGym, WEBHOOK_EVENTS } from "@nutria/core";
 import { encrypt, newToken } from "@nutria/integrations";
 import { db } from "@/lib/db";
 import { recomputeTargetsSafe } from "@/lib/targets";
@@ -96,14 +96,32 @@ const Sport = z.object({
     .array(z.object({ from: z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/), to: z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/) }).refine((w) => w.from < w.to, "El tramo debe acabar después de empezar"))
     .max(4)
     .default([]),
+  /** Fixed start per ISO weekday; empty = the openGym median. */
+  trainingTimes: z.record(z.string().regex(/^[1-7]$/), z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/)).default({}),
 });
 
 /** Sport profile = config of the "athlete" condition; recalculates the targets. */
 export async function saveSport(personId: string, input: z.input<typeof Sport>) {
   await manage(personId);
   const { active, ...v } = Sport.parse(input);
-  await saveSportProfile(db(), personId, active, { ...v, trainingDays: [...new Set(v.trainingDays)].sort(), proteinPerKg: Math.round(v.proteinPerKg * 10) / 10, gymHours: parseGymHours(v.gymHours) });
+  const days = [...new Set(v.trainingDays)].sort();
+  // Only times of training days are kept (a day taken off the plan drops its time).
+  const times = Object.fromEntries(Object.entries(v.trainingTimes).filter(([d]) => days.includes(Number(d))));
+  await saveSportProfile(db(), personId, active, { ...v, trainingDays: days, proteinPerKg: Math.round(v.proteinPerKg * 10) / 10, gymHours: parseGymHours(v.gymHours), trainingTimes: Object.keys(times).length ? times : undefined });
   await recomputeTargetsSafe(personId);
+  refresh();
+}
+
+/** «Solo para hoy»: today's training start (null = back to the fixed time / openGym median). */
+export async function setTrainingTimeToday(personId: string, time: string | null) {
+  const u = await me();
+  await assertAccess(u.id, uuid.parse(personId), "diary", true);
+  const [p] = await db().select({ tz: persons.timezone }).from(persons).where(eq(persons.id, personId)).limit(1);
+  if (!p) throw new UserError("Persona no encontrada");
+  const t = time == null ? null : z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/, "Hora no válida").parse(time);
+  const cur = await getSportProfile(db(), personId);
+  // Keeps the profile's active flag (switching it on would change the targets).
+  await saveSportProfile(db(), personId, cur.active, { timeToday: t ? { date: todayIn(p.tz), time: t } : undefined });
   refresh();
 }
 

@@ -1,16 +1,16 @@
 /** Meals around training: the day's session and meals, and the history for the personal analysis. */
 import { and, asc, diaryEntries, eq, exerciseLogs, gte, isNotNull, mealSlots, persons, type Database } from "@nutria/db";
-import { addDays, clockToMinutes, groupMeals, isoDow, todayIn, workoutExercises, type GroupedMeal, type SessionInput, type TimedMeal } from "@nutria/nutrition";
+import { addDays, clockToMinutes, groupMeals, todayIn, workoutExercises, type GroupedMeal, type SessionInput, type TimedMeal, type TrainingTimeSource } from "@nutria/nutrition";
 import { entryMinute } from "./caffeine";
 import { dayKindFor, getSportProfile } from "./sport";
 import { latestWeight } from "./targets";
-import { usualTrainingTime } from "./timing";
+import { plannedTrainingTime } from "./timing";
 
 const clock = (d: Date, timeZone: string) => new Intl.DateTimeFormat("en-GB", { timeZone, hour: "2-digit", minute: "2-digit", hourCycle: "h23" }).format(d);
 
 export interface TrainingDayMeals {
   /** Minutes from 00:00 of the day. null on rest days. */
-  session: { start: number; end: number; source: "logged" | "usual" | "default"; name: string | null } | null;
+  session: { start: number; end: number; source: TrainingTimeSource; name: string | null } | null;
   meals: GroupedMeal[];
   weightKg: number | null;
 }
@@ -46,9 +46,9 @@ export async function trainingDayMeals(db: Database, personId: string, date: str
     const start = clockToMinutes(clock(real.startedAt!, tz));
     session = { start, end: start + Math.max(20, real.min || 60), source: "logged", name: real.name };
   } else if (dayKindFor(date, today, logged.length > 0, sport.profile) === "training") {
-    const usual = await usualTrainingTime(db, personId, tz, today, isoDow(date));
-    const start = clockToMinutes(usual?.time ?? "18:30");
-    session = { start, end: start + (usual?.durationMin ?? 60), source: usual ? "usual" : "default", name: null };
+    const planned = await plannedTrainingTime(db, personId, tz, today, date, sport.profile);
+    const start = clockToMinutes(planned.time);
+    session = { start, end: start + planned.durationMin, source: planned.source, name: null };
   }
   return { session, meals, weightKg: weight?.kg ?? null };
 }

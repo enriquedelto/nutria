@@ -3,6 +3,7 @@ import { Dumbbell } from "lucide-react";
 import type { TrainingDayPlan } from "@nutria/core";
 import { Card, CardHeader } from "@/components/ui/card";
 import { cn } from "@/lib/utils";
+import { TrainingTimeToday } from "./training-time-today";
 
 const PHASE_TEXT: Record<TrainingDayPlan["phase"], string> = {
   early: "Hoy toca entreno",
@@ -13,8 +14,16 @@ const PHASE_TEXT: Record<TrainingDayPlan["phase"], string> = {
   late: "Entreno hecho",
 };
 
-/** Training day: what to eat before and after, at the usual (or real) training time. */
-export function TrainingCard({ plan, proteinLeft, children }: { plan: TrainingDayPlan; proteinLeft: number | null; children?: React.ReactNode }) {
+const SUBTITLE: Record<TrainingDayPlan["source"], (start: string) => string> = {
+  logged: (s) => `Entreno a las ${s}`,
+  today: (s) => `Hoy entrenas a las ${s} (solo hoy)`,
+  fixed: (s) => `Entrenas a las ${s} (tu hora fija)`,
+  usual: (s) => `Sueles entrenar hacia las ${s}`,
+  default: () => "Aún no sé a qué hora entrenas: supongo las 18:30",
+};
+
+/** Training day: what to eat before and after, at the planned (or real) training time. */
+export function TrainingCard({ plan, proteinLeft, personId, canWrite = false, children }: { plan: TrainingDayPlan; proteinLeft: number | null; personId?: string; canWrite?: boolean; children?: React.ReactNode }) {
   const t = plan.timing;
   const before = plan.phase === "early" || plan.phase === "pre" || plan.phase === "soon";
   const after = plan.phase === "post" || plan.phase === "during";
@@ -27,8 +36,14 @@ export function TrainingCard({ plan, proteinLeft, children }: { plan: TrainingDa
             <Dumbbell className="size-4 text-persimmon" aria-hidden /> {PHASE_TEXT[plan.phase]}
           </span>
         }
-        subtitle={plan.done ? `Entreno de ${t.start} a ${t.end}` : plan.known ? `Sueles entrenar hacia las ${t.start}` : "Aún no sé a qué hora entrenas: supongo las 18:30"}
+        subtitle={plan.done ? `Entreno de ${t.start} a ${t.end}` : SUBTITLE[plan.source](t.start)}
+        className={!plan.done && canWrite && personId ? "mb-1" : undefined}
       />
+      {!plan.done && canWrite && personId ? (
+        <div className="mb-3 text-sm">
+          <TrainingTimeToday personId={personId} start={t.start} isToday={plan.source === "today"} />
+        </div>
+      ) : null}
       <div className="grid grid-cols-1 gap-2 text-sm sm:grid-cols-2">
         <div className={cn("rounded-xl p-3", before ? "bg-herb-soft/60" : "bg-paper-2", plan.done || plan.phase === "late" ? "opacity-60" : "")}>
           <p className="font-medium">

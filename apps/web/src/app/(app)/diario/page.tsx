@@ -2,7 +2,7 @@ import { Suspense } from "react";
 import Link from "next/link";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import { and, dailySummaries, eq, gte, lte, mealFeelings } from "@nutria/db";
-import { addDays, dailyQualityScore, dayLogStatus, NOVA_MIN_COVERAGE, novaCoverage, NUTRIENTS, todayIn, upfKcalPct } from "@nutria/nutrition";
+import { addDays, dailyQualityScore, dayLogStatus, NOVA_MIN_COVERAGE, novaCoverage, NUTRIENTS, todayIn, TRAINING_TIME_SOURCE, upfKcalPct } from "@nutria/nutrition";
 import { MacroSummary } from "@/components/diary/macro-summary";
 import { MealCard } from "@/components/diary/meal-card";
 import { CaffeineCard } from "@/components/diary/caffeine-card";
@@ -123,7 +123,7 @@ async function Content({ searchParams }: { searchParams: Promise<Record<string, 
         <div className="min-w-0 space-y-4">
         {mealsAround.session && mealsAround.weightKg ? (
           <Card>
-            <CardHeader title="Comida y entreno" subtitle={`${mealsAround.session.name ?? "Entreno"} · ${mealsAround.session.source === "logged" ? "registrado" : "hora habitual"}`} action={<Link href="/salud/ejercicio#comida-entreno" className="text-xs text-herb underline">Tu mejor momento</Link>} />
+            <CardHeader title="Comida y entreno" subtitle={`${mealsAround.session.name ?? "Entreno"} · ${TRAINING_TIME_SOURCE[mealsAround.session.source]}`} action={<Link href="/salud/ejercicio#comida-entreno" className="text-xs text-herb underline">Tu mejor momento</Link>} />
             <TrainingMeals session={mealsAround.session} meals={mealsAround.meals} weightKg={mealsAround.weightKg} nowMin={date === today ? minuteOfDay(ctx.person.timezone) : null} />
           </Card>
         ) : null}

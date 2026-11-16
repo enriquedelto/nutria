@@ -5,15 +5,15 @@ import {
   CAFFEINE_DEFAULT_HALF_LIFE_H,
   CAFFEINE_PREGNANCY_HALF_LIFE_H,
   clockToMinutes,
-  isoDow,
   medianTime,
   minutesToClock,
   todayIn,
   type CaffeineDose,
+  type TrainingTimeSource,
 } from "@nutria/nutrition";
 import { dayKindFor, getSportProfile } from "./sport";
 import { latestWeight } from "./targets";
-import { usualTrainingTime } from "./timing";
+import { plannedTrainingTime } from "./timing";
 
 const local = (d: Date, timeZone: string) => {
   const p = new Intl.DateTimeFormat("en-CA", { timeZone, year: "numeric", month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit", hourCycle: "h23" }).formatToParts(d);
@@ -90,8 +90,8 @@ export interface CaffeineDay {
   doses: CaffeineDoseRow[];
   /** Training start (minutes) on training days, else null. */
   trainingStart: number | null;
-  /** "logged" = today's workout, "usual" = median of past workouts, "default" = 18:30. */
-  trainingSource: "logged" | "usual" | "default" | null;
+  /** logged > today («solo para hoy») > fixed (sport profile) > usual (openGym median) > default 18:30. */
+  trainingSource: TrainingTimeSource | null;
   /** Minutes from 00:00 of `date` (after midnight → > 1440). */
   bedtime: number;
   bedtimeSource: "manual" | "sleep" | "default";
@@ -136,9 +136,9 @@ export async function caffeineDay(db: Database, personId: string, date: string, 
     trainingStart = clockToMinutes(local(real.startedAt!, tz).time);
     trainingSource = "logged";
   } else if (training) {
-    const usual = await usualTrainingTime(db, personId, tz, today, isoDow(date));
-    trainingStart = clockToMinutes(usual?.time ?? "18:30");
-    trainingSource = usual ? "usual" : "default";
+    const planned = await plannedTrainingTime(db, personId, tz, today, date, sport.profile);
+    trainingStart = clockToMinutes(planned.time);
+    trainingSource = planned.source;
   }
 
   return { date, doses, trainingStart, trainingSource, ...caffeinePrefs(p ?? null, bedUsual), weightKg: weight?.kg ?? null };

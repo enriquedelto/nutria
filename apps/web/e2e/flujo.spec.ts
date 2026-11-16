@@ -96,6 +96,8 @@ test("deporte: volumen, días de entreno, objetivos por día y creatina marcada 
   await page.getByRole("button", { name: /Competitivo/ }).click();
   await expect(page.getByText("Proteína: 2,0 g/kg ≈ 125 g al día")).toBeVisible();
   for (const d of ["lunes", "miércoles", "viernes"]) await page.getByRole("button", { name: d, exact: true }).click();
+  // Fixed training time for those days (wins over the openGym median).
+  for (const d of ["lunes", "miércoles", "viernes"]) await page.getByLabel(`Hora de entreno del ${d}`).fill("19:00");
   await expect(page.getByLabel(/Más hidratos los días de entreno/)).toBeChecked();
   await page.getByLabel(/Agua según tu peso y tu entreno/).uncheck();
   await page.getByRole("button", { name: "Guardar deporte" }).click();
@@ -180,8 +182,16 @@ test("proteína por comida y tarjeta del entreno en Hoy", async () => {
   // Training days (Mon/Wed/Fri in the sport test) show what to eat before and after.
   if (await page.getByText("Día de entreno: más hidratos").count()) {
     const card = page.locator("#entreno");
-    await expect(card.getByText(/Aún no sé a qué hora entrenas|Sueles entrenar/)).toBeVisible();
+    await expect(card.getByText("Entrenas a las 19:00 (tu hora fija)")).toBeVisible();
     await expect(card.getByText(/19–25 g de proteína con hidratos/)).toBeVisible();
+    // «Solo hoy» wins over the fixed time, and can be undone.
+    await card.getByRole("button", { name: "Cambiar hora" }).click();
+    await card.getByLabel("Hora de entreno de hoy").fill("20:15");
+    await card.getByRole("button", { name: "Solo hoy" }).click();
+    await expect(card.getByText("Hoy entrenas a las 20:15 (solo hoy)")).toBeVisible();
+    await expect(card.getByText(/antes de las 23:15/).first()).toBeVisible(); // 60 min + 2 h
+    await card.getByRole("button", { name: "Usar la de siempre" }).click();
+    await expect(card.getByText("Entrenas a las 19:00 (tu hora fija)")).toBeVisible();
   } else await expect(page.locator("#entreno")).toHaveCount(0);
   await page.goto("/ajustes/notificaciones");
   await expect(page.getByText("Proteína del día")).toBeVisible();

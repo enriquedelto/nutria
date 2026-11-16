@@ -20,6 +20,8 @@ export type SportValues = {
   cycleCarbs: boolean;
   waterAuto: boolean;
   gymHours: { from: string; to: string }[];
+  /** ISO weekday → "HH:MM" (empty: the usual time in openGym). */
+  trainingTimes: Record<string, string>;
 };
 
 const DAYS = ["L", "M", "X", "J", "V", "S", "D"];
@@ -120,6 +122,30 @@ export function SportForm({ personId, initial, openGymDays, weightKg }: { person
               ) : null}
             </div>
           </Field>
+
+          {v.trainingDays.length ? (
+            <Field label="Hora de entreno (opcional)" hint="Vacía: se usa tu hora habitual según openGym. Para un día suelto, cámbiala en la tarjeta de entreno de Hoy.">
+              <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+                {v.trainingDays.map((d) => (
+                  <div key={d} className="flex items-center gap-2">
+                    <span className="w-24 text-sm first-letter:uppercase">{DAY_NAMES[d - 1]}</span>
+                    <Input
+                      type="time"
+                      aria-label={`Hora de entreno del ${DAY_NAMES[d - 1]}`}
+                      value={v.trainingTimes[String(d)] ?? ""}
+                      onChange={(e) => {
+                        const next = { ...v.trainingTimes };
+                        if (e.target.value) next[String(d)] = e.target.value;
+                        else delete next[String(d)];
+                        set("trainingTimes", next);
+                      }}
+                      className="w-32"
+                    />
+                  </div>
+                ))}
+              </div>
+            </Field>
+          ) : null}
 
           <Field label="Horario del gimnasio" hint="Con él te digo a qué hora te conviene entrenar (cafeína sin afectar al sueño y comida previa a tiempo). Lo ves en Salud › Ejercicio.">
             <div className="space-y-2">

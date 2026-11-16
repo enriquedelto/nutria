@@ -1,6 +1,6 @@
 /** Nutrient timing around training: usual training time, the plan for today and quick protein ideas. */
 import { and, dailySummaries, desc, diaryEntries, eq, exerciseLogs, gte, isNotNull, persons, sql, type Database } from "@nutria/db";
-import { addDays, isoDow, medianTime, proteinDoseG, timingPhase, todayIn, trainingTiming, type TimingPhase, type TrainingTiming } from "@nutria/nutrition";
+import { addDays, isoDow, medianTime, plannedTrainingStart, proteinDoseG, timingPhase, todayIn, trainingTiming, type SportProfile, type TimingPhase, type TrainingTimeSource, type TrainingTiming } from "@nutria/nutrition";
 import { notify, QUICK_ACTIONS } from "./notify";
 import { dayKindFor, getSportProfile } from "./sport";
 import { latestWeight } from "./targets";
@@ -48,6 +48,15 @@ export async function proteinIdeas(db: Database, personId: string, today: string
   return rows.map((r) => ({ foodId: r.foodId!, name: r.name, grams: Math.round(r.grams), protein: Math.round(r.protein) }));
 }
 
+/**
+ * Planned start of a training day without a logged workout: «solo para hoy» > fixed time of the
+ * weekday (sport profile) > openGym median > 18:30. Duration from the openGym history (60 min).
+ */
+export async function plannedTrainingTime(db: Database, personId: string, timeZone: string, today: string, date: string, sp: SportProfile) {
+  const usual = await usualTrainingTime(db, personId, timeZone, today, isoDow(date));
+  return { ...plannedTrainingStart(sp, date, isoDow(date), usual?.time ?? null), durationMin: usual?.durationMin ?? 60 };
+}
+
 export interface TrainingDayPlan {
   timing: TrainingTiming;
   phase: TimingPhase;
@@ -55,6 +64,7 @@ export interface TrainingDayPlan {
   done: boolean;
   /** The start is the real one (logged) or the usual one; false = no history, default 18:30. */
   known: boolean;
+  source: TrainingTimeSource;
   proteinDoseG: number;
   ideas: ProteinIdea[];
 }
@@ -72,12 +82,13 @@ export async function trainingDayPlan(db: Database, personId: string, now = new 
   if (!w) return null;
   if (dayKindFor(today, today, logged.length > 0, sport.profile) !== "training") return null;
   const real = logged.find((l) => l.startedAt);
-  const usual = real ? null : await usualTrainingTime(db, personId, p.tz, today, isoDow(today));
-  const timing = real ? trainingTiming(clock(real.startedAt!, p.tz), real.min || 60, w.kg) : trainingTiming(usual?.time ?? "18:30", usual?.durationMin ?? 60, w.kg);
+  const planned = real ? null : await plannedTrainingTime(db, personId, p.tz, today, today, sport.profile);
+  const timing = real ? trainingTiming(clock(real.startedAt!, p.tz), real.min || 60, w.kg) : trainingTiming(planned!.time, planned!.durationMin, w.kg);
   let phase = timingPhase(timing, clock(now, p.tz));
   // Logged without a time, or logged while the clock says "during": the session is over.
   if (logged.length && (!real || phase === "during" || phase === "soon" || phase === "pre" || phase === "early")) phase = "post";
-  return { timing, phase, done: logged.length > 0, known: !!real || !!usual, proteinDoseG: proteinDoseG(w.kg), ideas: await proteinIdeas(db, personId, today) };
+  const source: TrainingTimeSource = real ? "logged" : planned!.source;
+  return { timing, phase, done: logged.length > 0, known: source !== "default", source, proteinDoseG: proteinDoseG(w.kg), ideas: await proteinIdeas(db, personId, today) };
 }
 
 /** Protein eaten on a day (from the cached summary). */
